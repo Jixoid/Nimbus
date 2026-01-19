@@ -13,16 +13,11 @@
 
 #pragma once
 
-#include <iostream>
-#include <memory>
-#include <vector>
-#include <cmath>
 #include <unordered_map>
 
 #include "Basis.h"
 
 #include "qcl/Control.hh"
-#include "qcl/View.hh"
 #include "qcl/Graphic.hh"
 
 using namespace std;
@@ -35,9 +30,13 @@ namespace qcl
 
   class application
   {
+    friend class window;
+
     public:
       application();
-      application(bool nMakeCurrent);
+      explicit application(bool nMakeCurrent);
+      explicit application(handle nOHID);
+      application(handle nOHID, bool nMakeCurrent);
       ~application();
   
 
@@ -46,12 +45,13 @@ namespace qcl
 
       unordered_map<handle, qcl::window*> WinList;
 
+
+    protected:
+      void Window_Reg(qcl::window* Win);
+      void Window_Dis(qcl::window* Win);
       
     public:
       void MakeCurrent();
-
-      void Window_Reg(qcl::window* Win);
-      void Window_Dis(qcl::window* Win);
       
       void PushMessage(qcl::control* Ctrl, controlMessages Msg);
       void PushTask(void (*Fun)(u0), u0 Data);

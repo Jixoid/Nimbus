@@ -6,18 +6,17 @@
   You should have received a copy of the GNU General Public License
   along with QAOS. If not, see <https://www.gnu.org/licenses/>.
 
-  Copyright (c) 2025 by Kadir Aydın.
+  Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
 
 
 #pragma once
 
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <bits/types.h>
-#include <bits/pthreadtypes.h>
+#include <sys/types.h>
+#include <pthread.h>
 
 
 #ifdef __cplusplus

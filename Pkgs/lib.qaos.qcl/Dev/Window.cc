@@ -14,10 +14,9 @@
 #define el else
 #define ef else if
 
-#include <memory>
-
 #include "Basis.h"
 
+#include "qcl/Application.hh"
 #include "qcl/Control.hh"
 #include "qcl/View.hh"
 #include "qcl/Window.hh"
@@ -131,10 +130,28 @@ namespace qcl
     Do_WindowStateChanged(State);
   }
 
+
+  void __DeleteSelf(u0 p1)
+  {
+    delete (window*)(p1);
+  }
+
+
+  void window::Handler_WindowClose()
+  {
+    if (Do_WindowClose())
+      CurrentApp->PushTask(&__DeleteSelf, (u0)(this));
+  }
+  
+
   void window::Do_WindowStateChanged(windowStates State)
   {
-    if (OnWindowStateChanged != Nil)
-      OnWindowStateChanged(this, State);
+    OnWindowStateChanged.Call(this, State);
+  }
+
+  bool window::Do_WindowClose()
+  {
+    return true; //(OnWindowClose ? OnWindowClose(this) : true);
   }
 
 }

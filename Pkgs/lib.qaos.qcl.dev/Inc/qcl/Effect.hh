@@ -25,6 +25,28 @@ using namespace jix;
 
 namespace qcl
 {
+  struct propError
+  {
+    public:
+      enum _y: u16
+      {
+        peOK      = 0,
+        peUnknown = 1,
+        peInvalid = 2,
+      };
+
+    public:
+      _y Type;
+      string Msg;
+
+    public:
+      propError(_y nType, string nMsg = "")
+        : Type(nType)
+        , Msg(nMsg)
+      {}
+  };
+
+
 
   class effect
   {
@@ -40,7 +62,7 @@ namespace qcl
       virtual void Update(size_i32 Size) = 0;
       virtual void Draw(surface *Surface, poit_f32 Pos) = 0;
 
-      virtual bool LoadProp(string Name, const jconf::Value& Prop);
+      virtual propError LoadProp(string Name, const jconf::Value& Prop);
   };
 
 }

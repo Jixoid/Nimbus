@@ -7,7 +7,7 @@
 
   - `Pkgs/lib.qaos.qcl`: Core UI framework (Controls, Views, Windows).
   - `Pkgs/lib.qaos.qcl.qstd`: QCL standard component library.
-  - `Pkgs/lib.qaos.qcl.opengl`: OpenGL integration.
+  - `Pkgs/lib.qaos.qcl.qgl`: OpenGL integration.
 
 
 ## 📜 License

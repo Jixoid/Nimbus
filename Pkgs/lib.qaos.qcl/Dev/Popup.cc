@@ -11,15 +11,9 @@
 
 
 
-#include <iostream>
 #include <memory>
-#include <vector>
-#include <cmath>
-
-#include "Basis.h"
 
 #include "qcl/Control.hh"
-#include "qcl/Graphic.hh"
 #include "qcl/Popup.hh"
 
 using namespace std;

@@ -69,6 +69,12 @@ namespace jconf
       , IsOwner(true)
     {}
 
+    // Float
+    Value(f64 Val)
+      : Handle(jc_new_float(Val))
+      , IsOwner(true)
+    {}
+
     // String
     Value(const char* Val)
       : Handle(jc_new_val((char*)Val))
@@ -173,6 +179,7 @@ namespace jconf
     bool isNull() const { return Handle == Nil; }
     bool isInt() const { return Handle && jc_is_int(Handle); }
     bool isBool() const { return Handle && jc_is_bool(Handle); }
+    bool isFloat() const { return Handle && jc_is_float(Handle); }
     bool isString() const { return Handle && jc_is_val(Handle); }
     bool isData() const { return Handle && jc_is_data(Handle); }
     bool isStruct() const { return Handle && jc_is_stc(Handle); }
@@ -202,6 +209,14 @@ namespace jconf
         throw runtime_error("Node is not bool");
       
       return jc_bool_get(Handle);
+    }
+
+    operator f64() const
+    {
+      if (!isFloat())
+        throw runtime_error("Node is not float");
+      
+      return jc_float_get(Handle);
     }
 
     operator string() const

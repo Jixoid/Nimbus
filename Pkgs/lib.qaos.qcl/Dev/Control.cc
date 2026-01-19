@@ -11,10 +11,9 @@
 
 
 
+#include "qcl/Types.hh"
 #define el else
 #define ef else if
-
-#include <memory>
 
 #include "Basis.h"
 
@@ -24,6 +23,7 @@
 #include "qcl/Control.hh"
 #include "qcl/Graphic.hh"
 #include "qcl/Window.hh"
+#include "qcl/Effect.hh"
 #include "qcl/Application.hh"
 #include "qcl/DynamicLoad.hh"
 #include "qcl/Popup.hh"
@@ -48,7 +48,7 @@ namespace qcl
 
   control::control()
   {
-    Surface = make_shared<qcl::surface>(Size.W, Size.H);
+    Surface = qsh<qcl::surface>(new qcl::surface(Size.W, Size.H));
   }
 
   control::~control()
@@ -62,21 +62,7 @@ namespace qcl
   }
 
   void control::Draw_after()
-  {
-    //Surface->Set_Color(color(1,0,0));
-    //Surface->Set_LineSize(1);
-    
-    //Surface->Draw_Rect({0,0, (f32)Size.W, (f32)Size.H});
-    //Surface->Stroke();
-
-
-    //Surface->Set_FontSize(8);
-    //Surface->Set_Color(color(0,1,0));
-    //Surface->Set_Pos({5,5});
-    //string Cac = to_string(Size.W) +"x"+ to_string(Size.H);
-    //Surface->Draw_Text(Cac.c_str());
-    //Surface->Fill();
-  }
+  {}
 
   void control::Draw()
   {}
@@ -225,15 +211,15 @@ namespace qcl
   }
 
 
-  bool control::LoadProp(string Name, const jconf::Value& Prop)
+  propError control::LoadProp(string Name, const jconf::Value& Prop)
   {
 
     if (Name == "Effects")
     {
-      vector<shared_ptr<effect>> Nat;
+      vector<qsh<effect>> Nat;
 
       if (!Prop.isArray())
-        return false;
+        return propError::peInvalid;
       
 
       for (u32 i = 0; i < Prop.size(); i++)
@@ -241,33 +227,23 @@ namespace qcl
         jconf::Value X = Prop[i];
 
         if (!X.isStruct())
-          return false;
+          return propError::peInvalid;
 
 
         
         auto Cac = (string)X["&type"];
         if (Cac.empty())
-          return false;
+          return propError::peInvalid;
 
         
         auto it = dyn::EffList.find(Cac);
         if (it == dyn::EffList.end())
-          return false;
+          return propError::peInvalid;
 
-        Nat.push_back(shared_ptr<effect>(it->second()));
+        Nat.push_back(qsh<effect>(it->second()));
 
 
-        // Iterate over struct keys - API doesn't seem to support iterating keys directly easily
-        // reusing underlying handle or if jconf::Value has iterator (checked header, no iterator exposed directly?)
-        // JConf.hh shows: u32 size() const { if (isStruct()) return jc_stc_count(Handle); ... }
-        // But no key iterator. However, the original code used jc_StcC and jc_StcInd.
-        // I should probably use the underlying handle for iteration if the C++ API doesn't wrapper it.
-        // Or wait, the original code used:
-        // for (u32 j = 0; j < jc_StcC(X); j++) { auto SX = jc_StcInd(X, j, &Te); ... }
         
-        // Let's check JConf.hh again. It has no key iterator in Value class.
-        // But Value has getHandle().
-        // So I can do:
         jc_obj H = X.getHandle();
         for (u32 j = 0; j < jc_stc_count(H); j++)
         {
@@ -275,28 +251,26 @@ namespace qcl
           auto SX = jconf::Value(jc_stc_index(H, j, &Te));
           
           Cac = string(Te);
+          jc_dis_str(Te);
 
           if (Cac == "&type")
             continue;
 
-          if (!Nat.back()->LoadProp(Cac, SX))
-            return false;
-          
-          jc_dis_str(Te); // Original code used jc_DisStr(Te). Check if that was macro for jc_dis_str.
-          // Assuming jc_DisStr is macro for jc_dis_str.
+          if (auto Err = Nat.back()->LoadProp(Cac, SX); Err.Type != propError::peOK)
+            return Err;
         }
 
       }
     
 
       Effects = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Poit")
     {
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
       if (auto Buf = Prop["x"]; !Buf.isNull())
         Poit.X = (i64)Buf;
@@ -305,13 +279,13 @@ namespace qcl
         Poit.Y = (i64)Buf;
 
       Flag_Add(DirtyRebound);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Size")
     {
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
       if (auto Buf = Prop["w"]; !Buf.isNull())
         Size.W = (i64)Buf;
@@ -320,13 +294,13 @@ namespace qcl
         Size.H = (i64)Buf;
 
       Flag_Add(DirtyResize | DirtyRebound);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "MinSize")
     {
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
       if (auto Buf = Prop["w"]; !Buf.isNull())
         MinSize.W = (i64)Buf;
@@ -335,13 +309,13 @@ namespace qcl
         MinSize.H = (i64)Buf;
 
       //Flag_Add(DirtyResize | DirtyRebound);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "MaxSize")
     {
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
       if (auto Buf = Prop["w"]; !Buf.isNull())
         MaxSize.W = (i64)Buf;
@@ -350,57 +324,74 @@ namespace qcl
         MaxSize.H = (i64)Buf;
 
       //Flag_Add(DirtyResize | DirtyRebound);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Tag")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       Tag = (i64)Prop;
       
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Visible")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Visible = (bool)Prop;
 
-      return true;
+      if (Parent != Nil)
+        Parent->Flag_Add(DirtyTiling);
+
+      return propError::peOK;
     }
 
     ef (Name == "Enabled")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Enabled = (bool)Prop;
 
-      return true;
+      Flag_Add(DirtyDraw);
+      return propError::peOK;
     }
 
     ef (Name == "AutoSize")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       AutoSize = (bool)Prop;
 
-      return true;
+      if (Parent != Nil)
+        Parent->Flag_Add(DirtyTiling);
+
+      return propError::peOK;
     }
 
     ef (Name == "Transparent")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Transparent = (bool)Prop;
 
-      return true;
+      return propError::peOK;
+    }
+
+    ef (Name == "Opacity")
+    {
+      if (!Prop.isFloat())
+        return propError::peInvalid;
+
+      Opacity = (f64)Prop;
+
+      return propError::peOK;
     }
 
     ef (Name == "Anchors")
@@ -408,25 +399,26 @@ namespace qcl
       controlAnchors Nat = this->Anchors;
 
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
 
-      auto Handler = [&](control* This, const jconf::Value& Stc, controlAnchor* Anchor) -> bool
+      auto Handler = [this](control* This, const jconf::Value& Stc, controlAnchor* Anchor) -> pair<bool, string>
       {
         if (!Stc.isStruct())
-          return false;
+          return {false," is not a struct"};
 
-        string Cac;
         
         // Active
-        Anchor->Active = (bool)Stc["active"];
+        if (auto Buf = Stc["active"]; !Buf.isNull())
+          Anchor->Active = (bool)Stc["active"];
 
         // Control
-        Cac = (string)Stc["control"];
-        if (!Cac.empty())
+        if (auto Buf = Stc["control"]; !Buf.isNull())
         {
+          string Cac = (string)Buf;
+
           if (Cac[0] != '@')
-            return false;
+            return {false, "/control is not a citation"};
 
           if (Cac == "@^")
             Anchor->Control = this->Parent;
@@ -434,13 +426,14 @@ namespace qcl
             Anchor->Control = __findInScope(This, Cac.substr(1));
 
           if (Anchor->Control == Nil)
-            return false;
+            return {false, "/control is not finded"};
         }
 
         // Size
-        Cac = (string)Stc["side"];
-        if (!Cac.empty())
+        if (auto Buf = Stc["side"]; !Buf.isNull())
         {
+          string Cac = (string)Buf;
+
           if (Cac == "beg" || Cac == "<-")
             Anchor->Side = controlAnchorSide::casBegin;
 
@@ -448,43 +441,42 @@ namespace qcl
             Anchor->Side = controlAnchorSide::casEnd;
 
           else
-            return false;
+            return {false, "/side (use 'beg' | 'end')"};
         }
 
-        
-        return true;
+        return {true, ""};
       };
 
 
       if (auto Buf = Prop["left"]; !Buf.isNull())
-        if (!Handler(this, Buf, &Nat.Left))
-          return false;
+        if (auto Err = Handler(this, Buf, &Nat.Left); !Err.first)
+          return propError(propError::peInvalid, "Invalid: /left" +Err.second);
 
       if (auto Buf = Prop["top"]; !Buf.isNull())
-        if (!Handler(this, Buf, &Nat.Top))
-          return false;
+        if (auto Err = Handler(this, Buf, &Nat.Top); !Err.first)
+          return propError(propError::peInvalid, "Invalid: /top" +Err.second);
 
       if (auto Buf = Prop["righ"]; !Buf.isNull())
-        if (!Handler(this, Buf, &Nat.Righ))
-          return false;
+        if (auto Err = Handler(this, Buf, &Nat.Righ); !Err.first)
+          return propError(propError::peInvalid, "Invalid: /righ" +Err.second);
 
       if (auto Buf = Prop["bot"]; !Buf.isNull())
-        if (!Handler(this, Buf, &Nat.Bot))
-          return false;
+        if (auto Err = Handler(this, Buf, &Nat.Bot); !Err.first)
+          return propError(propError::peInvalid, "Invalid: /bot" +Err.second);
 
 
       Anchors = (Nat);
 
       if (Parent != Nil)
-        Parent->Do_Resize();
+        Parent->Flag_Add(DirtyTiling);
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Margins")
     {
       if (!Prop.isStruct())
-        return false;
+        return propError::peInvalid;
 
 
       if (auto Buf = Prop["left"]; !Buf.isNull())
@@ -499,16 +491,42 @@ namespace qcl
       if (auto Buf = Prop["bot"]; !Buf.isNull())
         Margins.Y2 = (i64)Buf;
 
-      return true;
+      if (Parent != Nil)
+        Parent->Flag_Add(DirtyTiling);
+
+      return propError::peOK;
+    }
+
+    ef (Name == "Paddings")
+    {
+      if (!Prop.isStruct())
+        return propError::peInvalid;
+
+
+      if (auto Buf = Prop["left"]; !Buf.isNull())
+        Paddings.X1 = (i64)Buf;
+
+      if (auto Buf = Prop["righ"]; !Buf.isNull())
+        Paddings.X2 = (i64)Buf;
+
+      if (auto Buf = Prop["top"]; !Buf.isNull())
+        Paddings.Y1 = (i64)Buf;
+
+      if (auto Buf = Prop["bot"]; !Buf.isNull())
+        Paddings.Y2 = (i64)Buf;
+
+      Flag_Add(DirtyTiling);
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool control::LoadFunc(string Name, point Func)
+  bool control::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    #define makro(X) (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
+
 
     if makro(OnPaint)
     ef makro(OnPaint_before)
@@ -537,6 +555,7 @@ namespace qcl
     switch (Msg)
     {
       case controlMessages::cmPaint: Handler_Paint(); break;
+      case controlMessages::cmReset: Do_Reset(); break;
 
       default: break;
     }
@@ -597,19 +616,21 @@ namespace qcl
 
 
 
+  void control::Do_Reset()
+  {
+    Handler_Paint();
+  }
+
   void control::Do_Paint()
   {
     Draw_before();
-    if (OnPaint_before != Nil)
-      OnPaint_before(this);
+    OnPaint_before.Call(this);
 
     Draw();
-    if (OnPaint != Nil)
-      OnPaint(this);
+    OnPaint.Call(this);
 
     Draw_after();
-    if (OnPaint_after != Nil)
-      OnPaint_after(this);
+    OnPaint_after.Call(this);
 
 
     if (!Enabled)
@@ -637,39 +658,32 @@ namespace qcl
   {
     Surface->Set_Size(max<i32>(0,Size.W), max<i32>(0,Size.H));
 
-    
-    if (OnResize != Nil)
-      OnResize(this);
+    OnResize.Call(this);
   }
 
   void control::Do_Click()
   {
-    if (OnClick != Nil)
-      OnClick(this);
+    OnClick.Call(this);
   }
 
   void control::Do_ClickEx(poit_i32 Pos)
   {
-    if (OnClickEx != Nil)
-      OnClickEx(this, Pos);
+    OnClickEx.Call(this, Pos);
   }
 
   void control::Do_DblClick()
   {
-    if (OnDblClick != Nil)
-      OnDblClick(this);
+    OnDblClick.Call(this);
   }
 
   void control::Do_MouseDown(poit_i32 Pos, shiftStateSet Button, shiftStateSet State)
   {
-    if (OnMouseDown != Nil)
-      OnMouseDown(this, Pos, Button, State);
+    OnMouseDown.Call(this, Pos, Button, State);
   }
 
   void control::Do_MouseUp(poit_i32 Pos, shiftStateSet Button, shiftStateSet State)
   {
-    if (OnMouseUp != Nil)
-      OnMouseUp(this, Pos, Button, State);
+    OnMouseUp.Call(this, Pos, Button, State);
 
 
     // Click
@@ -685,7 +699,7 @@ namespace qcl
       return;
 
 
-    if (OnDblClick == Nil || GetTickCount() -LastClick > 300)
+    if (OnDblClick || GetTickCount() -LastClick > 300)
     {
       Do_ClickEx(Pos);
       Do_Click();
@@ -701,38 +715,32 @@ namespace qcl
 
   void control::Do_MouseMove (poit_i32 Pos, shiftStateSet State)
   {
-    if (OnMouseMove != Nil)
-      OnMouseMove(this, Pos, State);
+    OnMouseMove.Call(this, Pos, State);
   }
 
   void control::Do_KeyDown(char *Key, u32 KeyCode, shiftStateSet State)
   {
-    if (OnKeyDown != Nil)
-      OnKeyDown(this, Key, KeyCode, State);
+    OnKeyDown.Call(this, Key, KeyCode, State);
   }
 
   void control::Do_KeyUp(char *Key, u32 KeyCode, shiftStateSet State)
   {
-    if (OnKeyUp != Nil)
-      OnKeyUp(this, Key, KeyCode, State);
+    OnKeyUp.Call(this, Key, KeyCode, State);
   }
 
   void control::Do_ScrollVert(poit_i32 Pos, i16 Delta, shiftStateSet State)
   {
-    if (OnScrollVert != Nil)
-      OnScrollVert(this, Pos, Delta, State);
+    OnScrollVert.Call(this, Pos, Delta, State);
   }
 
   void control::Do_ScrollHorz(poit_i32 Pos, i16 Delta, shiftStateSet State)
   {
-    if (OnScrollHorz != Nil)
-      OnScrollHorz(this, Pos, Delta, State);
+    OnScrollHorz.Call(this, Pos, Delta, State);
   }
 
   void control::Do_StateChanged(controlStateSet State)
   {
-    if (OnStateChanged != Nil)
-      OnStateChanged(this, State);
+    OnStateChanged.Call(this, State);
   }
 
 }

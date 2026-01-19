@@ -11,6 +11,7 @@
 
 
 
+#include "qcl/Types.hh"
 #define el else
 #define ef else if
 
@@ -28,6 +29,7 @@
 #include "qcl/View.hh"
 #include "qcl/Effect.hh"
 #include "qcl/Popup.hh"
+#include "qcl/Platform.hh"
 #include "qcl/DynamicLoad.hh"
 
 using namespace std;
@@ -52,42 +54,21 @@ namespace qcl::dyn
 
 
 
-  qdl LoadQDL_Arr(const jconf::Value& Arr, string Scope);
-
-  control* LoadQDL_Stc(const jconf::Value& Stc, string Scope, u32 Index)
+  [[gnu::noreturn]] void __qcl_error(string Msg)
   {
-    jconf::Value Cac;
+    platform::qcl_error(Msg.c_str());
+  }
 
 
+  
+  void LoadQDL_Arr(const jconf::Value& Arr, view *Par, string Scope);
 
-    // Name
-    Cac = Stc["&name"];
-    if (!Cac.isString())
-      throw runtime_error("Wrong type, value was expected: " +Scope+ "["+ std::to_string(Index) +"] -> &name");
-
-    string Name = (string)Cac;
-       
-
-
-    // Type
-    Cac = Stc["&type"];
-    if (!Cac.isString())
-      throw runtime_error("Wrong type, value was expected: " +Scope+ "/"+ Name +" -> &type");
-
-    string Type = (string)Cac;
-       
-
-
-    // Create New
-    auto it = RegList.find(Type);
-    if (it == RegList.end())
-      throw runtime_error("Species name not found: " +Scope+ "/"+ Name +" -> &type = \""+Type+"\"");
-
-
-    control *Self = it->second();
-
+  void LoadQDL_Stc2(const jconf::Value& Stc, control *Self, view *Par, string Scope, u32 Index)
+  {
     Self->QDL = jc_nref(Stc.getHandle());
-    Self->Name = Name;
+
+
+    jconf::Value Cac;
 
 
     // Style
@@ -109,7 +90,7 @@ namespace qcl::dyn
       {
         jconf::Value Obj = Cac[i];
         if (!Obj.isString())
-          throw runtime_error("Wrong type, value was expected: " +Scope+ "/"+ Name +" -> &style["+to_string(i)+"]");
+          throw runtime_error("Wrong type, value was expected: " +Scope+"/"+Self->Name+"/&style["+to_string(i)+"]");
 
 
         string Style = (string)Obj;
@@ -117,8 +98,8 @@ namespace qcl::dyn
       }
     }
 
-    else
-      throw runtime_error("Wrong type, value or array was expected: " +Scope+ "/"+ Name +" -> &style");
+    el
+      throw runtime_error("Wrong type, value or array was expected: " +Scope+"/"+Self->Name+"/&style");
     
       
 
@@ -128,27 +109,59 @@ namespace qcl::dyn
     if (!Cac.isNull())
     {
       if (!Cac.isArray())
-        throw runtime_error("Wrong type, array was expected: " +Scope+ "/"+ Name +" -> &subs");
+        throw runtime_error("Wrong type, array was expected: " +Scope+"/"+Self->Name+"/&subs");
       
       else
       {
-        if (dynamic_cast<qcl::view*>(Self) == Nil)
-          throw runtime_error("This component is not of type qcl::view: " +Scope+ "/"+ Name);
-
-
-        auto Childs = LoadQDL_Arr(Cac, Scope+"/"+Name);
-
-        for (auto &X: Childs)
-          dynamic_cast<qcl::view*>(Self)->Child_Add(shared_ptr<qcl::control>(X));
-
+        if (auto C = dynamic_cast<qcl::view*>(Self); C)
+          LoadQDL_Arr(Cac, C, Scope+"/"+Self->Name);
+        el
+          throw runtime_error("This component is not of type qcl::view: " +Scope+"/"+Self->Name);
       }
     }
 
-
-    return Self;
   }
 
-  qdl LoadQDL_Arr(const jconf::Value& Arr, string Scope)
+  void LoadQDL_Stc(const jconf::Value& Stc, view *Par, string Scope, u32 Index)
+  {
+    jconf::Value Cac;
+
+
+    // Name
+    Cac = Stc["&name"];
+    if (!Cac.isString())
+      throw runtime_error("Wrong type, value was expected: " +Scope+ "["+ std::to_string(Index) +"]/&name");
+
+    string Name = (string)Cac;
+       
+
+
+    // Type
+    Cac = Stc["&type"];
+    if (!Cac.isString())
+      throw runtime_error("Wrong type, value was expected: " +Scope+"/"+Name+"/&type");
+
+    string Type = (string)Cac;
+       
+
+
+    // Create New
+    auto it = RegList.find(Type);
+    if (it == RegList.end())
+      throw runtime_error("Species name not found: " +Scope+"/"+Name+"/&type = \""+Type+"\"");
+
+
+    qsh<control> Self = qsh<control>(it->second());
+    Par->Child_Add(Self);
+
+    Self->Name = Name;
+
+
+    // Absolute
+    LoadQDL_Stc2(Stc, Self.get(), Par, Scope, Index);
+  }
+
+  void LoadQDL_Arr(const jconf::Value& Arr, view *Par, string Scope)
   {
     vector<shared_ptr<control>> Ret;
 
@@ -159,15 +172,13 @@ namespace qcl::dyn
         throw runtime_error("Wrong type, struct was expected: " +Scope +"["+ std::to_string(i) +"]");
 
       
-      Ret.push_back(shared_ptr<control>(LoadQDL_Stc(Obj, Scope, i)));
+      LoadQDL_Stc(Obj, Par, Scope, i);
     }
-
-    return Ret;
   }
 
 
 
-  pair<bool, shared_ptr<popup_item>> __popup_load_items(const jconf::Value& Node, string Scope, unordered_map<string, point> &FuncMap)
+  pair<bool, shared_ptr<popup_item>> __popup_load_items(const jconf::Value& Node, string Scope, unordered_map<string, qev_seed> &FuncMap)
   {
     if (!Node.isArray())
       return {false, {}};
@@ -204,7 +215,7 @@ namespace qcl::dyn
         auto VIt = Sub["&subs"];
         if (!VIt.isNull())
         {
-          auto SThe = __popup_load_items(VIt, Scope +"/"+ Cac, FuncMap);
+          auto SThe = __popup_load_items(VIt, Scope+"/"+Cac, FuncMap);
 
           if (!SThe.first)
             return {false, {}};
@@ -228,10 +239,10 @@ namespace qcl::dyn
           auto it = FuncMap.find(Prop_Func);
 
           if (it == FuncMap.end())
-            throw runtime_error("Func not found in code: " +Scope+" -> "+"OnClick" +" = "+ Prop_Func);
+            throw runtime_error("Func not found in code: " +Scope+"/"+"OnClick" +" = "+ Prop_Func);
 
 
-          Tmp->OnClick = (void (*)(qcl::control*))it->second;
+          it->second.ToLoad(Tmp->OnClick);
         }
 
 
@@ -246,7 +257,7 @@ namespace qcl::dyn
   }
 
 
-  void LoadQDL_Popup(popup *Ctrl, string Scope, unordered_map<string, point> &FuncMap)
+  void LoadQDL_Popup(popup *Ctrl, string Scope, unordered_map<string, qev_seed> &FuncMap)
   {
     jconf::Value Node = jconf::Value(Ctrl->QDL, false)["Items"];
     // Assuming Ctrl->QDL is jc_obj/stc handle, we wrap it.
@@ -255,30 +266,30 @@ namespace qcl::dyn
       return;
 
     ef (!Node.isArray())
-      throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+" -> "+"Items");
+      throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"/"+"Items");
     
 
 
-    auto Temp = __popup_load_items(Node, Scope+"/"+Ctrl->Name +" -> Items", FuncMap);
+    auto Temp = __popup_load_items(Node, Scope+"/"+Ctrl->Name+"/Items", FuncMap);
     if (!Temp.first)
-      throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+" -> "+"Items");
+      throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"/"+"Items");
 
 
     Ctrl->Items = Temp.second;
     Ctrl->VItems = Ctrl->Items.get();
   }
 
-  void LoadQDL_Prop(control* Ctrl, string Scope, const jconf::Value& Styles, unordered_map<string, point> &FuncMap)
+  void LoadQDL_Prop(control* Ctrl, string Scope, const jconf::Value& Styles, unordered_map<string, qev_seed> &FuncMap)
   {
     // Set Styles
     for (u32 s = 0; s < Ctrl->Style.size(); s++)
     {
       jconf::Value Style = Styles[Ctrl->Style[s]];
       if (Style.isNull())
-        throw runtime_error("struct was expected: root/&styles -> " +Ctrl->Style[s]);
+        throw runtime_error("struct was expected: root/&styles/"+Ctrl->Style[s]);
 
       else if (!Style.isStruct())
-        throw runtime_error("Wrong type, struct was expected: root/&styles -> " +Ctrl->Style[s]);
+        throw runtime_error("Wrong type, struct was expected: root/&styles/"+Ctrl->Style[s]);
 
 
       jc_obj H = Style.getHandle();
@@ -306,18 +317,19 @@ namespace qcl::dyn
           auto it = FuncMap.find(Prop_Func);
 
           if (it == FuncMap.end())
-            throw runtime_error("Func not found in code: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+" -> "+Prop_Name +" = "+ Prop_Func);
+            throw runtime_error("Func not found in code: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+"/"+Prop_Name +" = "+ Prop_Func);
 
 
           if (!Ctrl->LoadFunc(Prop_Name.substr(1), it->second))
-            throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+" -> "+Prop_Name);
+            throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+"/"+Prop_Name);
         }
 
-        else
-        {
-          if (!Ctrl->LoadProp(Prop_Name, Prop))
-            throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+" -> "+Prop_Name);
-        }
+        ef (auto Err = Ctrl->LoadProp(Prop_Name, Prop); Err.Type != propError::peOK) switch (Err.Type)
+          {
+            case propError::peOK: break;
+            case propError::peUnknown: __qcl_error("Unknown prop: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+"/"+Prop_Name); break;
+            case propError::peInvalid: __qcl_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"("+Ctrl->Style[s]+")"+"/"+Prop_Name +", Error: "+Err.Msg); break;
+          }
       }
 
     }
@@ -342,91 +354,85 @@ namespace qcl::dyn
 
 
       
-      if (Prop_Name[0] == '^')
-      {
-        string Prop_Func;
+        if (Prop_Name[0] == '^')
+        {
+          string Prop_Func;
 
-        Prop_Func = (string)Prop;
-
-
-        auto it = FuncMap.find(Prop_Func);
-
-        if (it == FuncMap.end())
-          throw runtime_error("Func not found in code: " +Scope+"/"+Ctrl->Name+" -> "+Prop_Name +" = "+ Prop_Func);
+          Prop_Func = (string)Prop;
 
 
-        if (!Ctrl->LoadFunc(Prop_Name.substr(1), it->second))
-          throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+" -> "+Prop_Name);
+          auto it = FuncMap.find(Prop_Func);
+
+          if (it == FuncMap.end())
+            throw runtime_error("Func not found in code: " +Scope+"/"+Ctrl->Name+"/"+Prop_Name +" = "+ Prop_Func);
+
+
+          if (!Ctrl->LoadFunc(Prop_Name.substr(1), it->second))
+            throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"/"+Prop_Name);
+        }
+
+        ef (auto C = dynamic_cast<qcl::popup*>(Ctrl); C != Nil && Prop_Name == "Items")
+          {}
+
+        ef (auto Err = Ctrl->LoadProp(Prop_Name, Prop); Err.Type != propError::peOK) switch (Err.Type)
+          {
+            case propError::peOK: break;
+            case propError::peUnknown: __qcl_error("Unknown prop: " +Scope+"/"+Ctrl->Name+"/"+Prop_Name); break;
+            case propError::peInvalid: __qcl_error("Invalid prop: " +Scope+"/"+Ctrl->Name+"/"+Prop_Name +", Error: "+Err.Msg); break;
+          }
       }
 
-      ef (auto C = dynamic_cast<qcl::popup*>(Ctrl); C != Nil && Prop_Name == "Items")
-      {}
 
-      else
-      {
-        if (!Ctrl->LoadProp(Prop_Name, Prop))
-          throw runtime_error("Invalid prop: " +Scope+"/"+Ctrl->Name+" -> "+Prop_Name);
-      }
-    }
+      // Popup
+      if (auto C = dynamic_cast<qcl::popup*>(Ctrl); C != Nil)
+        LoadQDL_Popup(C, Scope, FuncMap);
 
 
-    // Popup
-    if (auto C = dynamic_cast<qcl::popup*>(Ctrl); C != Nil)
-      LoadQDL_Popup(C, Scope, FuncMap);
-
-
-    if (auto C = dynamic_cast<qcl::view*>(Ctrl); C != Nil)
-      for (auto &X: C->Childs)
-        LoadQDL_Prop(X.get(), Scope+"/"+Ctrl->Name, Styles, FuncMap);
+      if (auto C = dynamic_cast<qcl::view*>(Ctrl); C != Nil)
+        for (auto &X: C->Childs)
+          LoadQDL_Prop(X.get(), Scope+"/"+Ctrl->Name, Styles, FuncMap);
     }
   }
 
-  qdl Load_FormFile(string FPath, unordered_map<string, point> FuncMap)
+
+  void loadFromFile(control *Ctrl, string FPath, unordered_map<string, qev_seed> FuncMap)
   {
     // Open File
     jconf::Value DL = jconf::Value::Parse(FPath);
-   
     if (DL.isNull())
       throw runtime_error("Corrupt qdl file: " +FPath);
 
 
-    DL.saveBin(FPath+'b'); // jconf::Value::saveBin expects handle to be set.
 
+    // Root
+    jconf::Value Root = DL["&root"];
+    if (!Root.isStruct())
+      throw runtime_error("struct was expected: /&root: " +FPath);
 
-    // Load Comps
-    jconf::Value Comps = DL["&subs"];
-    if (!Comps.isArray())
-      throw runtime_error("array was expected: root -> &subs: " +FPath);
+    LoadQDL_Stc2(Root, Ctrl, Nil, "", 0);
+
     
-    auto Ret = LoadQDL_Arr(Comps, "root");
-
-
     // Load Design
     jconf::Value Styles = DL["&styles"];
     if (!Styles.isStruct())
-      throw runtime_error("struct was expected: root -> &styles: " +FPath);
-
-    for (auto &X: Ret)
-      LoadQDL_Prop(X.get(), "root", Styles, FuncMap);
-
-    return Ret;
+      throw runtime_error("struct was expected: /&styles: " +FPath);
+    
+    LoadQDL_Prop(Ctrl, "", Styles, FuncMap);
   }
 
 
 
-  shared_ptr<control> FindFromName(qdl QDL, string Name)
+  qsh<control> findFromName(view *View, string Name)
   {
-    for (auto &X: QDL)
-    {
+    for (auto &X: View->Childs)
       if (X->Name == Name)
         return X;
 
-      ef (auto C = dynamic_pointer_cast<view>(X); C != Nil)
+      ef (auto C = dynamic_cast<view*>(X.get()); C != Nil)
       {
-        if (auto B = FindFromName(C->Childs, Name); B != Nil)
+        if (auto B = findFromName(C, Name); B != Nil)
           return B;
       }
-    }
 
     return Nil;
   }

@@ -11,11 +11,9 @@
 
 
 
-#include <format>
 #define ef else if
 #define el else
 
-#include <memory>
 #include <vector>
 #include <ranges>
 #include <algorithm>
@@ -24,7 +22,6 @@
 
 #include "qcl/Control.hh"
 #include "qcl/View.hh"
-#include "qcl/Graphic.hh"
 #include "qcl/Application.hh"
 #include "qcl/Platform.hh"
 
@@ -83,14 +80,14 @@ namespace qcl
   }
 
 
-  void view::Child_Add(shared_ptr<control> Ctrl)
+  void view::Child_Add(qsh<control> Ctrl)
   {
     if (Ctrl->Parent != Nil)
       Ctrl->Parent->Child_Rem(Ctrl.get());
 
 
     auto it = std::ranges::find_if(Childs.begin(), Childs.end(),
-      [&](const shared_ptr<control>& c)
+      [&](const qsh<control>& c)
       {
         return c.get() == Ctrl.get();
       }
@@ -110,7 +107,7 @@ namespace qcl
   void view::Child_Rem(control* Ctrl)
   {
     auto it = std::ranges::find_if(Childs.begin(), Childs.end(),
-      [&](const std::shared_ptr<control>& c)
+      [&](const qsh<control>& c)
       {
         return c.get() == Ctrl;
       }
@@ -171,6 +168,29 @@ namespace qcl
 
   void view::Draw_after()
   {
+
+    #ifdef _QCL_DBG
+      Surface->Set_LineSize(1);
+
+      Surface->Set_Color(color(0,0.3,1));
+      l_Bounds: {
+        Surface->Draw_Rect({
+          (f32)(ClientPos.X +ClientBound.X1), (f32)(ClientPos.Y +ClientBound.Y1),
+          (f32)(ClientPos.X +ClientBound.X2), (f32)(ClientPos.Y +ClientBound.Y2),
+        });
+        Surface->Draw_Line(
+          {(f32)(ClientPos.X +ClientBound.X1), (f32)(ClientPos.Y +ClientBound.Y1)},
+          {(f32)(ClientPos.X +ClientBound.X2), (f32)(ClientPos.Y +ClientBound.Y2)}
+        );
+        Surface->Draw_Line(
+          {(f32)(ClientPos.X +ClientBound.X2), (f32)(ClientPos.Y +ClientBound.Y1)},
+          {(f32)(ClientPos.X +ClientBound.X1), (f32)(ClientPos.Y +ClientBound.Y2)}
+        );
+        Surface->Stroke();
+      }
+    #endif
+
+
     for (auto &X: Childs)
     {
       if (!X->Visible)
@@ -178,14 +198,30 @@ namespace qcl
 
       Surface->Set_Pos({ (f32)(ClientPos.X + X->Poit.X), (f32)(ClientPos.Y + X->Poit.Y) });
       Surface->Set_Source(X->Surface);
-      Surface->Paint();
 
+      if (X->Opacity == 1)
+        Surface->Paint();
+      ef (X->Opacity == 0);
+      el
+        Surface->PaintA(X->Opacity);
+      
+      
+      
+      #ifdef _QCL_DBG
+      Surface->Set_LineSize(1);
+      Surface->Set_FontSize(8);
+      
+      Surface->Set_Color(color(1,0,0));
+      l_Edge: {
+        Surface->Draw_Rect({
+          (f32)(ClientPos.X + X->Poit.X), (f32)(ClientPos.Y + X->Poit.Y),
+          (f32)(ClientPos.X + X->Poit.X) +X->Size.W, (f32)(ClientPos.Y + X->Poit.Y) +X->Size.H
+        });
+        Surface->Stroke();
+      }
 
-      continue;
-      l_Debug: {
-        Surface->Set_Color(color(0,0,1));
-        Surface->Set_LineSize(1);
-        
+      Surface->Set_Color(color(0,0.3,1));
+      l_Corner: {
         Surface->Set_Pos({
           (f32)(ClientPos.X + X->Poit.X) +5,
           (f32)(ClientPos.Y + X->Poit.Y),
@@ -245,6 +281,16 @@ namespace qcl
         });
         Surface->Stroke();
       }
+
+      Surface->Set_Color(color(0,1,0));
+      l_Size: {
+        Surface->Set_Pos({(f32)(ClientPos.X + X->Poit.X) +5, (f32)(ClientPos.Y + X->Poit.Y) +5});
+        string Cac = to_string(X->Size.W) +"x"+ to_string(X->Size.H);
+        Surface->Draw_Text(Cac.c_str());
+        Surface->Fill();
+      }
+
+      #endif
     }
 
 
@@ -302,10 +348,10 @@ namespace qcl
 
 
 
-  bool view::LoadProp(string Name, const jconf::Value& Prop)
+  propError view::LoadProp(string Name, const jconf::Value& Prop)
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     jconf::Value Buf;
@@ -316,12 +362,12 @@ namespace qcl
       bool Nat = this->ScrollVertVisible;
 
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Nat = (bool)Prop;
 
       ScrollVertVisible = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "ScrollHorzVisible")
@@ -329,16 +375,16 @@ namespace qcl
       bool Nat = this->ScrollHorzVisible;
 
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Nat = (bool)Prop;
 
       ScrollHorzVisible = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
 
@@ -410,6 +456,37 @@ namespace qcl
       VList.push_back(This);
   }
 
+
+
+  void view::Handler_StateChanged(controlStateSet State)
+  {
+    if (!(State & csHover) && FIn)
+    {
+      FIn = false;
+
+      FLegHoverControl = FHoverControl;  
+      HoverControlSet(Nil);
+    }
+
+    ef (State & csHover && !FIn)
+    {
+      FIn = true;
+
+      HoverControlSet(FLegHoverControl);
+    }
+
+
+    control::Handler_StateChanged(State);
+  }
+
+
+  void view::Do_Reset()
+  {
+    for (auto &X: Childs)
+      X->Do_Reset();
+
+    control::Do_Reset();
+  }
 
   void view::Do_Tiling()
   {
@@ -559,8 +636,8 @@ namespace qcl
 
 
       // End Fixed
-      if (!X->Anchors.Left.Active && X->Anchors.Righ.Active) SPos.X = EPos.X -X->Size.W;
-      if (!X->Anchors.Top.Active  && X->Anchors.Bot.Active)  SPos.Y = EPos.Y -X->Size.H;
+      if (!X->Anchors.Left.Active && X->Anchors.Righ.Active) SPos.X = EPos.X -NSize.W;
+      if (!X->Anchors.Top.Active  && X->Anchors.Bot.Active)  SPos.Y = EPos.Y -NSize.H;
 
 
       // Set Attrs
@@ -600,7 +677,7 @@ namespace qcl
 
 
     // Calc Limit
-    ClientBound = {0,0, Size.W, Size.H};
+    ClientBound = (Childs.empty() ? rect_i32{0,0,0,0}:rect_i32{0,0, Childs[0]->Poit.X, Childs[0]->Poit.Y});
     for (auto &X: Childs)
     {
       if (!X->Visible)
@@ -619,6 +696,20 @@ namespace qcl
       if (X->EndPoit.Y > ClientBound.Y2)
         ClientBound.Y2 = X->EndPoit.Y;
     }
+
+
+    // Fix Over Scroll
+    if (Size.H -ClientPos.Y > ClientBound.Y2)
+      ClientPos.Y = Size.H -ClientBound.Y2;
+
+    if (ClientPos.Y > ClientBound.Y1)
+      ClientPos.Y = ClientBound.Y1;
+
+    if (Size.W -ClientPos.X > ClientBound.X2)
+      ClientPos.X = Size.W -ClientBound.X2;
+
+    if (ClientPos.X > ClientBound.X1)
+      ClientPos.X = ClientBound.X1;
   }
 
 
@@ -675,6 +766,20 @@ namespace qcl
   void view::Do_Resize()
   {
     Flag_Add(DirtyTiling);
+
+    // Fix Over Scroll
+    if (Size.H -ClientPos.Y > ClientBound.Y2)
+      ClientPos.Y = Size.H -ClientBound.Y2;
+
+    if (ClientPos.Y > ClientBound.Y1)
+      ClientPos.Y = ClientBound.Y1;
+
+    if (Size.W -ClientPos.X > ClientBound.X2)
+      ClientPos.X = Size.W -ClientBound.X2;
+
+    if (ClientPos.X > ClientBound.X1)
+      ClientPos.X = ClientBound.X1;
+
 
     control::Do_Resize();
   }
@@ -762,16 +867,53 @@ namespace qcl
   void view::Do_ScrollVert(poit_i32 Pos, i16 Delta, shiftStateSet State)
   {
     control *Active = FindInput(Pos);
-    Delta *= 2;
+    
+    auto CanScrollRecursive = [&](auto&& Self, control* Ctrl, poit_i32 RelPos) -> bool
+    {
+      view *V = dynamic_cast<qcl::view*>(Ctrl);
+      if (!V)
+        return false;
 
-    if (Active == Nil || (dynamic_cast<qcl::view*>(Active) == Nil && __ifScrollableVert(this, Delta)))
+      control* Inner = V->FindInput(RelPos);
+      if (Inner)
+      {
+        poit_i32 InnerRel = {
+          .X = RelPos.X -V->ClientPos.X -Inner->Poit.X,
+          .Y = RelPos.Y -V->ClientPos.Y -Inner->Poit.Y,
+        };
+
+        if (Self(Self, Inner, InnerRel))
+          return true;
+      }
+      return __ifScrollableVert(V, Delta);
+    };
+
+    bool Delegate = false;
+    if (Active)
+    {
+      poit_i32 RelPos = {
+        .X = Pos.X -ClientPos.X -Active->Poit.X,
+        .Y = Pos.Y -ClientPos.Y -Active->Poit.Y,
+      };
+      Delegate = CanScrollRecursive(CanScrollRecursive, Active, RelPos);
+    }
+
+
+    if (!Delegate && __ifScrollableVert(this, Delta))
     {
       control::Do_ScrollVert(Pos, Delta, State);
 
 
       if (__ifScrollableVert(this, Delta))
       {
-        ClientPos.Y += Delta;
+        ClientPos.Y += Delta*6;
+
+        if (Size.H -ClientPos.Y > ClientBound.Y2)
+          ClientPos.Y = Size.H -ClientBound.Y2;
+
+        if (ClientPos.Y > ClientBound.Y1)
+          ClientPos.Y = ClientBound.Y1;
+
         DyeToRoot();
         CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
 
@@ -782,22 +924,60 @@ namespace qcl
       return;
     }
 
-    Active->Handler_ScrollVert({Pos.X  -ClientPos.X -Active->Poit.X, Pos.Y  -ClientPos.Y -Active->Poit.Y}, Delta, State);
+    if (Active)
+      Active->Handler_ScrollVert({Pos.X  -ClientPos.X -Active->Poit.X, Pos.Y  -ClientPos.Y -Active->Poit.Y}, Delta, State);
   }
 
   void view::Do_ScrollHorz(poit_i32 Pos, i16 Delta, shiftStateSet State)
   {
     control *Active = FindInput(Pos);
-    Delta *= 2;
 
-    if (Active == Nil || (dynamic_cast<qcl::view*>(Active) == Nil && __ifScrollableHorz(this, Delta)))
+    auto CanScrollRecursive = [&](auto&& Self, control* Ctrl, poit_i32 RelPos) -> bool
+    {
+      qcl::view* V = dynamic_cast<qcl::view*>(Ctrl);
+      if (!V)
+        return false;
+
+      control* Inner = V->FindInput(RelPos);
+      if (Inner)
+      {
+        poit_i32 InnerRel = {
+          .X = RelPos.X -V->ClientPos.X -Inner->Poit.X,
+          .Y = RelPos.Y -V->ClientPos.Y -Inner->Poit.Y,
+        };
+
+        if (Self(Self, Inner, InnerRel))
+          return true;
+      }
+      return __ifScrollableHorz(V, Delta);
+    };
+
+    bool Delegate = false;
+    if (Active)
+    {
+      poit_i32 RelPos = {
+        .X = Pos.X -ClientPos.X -Active->Poit.X,
+        .Y = Pos.Y -ClientPos.Y -Active->Poit.Y,
+      };
+      Delegate = CanScrollRecursive(CanScrollRecursive, Active, RelPos);
+    }
+
+
+    if (!Delegate && __ifScrollableHorz(this, Delta))
     {
       control::Do_ScrollHorz(Pos, Delta, State);
 
 
       if (__ifScrollableHorz(this, Delta))
       {
-        ClientPos.X += Delta;
+        ClientPos.X += Delta*6;
+
+        if (Size.W -ClientPos.X > ClientBound.X2)
+          ClientPos.X = Size.W -ClientBound.X2;
+
+        if (ClientPos.X > ClientBound.X1)
+          ClientPos.X = ClientBound.X1;
+
         DyeToRoot();
         CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
 
@@ -808,7 +988,8 @@ namespace qcl
       return;
     }
 
-    Active->Handler_ScrollHorz({Pos.X  -ClientPos.X -Active->Poit.X, Pos.Y  -ClientPos.Y -Active->Poit.Y}, Delta, State);
+    if (Active)
+      Active->Handler_ScrollHorz({Pos.X  -ClientPos.X -Active->Poit.X, Pos.Y  -ClientPos.Y -Active->Poit.Y}, Delta, State);
   }
 
 }

@@ -13,12 +13,8 @@
 
 #pragma once
 
-#include <iostream>
-#include <memory>
-
 #include "Basis.h"
 
-using namespace std;
 using namespace jix;
 
 

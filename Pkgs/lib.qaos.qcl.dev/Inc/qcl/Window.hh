@@ -13,8 +13,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "Basis.h"
 
 #include "qcl/Control.hh"
@@ -49,7 +47,7 @@ namespace qcl
 
       windowStates WindowState = windowStates::wsNormal;
 
-      shared_ptr<control> Overlay;
+      qsh<control> Overlay;
       
     public:
       void Show();
@@ -62,13 +60,16 @@ namespace qcl
       void Do_MouseDown(poit_i32 Pos, shiftStateSet Button, shiftStateSet State) override;
 
     public:
-      void (*OnWindowStateChanged)(qcl::control*, windowStates State) = Nil;
+      qev<windowStates /* State */> OnWindowStateChanged;
+      qev<> OnWindowClose;
 
 
       virtual void Handler_WindowStateChanged(windowStates State);
+      virtual void Handler_WindowClose();
 
 
       virtual void Do_WindowStateChanged(windowStates State);
+      virtual bool Do_WindowClose();
   };
 
 }

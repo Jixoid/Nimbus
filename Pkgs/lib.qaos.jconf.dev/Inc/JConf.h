@@ -27,6 +27,7 @@ typedef  point  jc_obj;
 typedef  jc_obj  jc_val;
 typedef  jc_obj  jc_int;
 typedef  jc_obj  jc_bool;
+typedef  jc_obj  jc_float;
 typedef  jc_obj  jc_data;
 typedef  jc_obj  jc_stc;
 typedef  jc_obj  jc_arr;
@@ -54,6 +55,7 @@ const char* jc_err_str();
 bool jc_is_val(jc_obj);
 bool jc_is_int(jc_obj);
 bool jc_is_bool(jc_obj);
+bool jc_is_float(jc_obj);
 bool jc_is_data(jc_obj);
 bool jc_is_stc(jc_obj);
 bool jc_is_arr(jc_obj);
@@ -61,12 +63,13 @@ bool jc_is_arr(jc_obj);
 
 
 // New / Dis
-jc_val  jc_new_val(char* value);
-jc_val  jc_new_int(u64  value);
-jc_bool jc_new_bool(bool  value);
-jc_data jc_new_data(data_64 value);
-jc_stc  jc_new_stc();
-jc_arr  jc_new_arr(jc_obj value[], u32 count);
+jc_val   jc_new_val(char* value);
+jc_val   jc_new_int(u64  value);
+jc_bool  jc_new_bool(bool  value);
+jc_float jc_new_float(f64  value);
+jc_data  jc_new_data(data_64 value);
+jc_stc   jc_new_stc();
+jc_arr   jc_new_arr(jc_obj value[], u32 count);
 
 void jc_dis_obj(jc_obj obj);
 void jc_dis_str(char *str);
@@ -88,6 +91,9 @@ void jc_int_set(jc_int, i64 value);
 
 bool jc_bool_get(jc_bool);
 void jc_bool_set(jc_bool, bool value);
+
+f64  jc_float_get(jc_float);
+void jc_float_set(jc_float, f64 value);
 
 data_64 jc_data_get(jc_val);
 void    jc_data_set(jc_val, data_64 value);

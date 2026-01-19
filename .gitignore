@@ -4,11 +4,14 @@
 .stfolder*
 .directory
 .clangd
+/build
+/.cache
 
 
 # Compiled files and Not applyed plans
 **@*
 **!*
+**.qdlb
 
 
 # Configs

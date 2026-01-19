@@ -14,6 +14,8 @@
 #define el else
 #define ef else if
 
+#include <iostream>
+#include <sstream>
 #include <memory>
 #include <vector>
 #include <random>
@@ -153,6 +155,9 @@ namespace qstd
 
   void monet::Update(color Color, bool Dark)
   {
+    LColor = Color;
+    LDark = Dark;
+    
     auto [H,S,L] = rgb2hsl(Color);
 
     if (Dark)
@@ -176,7 +181,7 @@ namespace qstd
       this->Main          = hsl2rgb(H, 55, 45);
       this->MainDark      = hsl2rgb(H, 55, 75);
       this->MainDarkS     = hsl2rgb(H, 55, 60);
-      this->MainLight     = hsl2rgb(H, 55, 30);
+      this->MainLight     = hsl2rgb(H, 55, 35);
       this->Text          = hsl2rgb(H, 55, 8);
       this->TextDis       = hsl2rgb(H, 55, 22);
       this->TextDark      = hsl2rgb(H, 55, 95);
@@ -184,33 +189,117 @@ namespace qstd
       this->Gray          = hsl2rgb(H, 8, 72);
       this->GrayDark      = hsl2rgb(H, 8, 82);
       this->GrayLight     = hsl2rgb(H, 8, 58);
-      this->Back          = hsl2rgb(H, 3, 86);
-      this->BackDark      = hsl2rgb(H, 3, 83);
+      this->Back          = hsl2rgb(H, 5, 86);
+      this->BackDark      = hsl2rgb(H, 5, 81);
     }
+  }
+
+  void monet::Update(color Color)
+  {
+    Update(Color, LDark);
+  }
+
+  void monet::Update(bool Dark)
+  {
+    Update(LColor, Dark);
   }
 
 
   color ParseColor(string Value)
   {
-    #define Reg(X) (Value == #X) return X;
+    if (Value.rfind("rgb", 0) == 0)
+    {
+      u0 SPos = Value.find('(') +1;
+      u0 EPos = Value.find(')');
+      string Content = Value.substr(SPos, EPos -SPos);
+      
+      color C(0,0,0);
+      
+      char Sep;
+      stringstream ss(Content);
+      ss >> C.R >> Sep >> C.G >> Sep >> C.B;
+      
+      if (Value.rfind("rgba", 0) == 0)
+      {
+        ss >> Sep >> C.A;
+      }
 
-    if Reg(Monet.Main)
-    ef Reg(Monet.MainLight)
-    ef Reg(Monet.MainDark)
-    ef Reg(Monet.MainDarkS)
-    ef Reg(Monet.Text)
-    ef Reg(Monet.TextDis)
-    ef Reg(Monet.TextHighlight)
-    ef Reg(Monet.TextDark)
-    ef Reg(Monet.Gray)
-    ef Reg(Monet.GrayLight)
-    ef Reg(Monet.GrayDark)
-    ef Reg(Monet.Back)
-    ef Reg(Monet.BackDark)
+      return C;
+    }
+
+    ef (Value.rfind("hsl", 0) == 0)
+    {
+      u0 SPos = Value.find('(') +1;
+      u0 EPos = Value.find(')');
+
+      stringstream ss(Value.substr(SPos, EPos -SPos));
+
+      float h, s, l;
+      
+      char sep;
+      ss >> h >> sep >> s >> sep >> l;
+      return hsl2rgb(h, s, l);
+    }
+    
+
+    string Target;
+    f64 TAlpha = 1;
+    
+    if (Value.rfind("monet(", 0) == 0)
+    {
+      u0 SPos = Value.find('(') +1;
+      u0 EPos = Value.find(')');
+      string Content = Value.substr(SPos, EPos -SPos);
+      
+
+      if (size_t commaPos = Content.find(','); commaPos != string::npos)
+      {
+        Target = Content.substr(0, commaPos);
+        TAlpha = stof(Content.substr(commaPos +1)); 
+      }
+      el {
+        Target = Content;
+      }
+    }
+
+    #define Reg(Obj, StrName) \
+      (Target == StrName) \
+      { \
+        color C = Obj; \
+        C.A = TAlpha; \
+        return C; \
+      }
+    
+    if Reg(Monet.Main, "Main")
+    ef Reg(Monet.MainLight, "MainLight")
+    ef Reg(Monet.MainDark, "MainDark")
+    ef Reg(Monet.MainDarkS, "MainDarkS")
+    ef Reg(Monet.Text, "Text")
+    ef Reg(Monet.TextDis, "TextDis")
+    ef Reg(Monet.TextHighlight, "TextHighlight")
+    ef Reg(Monet.TextDark, "TextDark")
+    ef Reg(Monet.Gray, "Gray")
+    ef Reg(Monet.GrayLight, "GrayLight")
+    ef Reg(Monet.GrayDark, "GrayDark")
+    ef Reg(Monet.Back, "Back")
+    ef Reg(Monet.BackDark, "BackDark")
 
     el return color(0,0,0,0);
 
     #undef Reg
+  }
+
+
+
+  void dcolor::Update(string nKey)
+  {
+    Key = nKey;
+    Update();
+  }
+
+  void dcolor::Update()
+  {
+    Color = ParseColor(Key);
   }
 
 
@@ -306,25 +395,25 @@ namespace qstd
   }
 
 
-  bool noise::LoadProp(string Name, const jconf::Value& Prop)
+  propError noise::LoadProp(string Name, const jconf::Value& Prop)
   {
-    if (effect::LoadProp(Name, Prop))
-      return true;
+    if (auto Err = effect::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Noise")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       this->VNoise = (i64)Prop;
 
       Reset();
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -336,6 +425,7 @@ namespace qstd
 
   form::form()
     : window()
+    , Color("monet(BackDark)")
   {}
 
   form::~form()
@@ -344,10 +434,17 @@ namespace qstd
 
   void form::Draw()
   {
-    Surface->Set_Color(qcl::color(0.12, 0.12, 0.12));
+    Surface->Set_Color(Color);
 
     Surface->Draw_Rect({0,0, (f32)Size.W, (f32)Size.H});
     Surface->Fill();
+  }
+
+  void form::Do_Reset()
+  {
+    Color.Update();
+
+    view::Do_Reset();
   }
 
   #pragma endregion
@@ -357,7 +454,7 @@ namespace qstd
 
   layout::layout()
     : view()
-    , Color(Monet.Back)
+    , Color("monet(Back)")
   {}
 
   layout::~layout()
@@ -449,38 +546,41 @@ namespace qstd
     Surface->Clip_Reset();
   }
 
-  bool layout::LoadProp(string Name, const jconf::Value& Prop)
+  void layout::Do_Reset()
   {
-    if (view::LoadProp(Name, Prop))
-      return true;
+    Color.Update();
+
+    view::Do_Reset();
+  }
+
+  propError layout::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = view::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "BorderRadius")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       this->BorderRadius = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Color")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
-      string Cac = (string)Prop;
-
-      this->Color = ParseColor(Cac);
-      if (this->Color == color(0,0,0,0))
-        return false;
+      this->Color.Update((string)Prop);
       
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -498,161 +598,110 @@ namespace qstd
 
   void layout_vert::Do_Tiling()
   {
-    // Apply Anchors
-    for (auto &X: Childs)
-    {
-      poit_i32 TempP = X->Poit;
+    i32
+      StartPos = 0,
+      LastMargin = 0;
 
-      if (X->Anchors.Left.Active)
-      {
-        if (X->Anchors.Left.Control == this)
-          TempP.X = 0;
-
-        else
-          switch (X->Anchors.Left.Side)
-          {
-            case controlAnchorSide::casBegin:
-              TempP.X = X->Anchors.Left.Control -> Poit.X;
-              break;
-
-            case controlAnchorSide::casEnd:
-              TempP.X = (X->Anchors.Left.Control->Visible) ? (X->Anchors.Left.Control -> EndPoit.X):(X->Anchors.Left.Control -> Poit.X);
-              break;
-          }
-
-        TempP.X += X->Margins.X1;
-      }
-
-      if (X->Anchors.Top.Active)
-      {
-        if (X->Anchors.Top.Control == this)
-          TempP.Y = 0;
-
-        else
-          switch (X->Anchors.Top.Side)
-          {
-            case controlAnchorSide::casBegin:
-              TempP.Y = X->Anchors.Top.Control -> Poit.Y;
-              break;
-
-            case controlAnchorSide::casEnd:
-              TempP.Y = (X->Anchors.Top.Control->Visible) ? (X->Anchors.Top.Control -> EndPoit.Y):(X->Anchors.Top.Control -> Poit.Y);
-              break;
-          }
-
-        TempP.Y += X->Margins.Y1;
-      }
-
-
-      
-      poit_i32 TempE = {TempP.X +X->Size.W, TempP.Y +X->Size.H};
-
-      if (X->Anchors.Righ.Active)
-      {
-        if (X->Anchors.Righ.Control == this)
-          TempE.X = Size.W;
-
-        else
-          switch (X->Anchors.Righ.Side)
-          {
-            case controlAnchorSide::casBegin:
-              TempE.X = (X->Anchors.Righ.Control->Visible) ? (X->Anchors.Righ.Control -> Poit.X):(X->Anchors.Righ.Control -> EndPoit.X);
-              break;
-
-            case controlAnchorSide::casEnd:
-              TempE.X = X->Anchors.Righ.Control -> EndPoit.X;
-              break;
-          }
-
-        TempE.X -= X->Margins.X2;
-      }
-
-      if (X->Anchors.Bot.Active)
-      {
-        if (X->Anchors.Bot.Control == this)
-          TempE.Y = Size.H;
-
-        else
-          switch (X->Anchors.Bot.Side)
-          {
-            case controlAnchorSide::casBegin:
-              TempE.Y = (X->Anchors.Bot.Control->Visible) ? (X->Anchors.Bot.Control -> Poit.Y):(X->Anchors.Bot.Control -> EndPoit.Y);
-              break;
-
-            case controlAnchorSide::casEnd:
-              TempE.Y = X->Anchors.Bot.Control -> EndPoit.Y;
-              break;
-          }
-
-        TempE.Y -= X->Margins.Y2;
-      }
-
-
-      if (!X->Anchors.Top.Active  && X->Anchors.Bot.Active)  TempP.Y = TempE.Y -X->Size.H;
-      if (!X->Anchors.Left.Active && X->Anchors.Righ.Active) TempP.X = TempE.X -X->Size.W;
-
-
-      if (X->Poit.X != TempP.X || X->Poit.Y != TempP.Y)
-      {
-        X->Poit = TempP;
-        X->Flag_Add(DirtyRebound);
-      }
-
-      if (X->Size.W != TempE.X-TempP.X || X->Size.H != TempE.Y-TempP.Y)
-      {
-        X->Size = {TempE.X-TempP.X, TempE.Y-TempP.Y};
-        X->Flag_Add(DirtyResize | DirtyRebound);
-      }
-
-    }
-
-
-    // Set vert layout
-    i32 StartPos = 0;
-    i32 LastMargin = 0;
-
+    // Tiling
     for (auto &X: Childs)
     {
       StartPos += (X->Margins.Y1 > LastMargin) ? (X->Margins.Y1):(LastMargin);
 
-      if (X->Anchors.Bot.Active)
+      // End Pos
+      size_i32 NSize = (X->AutoSize ? X->PreferedSize : X->Size);
+
+      NSize.W = max(X->MinSize.W, NSize.W);
+      NSize.H = max(X->MinSize.H, NSize.H);
+
+      if (X->MaxSize.W != 0) NSize.W = min(X->MaxSize.W, NSize.W);
+      if (X->MaxSize.H != 0) NSize.H = min(X->MaxSize.H, NSize.H);
+
+      i32
+        SPos = X->Margins.X1,
+        EPos = SPos +NSize.W;
+
+
+      // End Fixed
+      if (X->Anchors.Righ.Active) EPos = Size.W -X->Margins.X2;
+      if (!X->Anchors.Left.Active && X->Anchors.Righ.Active) SPos = EPos -NSize.W;
+
+      if (X->Poit.X != SPos || X->Poit.Y != StartPos)
       {
-        X->Poit = {X->Margins.X1, X->Poit.Y};
+        X->Poit = {
+          .X = SPos,
+          .Y = StartPos,
+        };
         X->Flag_Add(DirtyRebound);
+      }
+
+      if (X->Size.W != (EPos -SPos) || X->Size.H != NSize.H)
+      {
+        X->Size = {
+          .W = (EPos -SPos),
+          .H = (NSize.H),
+        };
+
+        X->Size.W = max(X->MinSize.W, X->Size.W);
+        X->Size.H = max(X->MinSize.H, X->Size.H);
+
+        if (X->MaxSize.W != 0) X->Size.W = min(X->MaxSize.W, X->Size.W);
+        if (X->MaxSize.H != 0) X->Size.H = min(X->MaxSize.H, X->Size.H);
+
+        X->Flag_Add(DirtyResize);
+      }
+
+      if (X->Flag_HasR(DirtyResize))
+        X->Do_Resize();
+
+      if (X->Flag_HasR(DirtyRebound))
+        X->EndPoit = {
+          .X = X->Poit.X +X->Size.W,
+          .Y = X->Poit.Y +X->Size.H,
+        };
+
+      X->Do_Paint_prepare();
+
+
+      // Tiling
+      LastMargin = X->Margins.Y2;
+      StartPos += X->Size.H;
+    }
+
+
+    // Calc Limit
+    ClientBound = (Childs.empty() ? rect_i32{0,0,0,0}:rect_i32{0,0, Childs[0]->Poit.X, Childs[0]->Poit.Y});
+    for (auto &X: Childs)
+    {
+      if (!X->Visible)
         continue;
-      }
-      
-      X->Poit = {X->Margins.X1, StartPos};
-      X->Flag_Add(DirtyRebound);
 
-      LastMargin = X->Margins.Y2;
-      StartPos += X->Size.H;
+
+      if (X->Poit.X < ClientBound.X1)
+        ClientBound.X1 = X->Poit.X;
+
+      if (X->Poit.Y < ClientBound.Y1)
+        ClientBound.Y1 = X->Poit.Y;
+
+      if (X->EndPoit.X > ClientBound.X2)
+        ClientBound.X2 = X->EndPoit.X;
+
+      if (X->EndPoit.Y > ClientBound.Y2)
+        ClientBound.Y2 = X->EndPoit.Y;
     }
 
-  }
 
-  void layout_vert::CalcAutoSize()
-  {
-    // Set vert layout
-    i32 StartPos = 0;
-    i32 LastMargin = 0;
+    // Fix Over Scroll
+    if (Size.H -ClientPos.Y > ClientBound.Y2)
+      ClientPos.Y = Size.H -ClientBound.Y2;
 
-    for (auto &X: Childs)
-    {
-      StartPos += (X->Margins.Y1 > LastMargin) ? (X->Margins.Y1):(LastMargin);
+    if (ClientPos.Y > ClientBound.Y1)
+      ClientPos.Y = ClientBound.Y1;
 
-      LastMargin = X->Margins.Y2;
-      StartPos += X->Size.H;
-    }
-    StartPos += LastMargin;
+    if (Size.W -ClientPos.X > ClientBound.X2)
+      ClientPos.X = Size.W -ClientBound.X2;
 
-
-    i32 AWidth = 0;
-    for (auto &X: Childs)
-      AWidth = max(AWidth, X->Margins.X1 +X->Margins.X2 +X->Size.W);
-
-
-    PreferedSize = {AWidth, StartPos};
+    if (ClientPos.X > ClientBound.X1)
+      ClientPos.X = ClientBound.X1;
   }
 
   #pragma endregion
@@ -670,53 +719,110 @@ namespace qstd
 
   void layout_horz::Do_Tiling()
   {
-    // Set vert layout
-    i32 StartPos = 0;
-    i32 LastMargin = 0;
+    i32
+      StartPos = 0,
+      LastMargin = 0;
 
+    // Tiling
     for (auto &X: Childs)
     {
       StartPos += (X->Margins.X1 > LastMargin) ? (X->Margins.X1):(LastMargin);
 
-      if (X->Anchors.Righ.Active)
+      // End Pos
+      size_i32 NSize = (X->AutoSize ? X->PreferedSize : X->Size);
+
+      NSize.W = max(X->MinSize.W, NSize.W);
+      NSize.H = max(X->MinSize.H, NSize.H);
+
+      if (X->MaxSize.W != 0) NSize.W = min(X->MaxSize.W, NSize.W);
+      if (X->MaxSize.H != 0) NSize.H = min(X->MaxSize.H, NSize.H);
+
+      i32
+        SPos = X->Margins.Y1,
+        EPos = SPos +NSize.H;
+
+
+      // End Fixed
+      if (X->Anchors.Bot.Active) EPos = Size.H -X->Margins.Y2;
+      if (!X->Anchors.Top.Active && X->Anchors.Bot.Active) SPos = EPos -NSize.H;
+
+      if (X->Poit.Y != SPos || X->Poit.X != StartPos)
       {
-        X->Poit = {X->Poit.X, X->Margins.Y1};
+        X->Poit = {
+          .X = StartPos,
+          .Y = SPos,
+        };
         X->Flag_Add(DirtyRebound);
-        continue;
       }
 
-      X->Poit = {StartPos, X->Margins.Y1};
-      X->Flag_Add(DirtyRebound);
+      if (X->Size.H != (EPos -SPos) || X->Size.W != NSize.W)
+      {
+        X->Size = {
+          .W = (NSize.W),
+          .H = (EPos -SPos),
+        };
 
+        X->Size.W = max(X->MinSize.W, X->Size.W);
+        X->Size.H = max(X->MinSize.H, X->Size.H);
+
+        if (X->MaxSize.W != 0) X->Size.W = min(X->MaxSize.W, X->Size.W);
+        if (X->MaxSize.H != 0) X->Size.H = min(X->MaxSize.H, X->Size.H);
+
+        X->Flag_Add(DirtyResize);
+      }
+
+      if (X->Flag_HasR(DirtyResize))
+        X->Do_Resize();
+
+      if (X->Flag_HasR(DirtyRebound))
+        X->EndPoit = {
+          .X = X->Poit.X +X->Size.W,
+          .Y = X->Poit.Y +X->Size.H,
+        };
+
+      X->Do_Paint_prepare();
+
+
+      // Tiling
       LastMargin = X->Margins.X2;
       StartPos += X->Size.W;
     }
 
-    view::Do_Tiling();
-  }
 
-  void layout_horz::CalcAutoSize()
-  {
-    // Set horz layout
-    i32 StartPos = 0;
-    i32 LastMargin = 0;
-
+    // Calc Limit
+    ClientBound = (Childs.empty() ? rect_i32{0,0,0,0}:rect_i32{0,0, Childs[0]->Poit.X, Childs[0]->Poit.Y});
     for (auto &X: Childs)
     {
-      StartPos += (X->Margins.X1 > LastMargin) ? (X->Margins.X1):(LastMargin);
+      if (!X->Visible)
+        continue;
 
-      LastMargin = X->Margins.X2;
-      StartPos += X->Size.W;
+
+      if (X->Poit.X < ClientBound.X1)
+        ClientBound.X1 = X->Poit.X;
+
+      if (X->Poit.Y < ClientBound.Y1)
+        ClientBound.Y1 = X->Poit.Y;
+
+      if (X->EndPoit.X > ClientBound.X2)
+        ClientBound.X2 = X->EndPoit.X;
+
+      if (X->EndPoit.Y > ClientBound.Y2)
+        ClientBound.Y2 = X->EndPoit.Y;
     }
-    StartPos += LastMargin;
 
 
-    i32 AHeight = 0;
-    for (auto &X: Childs)
-      AHeight = max(AHeight, X->Margins.Y1 +X->Margins.Y2 +X->Size.H);
+    // Fix Over Scroll
+    if (Size.H -ClientPos.Y > ClientBound.Y2)
+      ClientPos.Y = Size.H -ClientBound.Y2;
 
+    if (ClientPos.Y > ClientBound.Y1)
+      ClientPos.Y = ClientBound.Y1;
 
-    PreferedSize = {StartPos, AHeight};
+    if (Size.W -ClientPos.X > ClientBound.X2)
+      ClientPos.X = Size.W -ClientBound.X2;
+
+    if (ClientPos.X > ClientBound.X1)
+      ClientPos.X = ClientBound.X1;
   }
 
   #pragma endregion
@@ -771,57 +877,40 @@ namespace qstd
         LineHeight = X->Size.H;
     }
 
-    view::Do_Tiling();
-  }
-
-  void layout_flow::CalcAutoSize()
-  {
-    poit_i32 CPos = {0, 0};
-    poit_i32 LPad = {0, 0}; // R,B
-    i32 LineHeight = 0;
-
-    i32 MaxW = 0;
-    i32 MaxH = 0;
-
+    // Calc Limit
+    ClientBound = (Childs.empty() ? rect_i32{0,0,0,0}:rect_i32{0,0, Childs[0]->Poit.X, Childs[0]->Poit.Y});
     for (auto &X: Childs)
     {
       if (!X->Visible)
-          continue;
-
-      // Satırda sığacak mı?
-      if (CPos.X + X->Size.W +X->Margins.X1 +LPad.X > Size.W)
-      {
-        // Yeni satıra geç
-        MaxW = max(MaxW, CPos.X);
-
-        CPos.X = 0;
-        CPos.Y += LineHeight +LPad.Y +X->Margins.Y1;
-        LineHeight = 0;
-      }
-
-      if (CPos.X == 0)
-        CPos.X = X->Margins.X1;
-
-      if (CPos.Y == 0)
-        CPos.Y = X->Margins.Y1;
+        continue;
 
 
-      // Konum ata
-      //X->Poit.X = CPos.X;
-      //X->Poit.Y = CPos.Y;
+      if (X->Poit.X < ClientBound.X1)
+        ClientBound.X1 = X->Poit.X;
 
-      // Bir sonraki eleman için ilerle
-      CPos.X += X->Size.W +X->Margins.X1 +LPad.X;
+      if (X->Poit.Y < ClientBound.Y1)
+        ClientBound.Y1 = X->Poit.Y;
 
-      // Satır yüksekliğini güncelle
-      if (X->Size.H > LineHeight)
-        LineHeight = X->Size.H;
+      if (X->EndPoit.X > ClientBound.X2)
+        ClientBound.X2 = X->EndPoit.X;
+
+      if (X->EndPoit.Y > ClientBound.Y2)
+        ClientBound.Y2 = X->EndPoit.Y;
     }
 
-    MaxW = max(MaxW, CPos.X);
-    MaxH = CPos.Y + LineHeight;
 
-    PreferedSize = {MaxW, MaxH};
+    // Fix Over Scroll
+    if (Size.H -ClientPos.Y > ClientBound.Y2)
+      ClientPos.Y = Size.H -ClientBound.Y2;
+
+    if (ClientPos.Y > ClientBound.Y1)
+      ClientPos.Y = ClientBound.Y1;
+
+    if (Size.W -ClientPos.X > ClientBound.X2)
+      ClientPos.X = Size.W -ClientBound.X2;
+
+    if (ClientPos.X > ClientBound.X1)
+      ClientPos.X = ClientBound.X1;
   }
 
   #pragma endregion
@@ -831,7 +920,7 @@ namespace qstd
 
   text::text()
     : control()
-    , Color(Monet.Text)
+    , Color("monet(Text)")
   {
     AutoSize = true;
   }
@@ -913,48 +1002,51 @@ namespace qstd
     PreferedSize = {(i32)TSize.W, (i32)TSize.H};
   }
 
-  bool text::LoadProp(string Name, const jconf::Value& Prop)
+  void text::Do_Reset()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    Color.Update();
+
+    control::Do_Reset();
+  }
+
+  propError text::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
 
       Text = (string)Prop;
       
       Flag_Add(DirtyAutoSize);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Color")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
-      string Cac = (string)Prop;
+      Color.Update((string)Prop);
 
-      Color = ParseColor(Cac);
-      if (Color == color(0,0,0,0))
-        return false;
-
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "FontSize")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       
       FontSize = (i64)Prop;
 
       Flag_Add(DirtyAutoSize);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "AlignVert")
@@ -962,7 +1054,7 @@ namespace qstd
       text_align Nat;
 
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
 
       // Val
@@ -978,11 +1070,11 @@ namespace qstd
         Nat = text_align::taBottom;
 
       else
-        return false;
+        return propError::peInvalid;
 
 
       AlignVert = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "AlignHorz")
@@ -990,7 +1082,7 @@ namespace qstd
       text_align Nat;
 
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
 
       // Val
@@ -1006,15 +1098,15 @@ namespace qstd
         Nat = text_align::taRight;
 
       else
-        return false;
+        return propError::peInvalid;
 
 
       AlignHorz = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -1045,32 +1137,32 @@ namespace qstd
   {
     auto Sur = surface::FromFile_SVG(Size.W, Size.H, Path.c_str());
 
-    Icon = shared_ptr<surface>(Sur);
+    Icon = qsh<surface>(Sur);
 
     return true;
   }
 
 
-  bool icon::LoadProp(string Name, const jconf::Value& Prop)
+  propError icon::LoadProp(string Name, const jconf::Value& Prop)
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Path")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
 
       Path = (string)Prop;
 
       LoadIcon();
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -1080,7 +1172,10 @@ namespace qstd
 
   edit::edit()
     : control()
-  {}
+  {
+    Size = {160, 40};
+    Flag_Add(dirtyFlags::DirtyResize);
+  }
 
   edit::~edit()
   {}
@@ -1092,11 +1187,9 @@ namespace qstd
 
     if ((ControlState & (csFocus)) != 0)
       Theme = Monet.Main;
-
     ef ((ControlState & (csHover)) != 0)
       Theme = Monet.MainLight;
-
-    else
+    el
       Theme = Monet.Gray;
       
     
@@ -1123,7 +1216,7 @@ namespace qstd
       Surface->Set_OP(OpBak);
 
 
-      Surface->Set_Color(color(1,1,1));
+      Surface->Set_Color(Monet.Text);
       Surface->Set_Pos({14, 0});
       Surface->Draw_Text(Title.c_str());
       Surface->Fill();
@@ -1132,10 +1225,8 @@ namespace qstd
 
     Surface->Set_FontSize(15);
 
-    size_f32 TSize = Surface->Calc_Text(Text.c_str());
-
-    Surface->Set_Color(color(1,1,1));
-    Surface->Set_Pos({12, ((Size.H -5 -TSize.H)/2) +5});
+    Surface->Set_Color(Monet.Text);
+    Surface->Set_Pos({12, ((Size.H -5 -Surface->FontSize)/2) +5});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
 
@@ -1145,10 +1236,11 @@ namespace qstd
       size_f32 PosSize = Surface->Calc_Text((Text.substr(0, Pos)+".").c_str());
 
       Surface->Set_Color(Monet.Text);
+      Surface->Set_LineSize(1);
       
       Surface->Draw_Line(
-        {12 +PosSize.W -4, (((f32)Size.H -5)/2) +5 -(15/2)},
-        {12 +PosSize.W -4, (((f32)Size.H -5)/2) +5 +(15/2)}
+        {12 +PosSize.W -3.5f, (((f32)Size.H -5)/2) +5 -(15.0f/2)},
+        {12 +PosSize.W -3.5f, (((f32)Size.H -5)/2) +5 +(15.0f/2)}
       );
       Surface->Stroke();
     }
@@ -1218,6 +1310,8 @@ namespace qstd
     i8 i = 1;
     while (true)
     {
+      if (i > len) return i;
+
       if ((*(str -i) & 0xC0) != 0x80) // UTF-8 continuation bytes'i atla
         break;
 
@@ -1243,7 +1337,11 @@ namespace qstd
       Pos = (Pos == 0 ? 0:Pos -utf8_char_length_from_end((Text.c_str()+Pos), Pos));
 
     ef (KeyCode == 114)
-      Pos = min<u32>(Text.size(), Pos +utf8_char_length(*(Text.c_str()+Pos)));
+    {
+      i8 L = utf8_char_length(*(Text.c_str()+Pos));
+      if (L > 0)
+        Pos = min<u32>(Text.size(), Pos +L);
+    }
 
     ef (KeyCode == 111)
       Pos = 0;
@@ -1278,44 +1376,44 @@ namespace qstd
   }
 
 
-  bool edit::LoadProp(string Name, const jconf::Value& Prop)
+  propError edit::LoadProp(string Name, const jconf::Value& Prop)
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Text = (string)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Title")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Title = (string)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "BorderRadius")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       BorderRadius = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -1325,7 +1423,9 @@ namespace qstd
 
   radio::radio()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   radio::~radio()
   {}
@@ -1370,11 +1470,9 @@ namespace qstd
 
 
     Surface->Set_FontSize(15);
-
-    size_f32 TSize = Surface->Calc_Text(Text.c_str());
-
+    
     Surface->Set_Color(Monet.Text);
-    Surface->Set_Pos({27, ((Size.H -TSize.H)/2)});
+    Surface->Set_Pos({27, ((Size.H -Surface->FontSize)/2)});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
   }
@@ -1406,52 +1504,62 @@ namespace qstd
   {
     Checked = Status;
 
-    if (OnChanged != Nil)
-      OnChanged(this, Status);
+    OnChanged.Call(this, Status);
 
 
     DyeToRoot();
     CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
-  bool radio::LoadProp(string Name, const jconf::Value& Prop)
+  void radio::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    Surface->Set_FontSize(15);
+    size_f32 TSize = Surface->Calc_Text(Text.c_str());
+
+    TSize.W += 8;
+    TSize.H += 8;
+    
+    PreferedSize = {(i32)TSize.W +25, max<i32>(TSize.H, 22)};
+  }
+
+  propError radio::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Text = (string)Prop;
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Checked")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
       
       Checked = (bool)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool radio::LoadFunc(string Name, point Func)
+  bool radio::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    if (control::LoadFunc(Name, Func))
+    if (control::LoadFunc(Name, FuncSeed))
       return true;
 
 
-    #define makro(X)  if (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
 
-    makro(OnChanged)
+    if makro(OnChanged)
 
     #undef makro
 
@@ -1465,7 +1573,9 @@ namespace qstd
 
   check::check()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   check::~check()
   {}
@@ -1511,10 +1621,8 @@ namespace qstd
 
     Surface->Set_FontSize(15);
 
-    size_f32 TSize = Surface->Calc_Text(Text.c_str());
-
     Surface->Set_Color(Monet.Text);
-    Surface->Set_Pos({27, ((Size.H -TSize.H)/2)});
+    Surface->Set_Pos({27, ((Size.H -Surface->FontSize)/2)});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
   }
@@ -1538,52 +1646,62 @@ namespace qstd
   {
     Checked = Status;
 
-    if (OnChanged != Nil)
-      OnChanged(this, Status);
+    OnChanged.Call(this, Status);
 
 
     DyeToRoot();
     CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
-  bool check::LoadProp(string Name, const jconf::Value& Prop)
+  void check::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    Surface->Set_FontSize(15);
+    size_f32 TSize = Surface->Calc_Text(Text.c_str());
+
+    TSize.W += 8;
+    TSize.H += 8;
+    
+    PreferedSize = {(i32)TSize.W +25, max<i32>(TSize.H, 22)};
+  }
+
+  propError check::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Text = (string)Prop;
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Checked")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
       Checked = (bool)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool check::LoadFunc(string Name, point Func)
+  bool check::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    if (control::LoadFunc(Name, Func))
+    if (control::LoadFunc(Name, FuncSeed))
       return true;
 
 
-    #define makro(X)  if (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
 
-    makro(OnChanged)
+    if makro(OnChanged)
 
     #undef makro
 
@@ -1597,7 +1715,9 @@ namespace qstd
 
   toggle::toggle()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   toggle::~toggle()
   {}
@@ -1660,10 +1780,8 @@ namespace qstd
 
     Surface->Set_FontSize(15);
 
-    size_f32 TSize = Surface->Calc_Text(Text.c_str());
-
     Surface->Set_Color(Monet.Text);
-    Surface->Set_Pos({(Size.H -TSize.H)/2, (Size.H -TSize.H)/2});
+    Surface->Set_Pos({0, (Size.H -Surface->FontSize)/2});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
   }
@@ -1687,53 +1805,61 @@ namespace qstd
   {
     Checked = Status;
 
-    if (OnChanged != Nil)
-      OnChanged(this, Status);
+    OnChanged.Call(this, Status);
 
 
     DyeToRoot();
     CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
-  bool toggle::LoadProp(string Name, const jconf::Value& Prop)
+  void toggle::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    Surface->Set_FontSize(15);
+    size_f32 TSize = Surface->Calc_Text(Text.c_str());
+
+    TSize.W += 8;
+    TSize.H += 8;
+    
+    PreferedSize = {(i32)TSize.W +70, max<i32>(TSize.H, 26)};
+  }
+
+  propError toggle::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Text = (string)Prop;
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Checked")
     {
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
       
       Checked = (bool)Prop;
-
-      
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool toggle::LoadFunc(string Name, point Func)
+  bool toggle::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    if (control::LoadFunc(Name, Func))
+    if (control::LoadFunc(Name, FuncSeed))
       return true;
 
 
-    #define makro(X)  if (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
 
-    makro(OnChanged)
+    if makro(OnChanged)
 
     #undef makro
 
@@ -1747,7 +1873,9 @@ namespace qstd
 
   progbar::progbar()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   progbar::~progbar()
   {}
@@ -1792,7 +1920,7 @@ namespace qstd
     size_f32 TSize = Surface->Calc_Text(Text.c_str());
 
     Surface->Set_Color(Monet.Text);
-    Surface->Set_Pos({((Size.W -TSize.W)/2), ((Size.H -TSize.H)/2)});
+    Surface->Set_Pos({((Size.W -TSize.W)/2), ((Size.H -Surface->FontSize)/2)});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
 
@@ -1803,51 +1931,56 @@ namespace qstd
     Surface->Clip();
 
     Surface->Set_Color(Monet.TextDark);
-    Surface->Set_Pos({((Size.W -TSize.W)/2), ((Size.H -TSize.H)/2)});
+    Surface->Set_Pos({((Size.W -TSize.W)/2), ((Size.H -Surface->FontSize)/2)});
     Surface->Draw_Text(Text.c_str());
     Surface->Fill();
 
     Surface->Clip_Reset();
   }
 
-  bool progbar::LoadProp(string Name, const jconf::Value& Prop)
+  void progbar::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    PreferedSize = {140, 24};
+  }
+
+  propError progbar::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Text")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
       Text = (string)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Max")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       Max = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Value")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       Value = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -1857,7 +1990,9 @@ namespace qstd
 
   slider::slider()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   slider::~slider()
   {}
@@ -1978,54 +2113,58 @@ namespace qstd
   {
     Value = nValue;
 
-    if (OnChanged != Nil)
-      OnChanged(this, nValue);
+    OnChanged.Call(this, nValue);
 
 
     DyeToRoot();
     CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
-  bool slider::LoadProp(string Name, const jconf::Value& Prop)
+  void slider::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    PreferedSize = {140, 24};
+  }
+
+  propError slider::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Max")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       Max = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "Value")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
 
       Value = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool slider::LoadFunc(string Name, point Func)
+  bool slider::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    if (control::LoadFunc(Name, Func))
+    if (control::LoadFunc(Name, FuncSeed))
       return true;
 
 
-    #define makro(X)  if (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
 
-    makro(OnChanged)
+    if makro(OnChanged)
 
     #undef makro
 
@@ -2039,7 +2178,9 @@ namespace qstd
 
   tabs::tabs()
     : control()
-  {}
+  {
+    AutoSize = true;
+  }
 
   tabs::~tabs()
   {}
@@ -2075,11 +2216,11 @@ namespace qstd
         Surface->Sets_Push();
 
         Surface->Set_Color(color(1,1,1,1));
-        Surface->Draw_RectRound({(f32)XOff -6, (Size.H/2) -(OPT_Tabs[i].H/2) -6, XOff +OPT_Tabs[i].W +6, (Size.H/2) +(OPT_Tabs[i].H/2) +6}, 18);
+        Surface->Draw_RectRound({(f32)XOff -6, ((f32)Size.H/2) -(OPT_Tabs[i].H/2) -6, XOff +OPT_Tabs[i].W +6, ((f32)Size.H/2) +(OPT_Tabs[i].H/2) +6}, 18);
         Surface->Clip();
 
         Surface->Set_Color(Monet.Main);
-        Surface->Draw_Rect({(f32)XOff -6, (Size.H/2) -(OPT_Tabs[i].H/2) -6, XOff +OPT_Tabs[i].W +6, (Size.H/2) +(OPT_Tabs[i].H/2) +6});
+        Surface->Draw_Rect({(f32)XOff -6, ((f32)Size.H/2) -(OPT_Tabs[i].H/2) -6, XOff +OPT_Tabs[i].W +6, ((f32)Size.H/2) +(OPT_Tabs[i].H/2) +6});
         Surface->Fill();
 
         Surface->Set_Color(Monet.TextDark);
@@ -2092,7 +2233,7 @@ namespace qstd
           if (!X->Enabled) continue;
 
           X->Update({(i32)OPT_Tabs[i].W +12, (i32)OPT_Tabs[i].H +12});
-          X->Draw(Surface.get(), {(f32)XOff -6, (Size.H/2) -(OPT_Tabs[i].H/2) -6});
+          X->Draw(Surface.get(), {(f32)XOff -6, ((f32)Size.H/2) -(OPT_Tabs[i].H/2) -6});
         }
 
         Surface->Sets_Pop();
@@ -2106,12 +2247,12 @@ namespace qstd
       }
 
       
-      if (HTabID == i)
-      {
-        Surface->Set_Color(Monet.GrayLight);
-        Surface->Draw_RectRound({(f32)XOff -4, (f32)Size.H -4, XOff +OPT_Tabs[i].W +4, (f32)Size.H}, 6,0,6,0);
-        Surface->Fill();
-      }
+      //if (HTabID == i)
+      //{
+      //  Surface->Set_Color(Monet.GrayLight);
+      //  Surface->Draw_RectRound({(f32)XOff -4, (f32)Size.H -4, XOff +OPT_Tabs[i].W +4, (f32)Size.H}, 6,0,6,0);
+      //  Surface->Fill();
+      //}
 
 
       XOff += OPT_Tabs[i].W;
@@ -2119,6 +2260,15 @@ namespace qstd
 
 
     Surface->Clip_Reset();
+  }
+
+  void tabs::Handler_StateChanged(controlStateSet State)
+  {
+    control::Handler_StateChanged(State);
+
+    HTabID = -1;
+    DyeToRoot();
+    CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
   void tabs::ReCalc_TabsSize()
@@ -2193,12 +2343,7 @@ namespace qstd
 
 
     if (NTabID != -1 && NTabID != TabID)
-    {
-      TabID = NTabID;
-
-      DyeToRoot();
-      CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
-    }
+      Do_Changed(NTabID);
 
 
     control::Do_ClickEx(Pos);
@@ -2208,18 +2353,26 @@ namespace qstd
   {
     TabID = nTabID;
 
-    if (OnChanged != Nil)
-      OnChanged(this, nTabID);
+    OnChanged.Call(this, nTabID);
 
 
     DyeToRoot();
     CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
   }
 
-  bool tabs::LoadProp(string Name, const jconf::Value& Prop)
+  void tabs::CalcAutoSize()
   {
-    if (control::LoadProp(Name, Prop))
-      return true;
+    auto XOff = 16;
+    for (auto &X: OPT_Tabs)
+      XOff += X.W +16;
+
+    PreferedSize = {.W = XOff, .H = 32};
+  }
+
+  propError tabs::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Tabs")
@@ -2227,7 +2380,7 @@ namespace qstd
       vector<string> Nat;
 
       if (!Prop.isArray())
-        return false;
+        return propError::peInvalid;
 
       
       for (u32 i = 0; i < Prop.size(); i++)
@@ -2235,7 +2388,7 @@ namespace qstd
         auto It = Prop[i];
 
         if (!It.isString())
-          return false;
+          return propError::peInvalid;
 
         Nat.push_back((string)It);
       }
@@ -2243,33 +2396,33 @@ namespace qstd
 
       Tabs = (Nat);
       ReCalc_TabsSize();
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "TabID")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       
       TabID = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
-  bool tabs::LoadFunc(string Name, point Func)
+  bool tabs::LoadFunc(string Name, qev_seed FuncSeed)
   {
-    if (control::LoadFunc(Name, Func))
+    if (control::LoadFunc(Name, FuncSeed))
       return true;
 
 
-    #define makro(X)  if (Name == #X) { X = (decltype(X))Func; return true; }
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
 
-    makro(OnChanged)
+    if makro(OnChanged)
 
     #undef makro
 
@@ -2283,7 +2436,9 @@ namespace qstd
 
   choice::choice()
     : tabs()
-  {}
+  {
+    AutoSize = true;
+  }
 
   choice::~choice()
   {}
@@ -2343,12 +2498,12 @@ namespace qstd
       }
 
       
-      if (HTabID == i)
-      {
-        //Surface->Set_Color(Monet.GrayLight);
-        //Surface->Draw_RectRound({(f32)XOff -4, (f32)Size.H -4, XOff +OPT_Tabs[i].W +4, (f32)Size.H}, 6,0,6,0);
-        //Surface->Fill();
-      }
+      //if (HTabID == i)
+      //{
+      //  Surface->Set_Color(Monet.GrayLight);
+      //  Surface->Draw_RectRound({(f32)XOff -4, (f32)Size.H -4, XOff +OPT_Tabs[i].W +4, (f32)Size.H}, 6,0,6,0);
+      //  Surface->Fill();
+      //}
 
 
       XOff += OPT_Tabs[i].W;
@@ -2415,35 +2570,216 @@ namespace qstd
 
 
     if (NTabID != -1 && NTabID != TabID)
-    {
-      TabID = NTabID;
-
-      DyeToRoot();
-      CurrentApp->PushMessage(GetRoot(), controlMessages::cmPaint);
-    }
+      Do_Changed(NTabID);
 
 
     control::Do_ClickEx(Pos);
   }
 
-  bool choice::LoadProp(string Name, const jconf::Value& Prop)
+  void choice::CalcAutoSize()
   {
-    if (tabs::LoadProp(Name, Prop))
-      return true;
+    auto XOff = -4;
+    for (auto &X: OPT_Tabs)
+      XOff += X.W +16;
+
+    PreferedSize = {.W = XOff, .H = 28};
+  }
+
+  propError choice::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = tabs::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Threshold")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
         
       Threshold = (i64)Prop;
       
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
+  }
+
+  #pragma endregion
+
+
+
+  #pragma region grid
+
+  grid::grid()
+    : control()
+    , Pre_CheckBox_On(16,16)
+    , Pre_CheckBox_Off(16,16)
+  {
+    PreCtrlReset();
+
+    Cols = {
+      grid_column{.Title = "No", .Width = 30},
+      grid_column{.Title = "Ac", .Width = 24, .Type = grid_col_type::gctCheckbox},
+      grid_column{.Title = "Tabaka", .Width = 0},
+    };
+  }
+
+  grid::~grid()
+  {}
+
+
+  void grid::PreCtrlReset()
+  {
+    l_CheckBox_ON:
+    {
+      Pre_CheckBox_On.Set_LineSize(2);
+
+      Pre_CheckBox_On.Set_Color(Monet.Gray);
+      Pre_CheckBox_On.Draw_RectRound({1,1, 15, 15}, 5);
+      Pre_CheckBox_On.Stroke();
+
+      // Checked
+      {
+        Pre_CheckBox_On.Set_Color(Monet.Main);
+        Pre_CheckBox_On.Draw_RectRound({8-4,8-4, 8+4,8+4}, 3);
+        Pre_CheckBox_On.Fill();
+      }
+    }
+
+
+
+    l_CheckBox_OFF:
+    {
+      Pre_CheckBox_Off.Set_LineSize(2);
+
+      Pre_CheckBox_Off.Set_Color(Monet.Gray);
+      Pre_CheckBox_Off.Draw_RectRound({1,1, 15, 15}, 5);
+      Pre_CheckBox_Off.Stroke();
+    }
+  }
+
+
+  void grid::Draw()
+  {
+    Surface->Set_Color(Monet.Gray);
+    Surface->Set_LineSize(1);
+    for (int i = 1; i < Rows.size()+1; i++)
+    {
+      Surface->Draw_Line({0, (f32)i*RowHeight}, {(f32)Size.W, (f32)i*RowHeight});
+      Surface->Stroke();
+    }
+
+
+    // Satırları Çiz
+    int SX = 0;
+    for (int C = 0; C < Cols.size(); C++)
+    {
+      grid_column &Col = Cols[C];
+ 
+      Surface->Set_Color(Monet.Text);
+      Surface->Set_FontSize(14);
+
+
+      // Head
+      Surface->Set_Pos({(f32)SX+5, (f32)0+7});
+      Surface->Draw_Text(Cols[C].Title.c_str());
+      Surface->Fill();
+
+
+      // Items
+      int SY = RowHeight;
+      for (auto &R: Rows)
+      {
+        if (C >= R.size())
+          break;
+        
+        
+        switch (Col.Type)
+        {
+          case grid_col_type::gctText:
+          {
+            Surface->Set_Pos({(f32)SX+5, (f32)SY+7});
+            Surface->Draw_Text(R[C].c_str());
+            Surface->Fill();
+            break;
+          }
+
+          case grid_col_type::gctCheckbox:
+          {
+            Surface->Set_Pos({(f32)SX+4, (f32)SY+4});
+            Surface->Set_SourceP(R[C] == "1" ? &Pre_CheckBox_On : &Pre_CheckBox_Off);
+            Surface->Paint();
+            break;
+          }
+        }
+
+        SY += RowHeight;
+      }
+      SX += Col.Width;
+    }
+
+  }
+
+  void grid::Do_Reset()
+  {
+    LineColor.Update();
+
+    control::Do_Reset();
+  }
+
+  void grid::Do_ClickEx(poit_i32 Pos)
+  {
+    i32 nRow{-1}, nCol{-1};
+
+    i32 Cac{};
+    for (i32 i{}; i < Cols.size(); i++)
+      if ((Cac += Cols[i].Width) > Pos.X)
+      {
+        nCol = i;
+        break;
+      }
+
+    nRow = ((Pos.Y) /RowHeight) -1;
+
+    if (nRow >= Rows.size())
+      return;
+
+    Do_CellClick(nRow, nCol);    
+  }
+
+  void grid::Do_CellClick(i32 Row, i32 Col)
+  {
+    OnCellClick.Call(this, Row, Col);
+  }
+
+  void grid::CalcAutoSize()
+  {
+    PreferedSize = {100,100};
+  }
+
+
+  propError grid::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = control::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
+
+    return propError::peUnknown;
+  }
+
+  bool grid::LoadFunc(string Name, qev_seed FuncSeed)
+  {
+    if (control::LoadFunc(Name, FuncSeed))
+      return true;
+
+
+    #define makro(X) (Name == #X) { FuncSeed.ToLoad(X); return true; }
+
+    if makro(OnCellClick)
+
+    #undef makro
+
+    return false;
   }
 
   #pragma endregion
@@ -2641,8 +2977,7 @@ namespace qstd
 
     if (VItems->Items[NHSel]->Items.empty())
     {
-      if (VItems->Items[NHSel]->OnClick != Nil)
-        VItems->Items[NHSel]->OnClick(this);
+      VItems->Items[NHSel]->OnClick.Call(this);
 
       goto _l_Close;
     }
@@ -2729,7 +3064,7 @@ namespace qstd
 
   chip::chip()
     : view()
-    , Color(Monet.MainLight)
+    , Color("monet(MainLight)")
   {}
 
   chip::~chip()
@@ -2750,39 +3085,41 @@ namespace qstd
     Surface->Stroke();
   }
 
-  bool chip::LoadProp(string Name, const jconf::Value& Prop)
+  void chip::Do_Reset()
   {
-    if (view::LoadProp(Name, Prop))
-      return true;
+    Color.Update();
+
+    view::Do_Reset();
+  }
+
+  propError chip::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = view::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Color")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
-      string Cac = (string)Prop;
+      Color.Update((string)Prop);
 
-
-      Color = ParseColor(Cac);
-      if (Color == color(0,0,0,0))
-        return false;
-
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "BorderRadius")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       BorderRadius = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -2792,7 +3129,7 @@ namespace qstd
 
   card::card()
     : view()
-    , Color(Monet.Main)
+    , Color("monet(Main)")
   {}
 
   card::~card()
@@ -2826,38 +3163,41 @@ namespace qstd
     Surface->Clip_Reset();
   }
 
-  bool card::LoadProp(string Name, const jconf::Value& Prop)
+  void card::Do_Reset()
   {
-    if (view::LoadProp(Name, Prop))
-      return true;
+    Color.Update();
+
+    view::Do_Reset();
+  }
+
+  propError card::LoadProp(string Name, const jconf::Value& Prop)
+  {
+    if (auto Err = view::LoadProp(Name, Prop); Err.Type != propError::peUnknown)
+      return Err;
 
 
     if (Name == "Color")
     {
       if (!Prop.isString())
-        return false;
+        return propError::peInvalid;
 
-      string Cac = (string)Prop;
+      Color.Update((string)Prop);
 
-      Color = ParseColor(Cac);
-      if (Color == color(0,0,0,0))
-        return false;
-
-      return true;
+      return propError::peOK;
     }
 
     ef (Name == "BorderRadius")
     {
       if (!Prop.isInt())
-        return false;
+        return propError::peInvalid;
 
       BorderRadius = (i64)Prop;
 
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
   }
 
   #pragma endregion
@@ -2885,6 +3225,7 @@ namespace qstd
     Reg(qstd::slider);
     Reg(qstd::tabs);
     Reg(qstd::choice);
+    Reg(qstd::grid);
 
     Reg(qstd::popup);
 

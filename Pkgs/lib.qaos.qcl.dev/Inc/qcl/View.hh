@@ -13,7 +13,6 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "Basis.h"
@@ -38,17 +37,26 @@ namespace qcl
 
 
     public:
-      vector<shared_ptr<control>> Childs;
+      vector<qsh<control>> Childs;
 
-      control* FHoverControl = Nil;
-      control* FFocusControl = Nil;
+      control
+        *FHoverControl = Nil,
+        *FFocusControl = Nil;
+
+    private:
+      bool FIn = false;
+      control
+        *FLegHoverControl = Nil,
+        *FLegFocusControl = Nil;
+    
       void HoverControlSet(control* Ctrl);
       void FocusControlSet(control* Ctrl);
 
+    public:
       bool ScrollVertVisible = true;
       bool ScrollHorzVisible = true;
 
-      void Child_Add(shared_ptr<control> Ctrl);
+      void Child_Add(qsh<control> Ctrl);
       void Child_Rem(control* Ctrl);
 
     public:
@@ -66,7 +74,7 @@ namespace qcl
       virtual void Draw_ScrollVert();
       virtual void Draw_ScrollHorz();
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
 
     public:
       virtual control* FindInput(poit_i32 Pos);
@@ -76,6 +84,9 @@ namespace qcl
 
       virtual void Do_Tiling();
 
+      void Handler_StateChanged(controlStateSet State) override;
+
+      void Do_Reset        () override;
       void Do_Paint_prepare() override;
       void Do_Paint        () override;
       void Do_Resize       () override;

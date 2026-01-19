@@ -13,7 +13,6 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include <sys/time.h>
@@ -26,6 +25,7 @@
 #include "qcl/Graphic.hh"
 #include "qcl/Effect.hh"
 #include "qcl/Input.hh"
+#include "qcl/Types.hh"
 
 using namespace std;
 using namespace jix;
@@ -81,10 +81,11 @@ namespace qcl
   enum controlMessages: u32
   {
     cmPaint = 1,
+    cmReset = 2,
 
-    cmMouseDown = 2,  // for Check
-    cmMouseUp   = 3,  // for Check
-    cmMouseMove = 4,  // for Check
+    cmMouseDown = 3,  // for Check
+    cmMouseUp   = 4,  // for Check
+    cmMouseMove = 5,  // for Check
   };
 
 
@@ -97,7 +98,7 @@ namespace qcl
       virtual ~control();
 
     public:
-      shared_ptr<surface> Surface;
+      qsh<surface> Surface;
       poit_i32 Poit = {0, 0};
       size_i32 Size = {20, 10};
       poit_i32 EndPoit = {20,10};
@@ -108,19 +109,22 @@ namespace qcl
 
       view *Parent = Nil;
       
-      shared_ptr<popup> Popup;
+      qsh<popup> Popup;
 
       bool AutoSize = false;
       bool Transparent = false;
 
+      f64 Opacity = 1.0;
+
       string Name = "";
       vector<string> Style;
-      vector<shared_ptr<effect>> Effects;
+      vector<qsh<effect>> Effects;
 
       dirtyFlagSet DirtyFlags = (DirtyDraw | DirtyAutoSize | DirtyTiling);
       controlStateSet ControlState = 0;
 
       rect_i32 Margins = {0,0,0,0};
+      rect_i32 Paddings = {0,0,0,0};
       controlAnchors Anchors = {{false, Nil},{false, Nil},{false, Nil},{false, Nil}};
 
       bool Visible = true;
@@ -154,8 +158,8 @@ namespace qcl
       inline bool Flag_HasR(dirtyFlagSet Flag) {bool ret = (DirtyFlags & Flag); Flag_Rem(Flag); return ret;}
 
 
-      virtual bool LoadProp(string Name, const jconf::Value& Prop);
-      virtual bool LoadFunc(string Name, point Func);
+      virtual propError LoadProp(string Name, const jconf::Value& Prop);
+      virtual bool LoadFunc(string Name, qev_seed FuncSeed);
       
 
     protected:
@@ -164,26 +168,27 @@ namespace qcl
       
       
     public:
-      void (*OnPaint)       (qcl::control*) = Nil;
-      void (*OnPaint_before)(qcl::control*) = Nil;
-      void (*OnPaint_after) (qcl::control*) = Nil;
-      void (*OnResize)      (qcl::control*) = Nil;
-      
-      void (*OnClick)       (qcl::control*) = Nil;
-      void (*OnClickEx)     (qcl::control*, poit_i32 Pos) = Nil;
-      void (*OnDblClick)    (qcl::control*) = Nil;
-      
-      void (*OnMouseDown)   (qcl::control*, poit_i32 Pos, shiftStateSet Button, shiftStateSet State) = Nil;
-      void (*OnMouseUp)     (qcl::control*, poit_i32 Pos, shiftStateSet Button, shiftStateSet State) = Nil;
-      void (*OnMouseMove)   (qcl::control*, poit_i32 Pos, shiftStateSet State) = Nil;
 
-      void (*OnKeyDown)     (qcl::control*, char *Key, u32 KeyCode, shiftStateSet State) = Nil;
-      void (*OnKeyUp)       (qcl::control*, char *Key, u32 KeyCode, shiftStateSet State) = Nil;
+      qev<> OnPaint;
+      qev<> OnPaint_before;
+      qev<> OnPaint_after;
+      qev<> OnResize;
       
-      void (*OnScrollVert)  (qcl::control*, poit_i32 Pos, i16 Delta, shiftStateSet State) = Nil;
-      void (*OnScrollHorz)  (qcl::control*, poit_i32 Pos, i16 Delta, shiftStateSet State) = Nil;
+      qev<> OnClick;
+      qev<poit_i32 /* Pos */> OnClickEx;
+      qev<> OnDblClick;
       
-      void (*OnStateChanged)(qcl::control*, controlStateSet State) = Nil;
+      qev<poit_i32 /* Pos */, shiftStateSet /* Button */, shiftStateSet /* State */> OnMouseDown;
+      qev<poit_i32 /* Pos */, shiftStateSet /* Button */, shiftStateSet /* State */> OnMouseUp;
+      qev<poit_i32 /* Pos */, shiftStateSet /* State */> OnMouseMove;
+
+      qev<char* /*Key*/, u32 /* KeyCode */, shiftStateSet /* State */> OnKeyDown;
+      qev<char* /*Key*/, u32 /* KeyCode */, shiftStateSet /* State */> OnKeyUp;
+      
+      qev<poit_i32 /* Pos */, i16 /* Delta */, shiftStateSet /* State */ > OnScrollVert;
+      qev<poit_i32 /* Pos */, i16 /* Delta */, shiftStateSet /* State */ > OnScrollHorz;
+      
+      qev<controlStateSet /* State */> OnStateChanged;
 
 
       virtual void Handler_Message     (controlMessages Msg);
@@ -199,6 +204,7 @@ namespace qcl
       virtual void Handler_StateChanged(controlStateSet State);
 
 
+      virtual void Do_Reset        ();
       virtual void Do_Paint_prepare();
       virtual void Do_Paint        ();
       virtual void Do_Resize       ();

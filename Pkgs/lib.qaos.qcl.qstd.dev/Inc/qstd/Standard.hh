@@ -13,7 +13,6 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "Basis.h"
@@ -40,6 +39,9 @@ namespace qstd
       monet();
 
     public:
+      color LColor = color(203.0/255.0, 151.0/255.0, 77.0/255.0);
+      bool LDark = true;
+
       color Main;
       color MainDark;
       color MainDarkS;
@@ -55,10 +57,37 @@ namespace qstd
       color BackDark;
 
     public:
-      void Update(color Color, bool Dark = true);
+      void Update(color Color, bool Dark);
+      void Update(color Color);
+      void Update(bool Dark);
   };
 
   extern monet Monet;
+
+
+
+  struct dcolor
+  {
+    public:
+      explicit dcolor(string nKey)
+        : Key(nKey)
+        , Color(0,0,0)
+      {
+        Update();
+      }
+
+      void Update(string nKey);
+      void Update();
+
+      operator color() const
+      {
+        return Color;
+      }
+
+    public:
+      string Key;
+      color Color;
+  };
 
 
 
@@ -88,7 +117,7 @@ namespace qstd
       void Update(size_i32 Size) override;
       void Draw(surface *Surface, poit_f32 Pos) override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
 
@@ -99,9 +128,14 @@ namespace qstd
       form();
       ~form() override;
 
+    
+    public:
+      dcolor Color;
       
     public:
       void Draw() override;
+
+      void Do_Reset() override;
 
   };
 
@@ -112,7 +146,7 @@ namespace qstd
       ~layout() override;
 
     public:
-      color Color;
+      dcolor Color;
       u16 BorderRadius = 12;
 
     public:
@@ -121,7 +155,9 @@ namespace qstd
       void Draw_ScrollVert() override;
       void Draw_ScrollHorz() override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void Do_Reset() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class layout_vert: public layout
@@ -133,8 +169,6 @@ namespace qstd
 
     public:
       void Do_Tiling() override;
-
-      void CalcAutoSize() override;
   };
 
   class layout_horz: public layout
@@ -146,8 +180,6 @@ namespace qstd
 
     public:
       void Do_Tiling() override;
-
-      void CalcAutoSize() override;
   };
 
   class layout_flow: public layout
@@ -159,8 +191,6 @@ namespace qstd
 
     public:
       void Do_Tiling() override;
-
-      void CalcAutoSize() override;
   };
 
 
@@ -185,7 +215,7 @@ namespace qstd
     public:
       string Text = "text";
 
-      color Color;
+      dcolor Color;
 
       u16 FontSize = 14;
 
@@ -197,7 +227,9 @@ namespace qstd
 
       void CalcAutoSize() override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void Do_Reset() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class icon: public qcl::control
@@ -208,7 +240,7 @@ namespace qstd
 
 
     public:
-      shared_ptr<surface> Icon;
+      qsh<surface> Icon;
 
       string Path = "";
 
@@ -218,7 +250,7 @@ namespace qstd
 
       bool LoadIcon();
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class edit: public qcl::control
@@ -242,7 +274,7 @@ namespace qstd
 
       void Do_KeyDown(char *Key, u32 KeyCode, qcl::shiftStateSet State) override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class radio: public qcl::control
@@ -257,7 +289,7 @@ namespace qstd
 
       bool Checked = false;
 
-      void (*OnChanged) (qcl::control*, bool Status) = Nil;
+      qev<bool /* Status */> OnChanged;
 
     public:
       void Draw() override;
@@ -267,8 +299,10 @@ namespace qstd
       void Do_Click() override;
       virtual void Do_Changed(bool Status);
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
-      bool LoadFunc(string Name, point Func) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
   };
 
   class check: public qcl::control
@@ -283,7 +317,7 @@ namespace qstd
 
       bool Checked = false;
 
-      void (*OnChanged) (qcl::control*, bool Status) = Nil;
+      qev<bool /* Status */> OnChanged;
 
     public:
       void Draw() override;
@@ -293,8 +327,10 @@ namespace qstd
       void Do_Click() override;
       virtual void Do_Changed(bool Status);
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
-      bool LoadFunc(string Name, point Func) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
   };
 
   class toggle: public qcl::control
@@ -309,7 +345,7 @@ namespace qstd
 
       bool Checked = false;
 
-      void (*OnChanged) (qcl::control*, bool Status) = Nil;
+      qev<bool /* Status */> OnChanged;
 
     public:
       void Draw() override;
@@ -319,8 +355,10 @@ namespace qstd
       void Do_Click() override;
       virtual void Do_Changed(bool Status);
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
-      bool LoadFunc(string Name, point Func) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
   };
 
   class progbar: public qcl::control
@@ -339,7 +377,9 @@ namespace qstd
     public:
       void Draw() override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class slider: public qcl::control
@@ -353,7 +393,7 @@ namespace qstd
       u32 Max = 100;
       u32 Value = 20;
 
-      void (*OnChanged) (qcl::control*, u32 Value) = Nil;
+      qev<u32 /* Value */> OnChanged;
 
     public:
       void Draw() override;
@@ -363,8 +403,10 @@ namespace qstd
       void Do_MouseMove(poit_i32 Pos, shiftStateSet State) override;
       virtual void Do_Changed(u32 Value);
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
-      bool LoadFunc(string Name, point Func) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
   };
 
   class tabs: public qcl::control
@@ -380,19 +422,23 @@ namespace qstd
       i32 TabID = -1;
       i32 HTabID = -1;
 
-      void (*OnChanged)(qcl::control*, i32 TabID) = Nil;
+      qev<i32 /* TabID */> OnChanged;
 
     public:
       void Draw() override;
 
       void ReCalc_TabsSize();
 
+      void Handler_StateChanged(qcl::controlStateSet State) override;
+
       void Do_MouseMove(poit_i32 Pos, shiftStateSet State) override;
       void Do_ClickEx(poit_i32 Pos) override;
       virtual void Do_Changed(i32 nTabID);
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
-      bool LoadFunc(string Name, point Func) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
   };
 
   class choice: public tabs
@@ -410,9 +456,66 @@ namespace qstd
       void Do_MouseMove(poit_i32 Pos, shiftStateSet State) override;
       void Do_ClickEx(poit_i32 Pos) override;
 
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void CalcAutoSize() override;
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
+
+  enum grid_col_type 
+  {
+    gctText     = 1,
+    gctCheckbox = 2,
+    gctButton   = 3,
+  };
+
+  struct grid_column
+  {
+    string Title;
+    string FieldName;
+    i32 Width = 100;
+    
+    grid_col_type Type = grid_col_type::gctText;
+  };
+
+  class grid: public qcl::control
+  {
+    public:
+      grid();
+      ~grid() override;
+
+
+    public:
+      vector<grid_column> Cols;
+      vector<vector<string>> Rows;
+
+      u32 RowHeight = 24;
+      u32 HeaderHeight = 30;
+
+      dcolor LineColor = dcolor("monet(GrayDark)");
+
+
+      surface
+        Pre_CheckBox_On,
+        Pre_CheckBox_Off;
+
+      void PreCtrlReset();
+
+
+      qev<i32 /* Row */, i32 /* Col */> OnCellClick;
+
+    public:
+      void Draw() override;
+
+      void CalcAutoSize() override;
+
+      void Do_Reset() override;
+      void Do_ClickEx(poit_i32 Pos) override;
+      virtual void Do_CellClick(i32 Row, i32 Col);
+
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
+      bool LoadFunc(string Name, qev_seed FuncSeed) override;
+  };
 
 
   class popup: public qcl::popup
@@ -442,12 +545,13 @@ namespace qstd
       ~chip() override;
 
     public:
-      color Color;
+      dcolor Color;
       i32 BorderRadius = -1;
 
     public:
       void Draw() override;
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void Do_Reset() override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
 
   class card: public qcl::view
@@ -457,12 +561,13 @@ namespace qstd
       ~card() override;
 
     public:
-      color Color;
+      dcolor Color;
       i32 BorderRadius = -1;
 
     public:
       void Draw() override;
-      bool LoadProp(string Name, const jconf::Value& Prop) override;
+      void Do_Reset() override;
+      propError LoadProp(string Name, const jconf::Value& Prop) override;
   };
   
 }

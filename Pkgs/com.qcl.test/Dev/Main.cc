@@ -11,8 +11,6 @@
 
 
 #include <iostream>
-#include <vector>
-#include <memory>
 
 #include "Basis.h"
 
@@ -28,48 +26,61 @@ using namespace qcl;
 
 
 
-void But1_OnClick(qcl::control* Self)
+#define DECLARE_SUB(Name, Type) Type *Name;
+#define INIT_SUB(Name, Type) Name = dynamic_cast<Type*>(qcl::dyn::findFromName(this, #Name).get());
+#define INIT_EV(Class, Name) {#Name, qev_seed(this, &Class::Name)},
+#define SUBCOM_GENERATE(File, Class, Events, Comps) \
+public: \
+  Comps(DECLARE_SUB) \
+  Class() { \
+    qcl::dyn::loadFromFile(this, File, {Events(INIT_EV)}); \
+    Comps(INIT_SUB) \
+  }
+
+
+
+class MainForm: public qstd::form
 {
-  cout << "Click: " << Self->Tag << endl;
-}
+public:
+  #define COMPONENTS(DO)
 
 
-void Nav_Menu(qcl::control* Self)
+  #define EVENTS(DO) \
+    DO(MainForm, ThemeChange)
+
+  
+  SUBCOM_GENERATE("Des/Main.qdl", MainForm, EVENTS, COMPONENTS)
+
+
+public:
+  void ThemeChange(control *Self, i32 TabID)
+  {
+    qstd::Monet.Update(TabID == 0);
+
+    CurrentApp->PushMessage(this, controlMessages::cmReset);
+  }
+
+};
+
+
+
+extern "C" int qcl_entry2(ohid App_H)
 {
-  cout << "Menu" << endl;
-}
-
-void Nav_Add(qcl::control* Self)
-{
-  cout << "Add" << endl;
-}
+  application App(App_H, true);
 
 
-#define RegFunc(X) {#X, (point)&X},
-
-extern "C" int qcl_entry2(shared_ptr<qcl::application> app)
-{
   qstd::Register();
 
 
-  qstd::Monet
-    .Update(color(203.0/255.0, 151.0/255.0, 77.0/255.0));
-    //.Update(color(49.0/255.0, 211.0/255.0, 76.0/255.0));
-    //.Update(color(0.45, 0.30, 0.80));
+  qstd::Monet.Update(color(203.0/255.0, 151.0/255.0, 77.0/255.0), true);
+    //.Update(color(49.0/255.0, 211.0/255.0, 76.0/255.0), true);
+    //.Update(color(0.45, 0.30, 0.80), true);
 
 
-  auto QDL = qcl::dyn::Load_FormFile(
-    "Des/Main.qdl", {
+  auto AForm = new MainForm();
+  AForm->Show();
 
-    RegFunc(But1_OnClick)
-    RegFunc(Nav_Menu)
-    RegFunc(Nav_Add)
-  });
-
-  dynamic_cast<qstd::form*>(QDL[0].get())->Show();
-
-
-  app->Run();
+  CurrentApp->Run();
   return 0;
 }
 

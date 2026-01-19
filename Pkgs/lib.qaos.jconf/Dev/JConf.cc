@@ -39,12 +39,13 @@ const char _c_Mag_Jixoid[10] = {'\e','^','J','I','X','0','1','D','!','\a'};
 const char _c_Mag_JConf[7] = {'C','o','n','f','i','g','_'};
 
 
-const u8 _c_Val  = 0x1;
-const u8 _c_Stc  = 0x2;
-const u8 _c_Arr  = 0x3;
-const u8 _c_Int  = 0x4;
-const u8 _c_Bool = 0x5;
-const u8 _c_Data = 0x6;
+const u8 _c_Val   = 0x1;
+const u8 _c_Stc   = 0x2;
+const u8 _c_Arr   = 0x3;
+const u8 _c_Int   = 0x4;
+const u8 _c_Bool  = 0x5;
+const u8 _c_Data  = 0x6;
+const u8 _c_Float = 0x7;
 
 
 // Intern
@@ -99,6 +100,19 @@ struct cBool: cObj
   {}
 
   bool Val;
+};
+
+struct cFloat: cObj
+{
+  cFloat() : cObj(_c_Float)
+  {}
+
+  cFloat(f64 nVal)
+    : cObj(_c_Float)
+    , Val(nVal)
+  {}
+
+  f64 Val;
 };
 
 struct cData: cObj
@@ -200,6 +214,11 @@ extern "C" bool jc_is_bool(jc_obj __Obj)
   return (__Obj != Nil) && ((*Obj)->Type == _c_Bool);
 }
 
+extern "C" bool jc_is_float(jc_obj __Obj)
+{
+  return (__Obj != Nil) && ((*Obj)->Type == _c_Float);
+}
+
 extern "C" bool jc_is_data(jc_obj __Obj)
 {
   return (__Obj != Nil) && ((*Obj)->Type == _c_Data);
@@ -242,6 +261,13 @@ extern "C" jc_bool jc_new_bool(bool value)
 {
   return new jc<cObj>(
     new cBool(value)
+  );
+}
+
+extern "C" jc_float jc_new_float(f64 value)
+{
+  return new jc<cObj>(
+    new cFloat(value)
   );
 }
 
@@ -382,12 +408,13 @@ extern "C" jc_obj jc_nref(jc_obj __Obj)
 
 
 
-#define SVal  ((cVal*)Obj->get())
-#define SInt  ((cInt*)Obj->get())
-#define SBool ((cBool*)Obj->get())
-#define SData ((cData*)Obj->get())
-#define SStc  ((cStc*)Obj->get())
-#define SArr  ((cArr*)Obj->get())
+#define SVal   ((cVal*)Obj->get())
+#define SInt   ((cInt*)Obj->get())
+#define SBool  ((cBool*)Obj->get())
+#define SFloat ((cFloat*)Obj->get())
+#define SData  ((cData*)Obj->get())
+#define SStc   ((cStc*)Obj->get())
+#define SArr   ((cArr*)Obj->get())
 
 
 // Set/Get
@@ -421,6 +448,17 @@ extern "C" bool jc_bool_get(jc_bool __Obj)
 extern "C" void jc_bool_set(jc_bool __Obj, bool Value)
 {
   SBool->Val = Value;
+}
+
+
+extern "C" f64 jc_float_get(jc_float __Obj)
+{
+  return SFloat->Val;
+}
+
+extern "C" void jc_float_set(jc_float __Obj, f64 Value)
+{
+  SFloat->Val = Value;
 }
 
 
@@ -534,6 +572,7 @@ extern "C" void jc_arr_clear(jc_arr __Obj)
 #undef SVal
 #undef SInt
 #undef SBool
+#undef SFloat
 #undef SData
 #undef SStc
 #undef SArr
@@ -668,7 +707,7 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
   string Line;
   while (getline(File, Line))
   {
-    if (! Temp.empty() && ! InString)
+    if (!Temp.empty() && !InString)
     {
       Tokens.push_back(Temp); // Önceki kelimeyi ekle
       Temp.clear();
@@ -753,7 +792,7 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
     _l_NextLine: {}
   }
 
-  if (! Temp.empty())
+  if (!Temp.empty())
   {
     Tokens.push_back(Temp); // Önceki kelimeyi ekle
     Temp.clear();
@@ -782,7 +821,7 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
 
 
   // Start
-  while (! isEnd)
+  while (!isEnd)
   {
     string Name;
 
@@ -847,7 +886,7 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
     _l_Content:
 
 
-    // String
+    // Bool
     if (Word == "true" || Word == "false" || Word == "yes" || Word == "no")
     {
       jc<cBool> Bool = jc<cBool>(new cBool());
@@ -881,37 +920,62 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
       Next();
     }
 
-    // Integer
+    // Integer / Float
     ef (GetType(Word) == eToken::Int || Word == "-")
     {
-      jc<cInt> Int = jc<cInt>(new cInt());
-
       string Temp;
       if (Word == "-")
       {
         Next();
         Temp = "-" +Word;
       }
-      else
+      el
         Temp = Word;
+      Next();
 
 
-
-      auto eret = from_chars(Temp.data(), Temp.data() +Temp.size(), Int->Val);
-      if (eret.ec != std::errc())
+      bool IsFloat{};
+      if (!isEnd && Word == ".")
       {
-        JC_ERROR = JC_ERR_ConvertToInteger;
-        return Nil;
+        IsFloat = true;
+        Next();
+        Temp += "." +Word;
+        Next();
+      }
+
+
+      shared_ptr<cObj> O;
+
+      if (IsFloat)
+      {
+        jc<cFloat> Flo = jc<cFloat>(new cFloat());
+        auto eret = from_chars(Temp.data(), Temp.data() +Temp.size(), Flo->Val);
+        if (eret.ec != std::errc())
+        {
+          JC_ERROR = JC_ERR_ConvertToInteger;
+          return Nil;
+        }
+        O = Flo;
+        
+      }
+      el
+      {
+        jc<cInt> Int = jc<cInt>(new cInt());
+        auto eret = from_chars(Temp.data(), Temp.data() +Temp.size(), Int->Val);
+        if (eret.ec != std::errc())
+        {
+          JC_ERROR = JC_ERR_ConvertToInteger;
+          return Nil;
+        }
+        O = Int;
       }
 
 
       if (Cov->Type == _c_Arr)
-        ((cArr*)Cov.get())->Arr.push_back(Int);
+        ((cArr*)Cov.get())->Arr.push_back(O);
 
       ef (Cov->Type == _c_Stc)
-      ((cStc*)Cov.get())->Stc.push_back({Name, Int});
-
-      Next();
+        ((cStc*)Cov.get())->Stc.push_back({Name, O});
     }
 
     // Data
@@ -1152,6 +1216,21 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
     return Ret;
   }
 
+  cFloat* __ParseBin_Float(ifstream &Stream)
+  {
+    // Ret
+    auto Ret = new cFloat();
+
+
+    // Load Value
+    f64 Tmp;
+    Stream.read((c8*)(&Tmp), sizeof(f64));
+    Ret->Val = Tmp;
+
+    // Ret
+    return Ret;
+  }
+
   cData* __ParseBin_Data(ifstream &Stream)
   {
     // Ret
@@ -1200,6 +1279,10 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
 
         case _c_Bool:
           Ret->Arr.push_back(jc<cObj>(__ParseBin_Bool(Stream)));
+          break;
+
+        case _c_Float:
+          Ret->Arr.push_back(jc<cObj>(__ParseBin_Float(Stream)));
           break;
 
         case _c_Data:
@@ -1275,6 +1358,10 @@ extern "C" jc_stc jc_parse_raw(const char* FPath)
 
         case _c_Bool:
           Ret->Stc.push_back({Key, jc<cObj>(__ParseBin_Bool(Stream))});
+          break;
+
+        case _c_Float:
+          Ret->Stc.push_back({Key, jc<cObj>(__ParseBin_Float(Stream))});
           break;
 
         case _c_Data:
@@ -1372,6 +1459,11 @@ extern "C" jc_stc jc_parse_bin(const char* FPath)
     Stream << (Content->Val ? "yes":"no") << "\n";
   }
 
+  void __WriteRaw_Float(ofstream &Stream, cFloat *Content)
+  {
+    Stream << std::fixed << Content->Val << "\n";
+  }
+
   void __WriteRaw_Data(ofstream &Stream, cData *Content)
   {
     Stream << "%BLOB" << ":" << Content->Val.Size << ":";
@@ -1402,6 +1494,10 @@ extern "C" jc_stc jc_parse_bin(const char* FPath)
 
       case _c_Bool:
         __WriteRaw_Bool(Stream, (cBool*)Objec.get());
+        break;
+
+      case _c_Float:
+        __WriteRaw_Float(Stream, (cFloat*)Objec.get());
         break;
 
       case _c_Data:
@@ -1447,6 +1543,10 @@ extern "C" jc_stc jc_parse_bin(const char* FPath)
 
       case _c_Bool:
         __WriteRaw_Bool(Stream, (cBool*)Objec.get());
+        break;
+
+      case _c_Float:
+        __WriteRaw_Float(Stream, (cFloat*)Objec.get());
         break;
 
       case _c_Data:
@@ -1525,6 +1625,16 @@ extern "C" void jc_write_raw(const char* FPath, jc_stc Data)
     Stream.write((c8*)(&Content->Val), sizeof(bool));
   }
 
+  void __WriteBin_Float(ofstream &Stream, cFloat *Content)
+  {
+    // Magic
+    Stream.write((c8*)(&_c_Float), sizeof(i8));
+
+
+    // Save Value
+    Stream.write((c8*)(&Content->Val), sizeof(f64));
+  }
+
   void __WriteBin_Data(ofstream &Stream, cData *Content)
   {
     // Magic
@@ -1560,6 +1670,10 @@ extern "C" void jc_write_raw(const char* FPath, jc_stc Data)
 
       case _c_Bool:
         __WriteBin_Bool(Stream, (cBool*)Objec.get());
+        break;
+
+      case _c_Float:
+        __WriteBin_Float(Stream, (cFloat*)Objec.get());
         break;
 
       case _c_Data:
@@ -1619,6 +1733,10 @@ extern "C" void jc_write_raw(const char* FPath, jc_stc Data)
 
         case _c_Bool:
           __WriteBin_Bool(Stream, (cBool*)Objec.get());
+          break;
+
+        case _c_Float:
+          __WriteBin_Float(Stream, (cFloat*)Objec.get());
           break;
 
         case _c_Data:

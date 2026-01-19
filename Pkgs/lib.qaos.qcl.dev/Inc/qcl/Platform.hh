@@ -13,18 +13,10 @@
 
 #pragma once
 
-#include <iostream>
-#include <memory>
-#include <vector>
-#include <cmath>
-
 #include "Basis.h"
 
 #include "qcl/Control.hh"
-#include "qcl/View.hh"
-#include "qcl/Window.hh"
 #include "qcl/Graphic.hh"
-#include "qcl/Application.hh"
 
 using namespace std;
 using namespace jix;
@@ -33,10 +25,11 @@ using namespace jix;
 
 namespace qcl::platform
 {
-  extern "C" int qcl_entry1(shared_ptr<qcl::application> app, shared_ptr<qcl::window> win);
-  extern "C" int qcl_entry2(shared_ptr<qcl::application> app);
+  extern "C" [[gnu::weak]] int qcl_entry1(ohid App_H, ohid Win_H);
+  extern "C" [[gnu::weak]] int qcl_entry2(ohid App_H);
+  extern "C" [[gnu::weak]] int qcl_entry3();
   
-  extern "C" void qcl_error(const char *Msg);
+  extern "C" [[gnu::noreturn]] void qcl_error(const char *Msg);
 
   
   namespace window
@@ -63,10 +56,11 @@ namespace qcl::platform
 
 
     void Set_Color(handle  val, color Val);
-    void Set_Source(handle  val, shared_ptr<qcl::surface> Val);
-    void Set_SourceP(handle  val, qcl::surface *Val);
+    void Set_Source(handle  val, qcl::surface *Val);
     void Set_FontSize(handle  val, f32 Size);
     void Set_LineSize(handle  val, f32 Size);
+
+    void Set_Translate(handle  val, poit_f32 P);
 
     void Set_OP(handle  val, qcl::surface::operators  Op);
     qcl::surface::operators Get_OP(handle  val);
@@ -95,6 +89,7 @@ namespace qcl::platform
     void Stroke(handle  val);
     void Fill(handle  val);
     void Paint(handle  val);
+    void PaintA(handle  val, f64 A);
     void Clip(handle  val);
     void Clip_Reset(handle  val);
 

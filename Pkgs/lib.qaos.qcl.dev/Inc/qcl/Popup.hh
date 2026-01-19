@@ -13,15 +13,12 @@
 
 #pragma once
 
-#include <iostream>
 #include <memory>
 #include <vector>
-#include <cmath>
 
 #include "Basis.h"
 
 #include "qcl/Control.hh"
-#include "qcl/Graphic.hh"
 
 using namespace std;
 using namespace jix;
@@ -35,7 +32,7 @@ namespace qcl
   {
     string Name;
 
-    void (*OnClick)(qcl::control*) = Nil;
+    qev<> OnClick;
 
 
     popup_item *Parent = Nil;

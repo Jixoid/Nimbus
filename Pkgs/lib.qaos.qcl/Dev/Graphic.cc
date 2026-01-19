@@ -11,12 +11,10 @@
 
 
 
-#include <iostream>
-#include <memory>
-
 #include "Basis.h"
 
 #include "qcl/Graphic.hh"
+#include "qcl/Window.hh"
 #include "qcl/Platform.hh"
 
 using namespace std;
@@ -79,24 +77,31 @@ namespace qcl
     platform::surface::Set_Color(OHID, Val);
   }
 
-  void surface::Set_Source(shared_ptr<surface> Val)
+  void surface::Set_Source(qsh<surface> Val)
   {
-    platform::surface::Set_Source(OHID, std::move(Val));
+    platform::surface::Set_Source(OHID, Val.get());
   }
 
   void surface::Set_SourceP(surface *Val)
   {
-    platform::surface::Set_SourceP(OHID, Val);
+    platform::surface::Set_Source(OHID, Val);
   }
 
   void surface::Set_FontSize(f32 Size)
   {
+    FontSize = Size;
     platform::surface::Set_FontSize(OHID, Size);
   }
 
   void surface::Set_LineSize(f32 Size)
   {
+    LineSize = Size;
     platform::surface::Set_LineSize(OHID, Size);
+  }
+
+  void surface::Set_Translate(poit_f32 P)
+  {
+    platform::surface::Set_Translate(OHID, P);
   }
 
 
@@ -214,6 +219,11 @@ namespace qcl
   void surface::Paint()
   {
     platform::surface::Paint(OHID);
+  }
+
+  void surface::PaintA(f64 A)
+  {
+    platform::surface::PaintA(OHID, A);
   }
 
   void surface::Clip()

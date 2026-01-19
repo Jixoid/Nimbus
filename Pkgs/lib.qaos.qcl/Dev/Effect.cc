@@ -36,7 +36,7 @@ namespace qcl
 
 
 
-  bool effect::LoadProp(string Name, const jconf::Value& Prop)
+  propError effect::LoadProp(string Name, const jconf::Value& Prop)
   {
 
     if (Name == "Enabled")
@@ -44,17 +44,17 @@ namespace qcl
       bool Nat = this->Enabled;
       
       if (!Prop.isBool())
-        return false;
+        return propError::peInvalid;
 
 
       Nat = (bool)Prop;
 
       Enabled = (Nat);
-      return true;
+      return propError::peOK;
     }
 
     else
-      return false;
+      return propError::peUnknown;
 
   }
 

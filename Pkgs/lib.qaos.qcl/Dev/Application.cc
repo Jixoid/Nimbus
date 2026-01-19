@@ -11,15 +11,9 @@
 
 
 
-#include <iostream>
-#include <memory>
-#include <vector>
-#include <cmath>
-
 #include "Basis.h"
 
 #include "qcl/Control.hh"
-#include "qcl/View.hh"
 #include "qcl/Window.hh"
 #include "qcl/Graphic.hh"
 #include "qcl/Application.hh"
@@ -45,12 +39,25 @@ namespace qcl
       MakeCurrent();
   }
 
+  application::application(handle nOHID)
+  {
+    OHID = nOHID;
+  }
+
+  application::application(handle nOHID, bool nMakeCurrent)
+  {
+    OHID = nOHID;
+
+    if (nMakeCurrent)
+      MakeCurrent();
+  }
+
   application::~application()
   {
-    platform::application::Dis(OHID);
-
     if (CurrentApp == this)
       CurrentApp = Nil;
+    
+    platform::application::Dis(OHID);
   }
 
   

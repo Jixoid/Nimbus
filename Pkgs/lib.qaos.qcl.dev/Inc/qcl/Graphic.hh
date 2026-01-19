@@ -13,12 +13,9 @@
 
 #pragma once
 
-#include <iostream>
-#include <memory>
-
 #include "Basis.h"
+#include "qcl/Types.hh"
 
-using namespace std;
 using namespace jix;
 
 
@@ -26,123 +23,6 @@ using namespace jix;
 namespace qcl
 {
   class window;
-
-
-  // Color
-  struct color
-  {
-    f32
-      A,R,G,B;
-
-    inline color(f32 nR, f32 nG, f32 nB, f32 nA = 1.0f)
-      : R(nR)
-      , G(nG)
-      , B(nB)
-      , A(nA)
-    {}
-
-    inline color _A(f32 nA)
-    {
-      color Ret = *this;
-      Ret.A = nA;
-
-      return Ret;
-    }
-
-    inline color _R(f32 nR)
-    {
-      color Ret = *this;
-      Ret.R = nR;
-
-      return Ret;
-    }
-    
-    inline color _G(f32 nG)
-    {
-      color Ret = *this;
-      Ret.G = nG;
-
-      return Ret;
-    }
-
-    inline color _B(f32 nB)
-    {
-      color Ret = *this;
-      Ret.B = nB;
-
-      return Ret;
-    }
-
-
-    inline bool operator==(const color &It) const
-    {
-      return (A == It.A) && (R == It.R) && (G == It.G) && (B == It.B);
-    }
-
-  };
-
-
-  // Rect
-  template <typename _T>
-  struct rect
-  {
-    _T
-      X1,Y1,
-      X2,Y2;
-
-    inline bool operator==(const rect &It) const
-    {
-      return (X1 == It.X1) && (X2 == It.X2) && (Y1 == It.Y1) && (Y2 == It.Y2);
-    }
-  };
-
-  using rect_f32 = rect<f32>;
-  using rect_i32 = rect<i32>;
-
-
-  // Poit
-  template <typename _T>
-  struct poit
-  {
-    _T X,Y;
-
-    inline bool operator==(const poit &It) const
-    {
-      return (X == It.X) && (Y == It.Y);
-    }
-
-    inline poit operator+(const poit &It) const
-    {
-      return {X +It.X, Y +It.Y};
-    }
-
-    inline poit& operator+=(const poit &It)
-    {
-      X += It.X;
-      Y += It.Y;
-
-      return *this;
-    }
-  };
-
-  using poit_f32 = poit<f32>;
-  using poit_i32 = poit<i32>;
-
-
-  // Size
-  template <typename _T>
-  struct size
-  {
-    _T W,H;
-
-    inline bool operator==(const size &It) const
-    {
-      return (W == It.W) && (H == It.H);
-    }
-  };
-
-  using size_f32 = size<f32>;
-  using size_i32 = size<i32>;
 
 
   // Surface
@@ -175,13 +55,17 @@ namespace qcl
     public:
       u32 Width, Height;
 
+      f32 FontSize;
+      f32 LineSize;
 
     public:
       void Set_Color(color Val);
-      void Set_Source(shared_ptr<surface> Val);
+      void Set_Source(qsh<surface> Val);
       void Set_SourceP(surface *Val);
       void Set_FontSize(f32 Size);
       void Set_LineSize(f32 Size);
+
+      void Set_Translate(poit_f32 P);
 
       void      Set_OP(operators Op);
       operators Get_OP();
@@ -214,6 +98,7 @@ namespace qcl
       void Stroke();
       void Fill();
       void Paint();
+      void PaintA(f64 A);
       void Clip();
       void Clip_Reset();
 
