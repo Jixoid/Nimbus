@@ -1,4 +1,7 @@
 
+# v0.8.0:0-rc1 [Main]
+  
+
 ## v0.7.4:0 [Main Daily]
   - Added: QEV (QCL Event System)
   - Refactored: New Object Oriented Structure

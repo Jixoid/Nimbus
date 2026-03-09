@@ -12,7 +12,7 @@
 
 ## 📜 License
 
-JConf project uses multiple licenses:
+QCL project uses multiple licenses:
 
 - GPL for **source code**.
 - LGPL for **build system**.

@@ -1,6 +1,8 @@
-cmake_minimum_required(VERSION 3.20)
-project(QCL CXX)
+cmake_minimum_required(VERSION 3.28)
+project(QCL C CXX)
 
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,13 +10,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+add_compile_options(-gdwarf-4)
+
+
 # Debug
-add_compile_definitions($<$<CONFIG:Debug>:_DBG>)
-#add_compile_definitions($<$<CONFIG:Debug>:_QCL_DBG>)
+add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
+#add_compile_definitions(_QCL_use_debug)
+add_compile_definitions(_QCL_use_hwvec)
+
 
 # Sanitizer
 add_compile_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
 add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak,undefined>)
+
 
 # LTO
 include(CheckIPOSupported)
@@ -28,17 +36,15 @@ else()
 endif()
 
 
-
-# Childs
-file(GLOB childs RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/Pkgs" "${CMAKE_CURRENT_SOURCE_DIR}/Pkgs/*")
+file(GLOB childs RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/pkgs" "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/*")
 foreach(child ${childs})
   if(
-    IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Pkgs/${child}" AND
-    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Pkgs/${child}/CMakeLists.txt"
+    IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}" AND
+    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}/CMakeLists.txt"
   )
     
     message(STATUS "Sub Project Added: ${child}")
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Pkgs/${child}")
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}")
       
   endif()
 endforeach()

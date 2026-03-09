@@ -4,7 +4,7 @@ This project contains files licensed under different licenses depending on
 their type:
 
   Source code files written in C, C++, Pascal, Assembly, LLVM and QLang
-  (*.c, *.h, *.cpp, *.hpp, *.pas, *.s, *.ll, *.bc, *.ql, etc.) are
+  (*.c, *.h, *.cpp, *.hpp, etc.) are
   licensed under the GNU General Public License (GPL).
 
   Build system files, including Makefile, are licensed under
