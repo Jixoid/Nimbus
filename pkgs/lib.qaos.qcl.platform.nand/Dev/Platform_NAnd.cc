@@ -10,13 +10,12 @@
 */
 
 
-
 #define el else
 #define ef else if
 
 #include <android_native_app_glue.h>
 
-#include "Basis.h"
+#include "basis.hh"
 
 #include "qcl/Application.hh"
 #include "qcl/Control.hh"
@@ -27,9 +26,10 @@
 using namespace std;
 
 
+
 struct nand_app_handle
 {
-    android_app *State = Nil;
+    android_app *State = nil;
 };
 
 struct nand_win_handle
@@ -293,7 +293,7 @@ namespace qcl::platform::dialog
 
 [[gnu::weak]] void android_main(android_app *State)
 {
-  if (qcl::platform::qcl_entry1 != Nil)
+  if (qcl::platform::qcl_entry1 != nil)
   {
     ohid App_H{};
     qcl::platform::application::New(&App_H);
@@ -305,7 +305,7 @@ namespace qcl::platform::dialog
     qcl::platform::qcl_entry1(App_H, Win_H);
   }
 
-  ef (qcl::platform::qcl_entry2 != Nil)
+  ef (qcl::platform::qcl_entry2 != nil)
   {
     ohid App_H{};
     qcl::platform::application::New(&App_H);
@@ -314,7 +314,7 @@ namespace qcl::platform::dialog
     qcl::platform::qcl_entry2(App_H);
   }
 
-  ef (qcl::platform::qcl_entry3 != Nil)
+  ef (qcl::platform::qcl_entry3 != nil)
   {
     qcl::platform::qcl_entry3();
   }

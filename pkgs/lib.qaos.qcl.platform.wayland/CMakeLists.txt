@@ -56,13 +56,6 @@ target_include_directories(${TARGET_NAME}_shared PUBLIC inc)
 target_link_libraries(${TARGET_NAME}_shared PUBLIC
   qaos_qcl_shared
 
-  qaos_skia_inc
-  qaos_skia_svg_lib
-  qaos_skia_shaper_lib
-  qaos_skia_unicode_core_lib
-  qaos_skia_unicode_icu_lib
-  qaos_skia_lib
-
   EGL
   GLESv2
 
@@ -92,13 +85,6 @@ target_include_directories(${TARGET_NAME}_static PUBLIC inc)
 
 target_link_libraries(${TARGET_NAME}_static PUBLIC
   qaos_qcl_static
-
-  qaos_skia_inc
-  qaos_skia_svg_lib
-  qaos_skia_shaper_lib
-  qaos_skia_unicode_core_lib
-  qaos_skia_unicode_icu_lib
-  qaos_skia_lib
 
   EGL
   GLESv2

@@ -9,13 +9,14 @@
   Copyright (c) 2025 by Kadir Aydın.
 */
 
+
 #pragma once
 
-#include "qcl/Widget.hh"
-#include "DS.hh"
-#include "qstd/Monet.hh"
+#include "ds/ds.hh"
+#include "qcl/widget.hh"
 
 using namespace qcl;
+
 
 
 namespace qstd
@@ -81,8 +82,8 @@ namespace qstd
       virtual fun doChanged(u32 Pos1, u32 Pos2) -> void;
 
     public:
-      fun getProp(string_view) -> expected<any, bool> override;
-      fun setProp(string_view, any) -> expected<void, bool> override;
+      fun getProp(string_view) -> expected<std::any, bool> override;
+      fun setProp(string_view, std::any) -> expected<void, bool> override;
       fun loadProp(string_view, const ds::value&, function<expected<qev_seed,bool>(string_view)>) -> expected<bool, string> override;
   };
 

@@ -13,10 +13,18 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 add_compile_options(-gdwarf-4)
 
 
+
+
 # Debug
 add_compile_definitions($<$<CONFIG:Debug>:_DBG> $<$<CONFIG:RelWithDebInfo>:_DBG>)
+add_compile_definitions(_QCL_WAYLAND_use_painttime)
 #add_compile_definitions(_QCL_use_debug)
 add_compile_definitions(_QCL_use_hwvec)
+
+if (EMSCRIPTEN)
+  add_compile_definitions("SK_TRIVIAL_ABI=[[clang::trivial_abi]]")
+  add_link_options("-sASSERTIONS=1" "-sERROR_ON_UNDEFINED_SYMBOLS=1" "-sVERBOSE=1")
+endif()
 
 
 # Sanitizer
@@ -36,16 +44,21 @@ else()
 endif()
 
 
+# Sub Proj
 file(GLOB childs RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/pkgs" "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/*")
 foreach(child ${childs})
   if(
     IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}" AND
     EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}/CMakeLists.txt"
   )
+
+    if(child MATCHES "^ext\\.")
+      message(STATUS "Ext Project Added: ${child}")
+    else()
+      message(STATUS "Sub Project Added: ${child}")
+    endif()
     
-    message(STATUS "Sub Project Added: ${child}")
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}")
-      
+    
   endif()
 endforeach()
-

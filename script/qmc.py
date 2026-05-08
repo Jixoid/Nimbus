@@ -129,7 +129,7 @@ def parse_qcl_headers(input_file, output_file, inc_file):
 	with open(output_file, 'w', encoding='utf-8') as out:
 		out.write("// Auto generated file, QCL Meta Compiler\n")
 		out.write("#include <string_view>\n#include <any>\n#include <expected>\n")
-		out.write("#include \"qcl/Types.hh\"\n#include \"DS.hh\"\n")
+		out.write("#include \"qcl/types.hh\"\n#include \"ds/ds.hh\"\n")
 		out.write(f"#include \"{inc_file}\"\n\n")
 
 		out.write("""\n\n
@@ -177,7 +177,7 @@ namespace {
 			out.write("    default: return std::unexpected(true);\n  }\n}\n\n")
 
 			# loadProp
-			out.write(f"auto {comp}::loadProp(std::string_view Name, const qcl::ds::value& Prop, std::function<std::expected<qcl::qev_seed,bool>(std::string_view)> FuncMap) -> std::expected<bool, std::string> {{\n")
+			out.write(f"auto {comp}::loadProp(std::string_view Name, const ds::value& Prop, std::function<std::expected<qcl::qev_seed,bool>(std::string_view)> FuncMap) -> std::expected<bool, std::string> {{\n")
 			if parent: out.write(f"  if (auto Res = {parent}::loadProp(Name, Prop, FuncMap); !Res || *Res) return Res;\n")
 			out.write("  switch (hash_fnv1a(Name)) {\n")
 			for p in data['props']:

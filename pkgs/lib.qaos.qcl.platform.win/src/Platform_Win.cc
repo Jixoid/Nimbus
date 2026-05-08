@@ -10,7 +10,6 @@
 */
 
 
-
 #include <iterator>
 #define el else
 #define ef else if
@@ -18,7 +17,7 @@
 #include <iostream>
 #include <queue>
 
-#include "Basis.h"
+#include "basis.hh"
 
 #include "qcl/Application.hh"
 #include "qcl/Control.hh"
@@ -32,6 +31,7 @@
 #include <gdiplus.h>
 
 using namespace std;
+
 
 
 struct win_handle

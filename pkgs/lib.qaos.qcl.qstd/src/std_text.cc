@@ -9,9 +9,12 @@
   Copyright (c) 2025 by Kadir Aydın.
 */
 
-#include "Basis.hh"
 
-#include "qstd/Standard.hh"
+#include "basis.hh"
+#include "qstd/standard.hh"
+#include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
+
 
 
 namespace qstd
