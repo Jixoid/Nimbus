@@ -44,21 +44,71 @@ else()
 endif()
 
 
-# Sub Proj
-file(GLOB childs RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/pkgs" "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/*")
-foreach(child ${childs})
-  if(
-    IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}" AND
-    EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}/CMakeLists.txt"
-  )
+# Depency
+find_package(Python3 REQUIRED) 
 
-    if(child MATCHES "^ext\\.")
-      message(STATUS "Ext Project Added: ${child}")
-    else()
-      message(STATUS "Sub Project Added: ${child}")
-    endif()
-    
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/pkgs/${child}")
-    
-  endif()
+add_subdirectory(platform)
+add_subdirectory(thirdparty/skia)
+
+
+# QMC begin
+file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/qcl/*.hh" "${CMAKE_CURRENT_SOURCE_DIR}/qstd/*.hh")
+
+set(QMC_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/script/qmc.py")
+set(QMC_SOURCES "")
+
+foreach(HEADER ${HEADERS})
+  file(RELATIVE_PATH REL_HEADER "${CMAKE_CURRENT_SOURCE_DIR}" "${HEADER}")
+  
+  string(REPLACE "/" "_" FLAT_HEADER "${REL_HEADER}")
+  set(GENERATED_CC "${CMAKE_CURRENT_BINARY_DIR}/qmc_gen_${FLAT_HEADER}.cc")
+
+  add_custom_command(
+    OUTPUT ${GENERATED_CC}
+    COMMAND ${Python3_EXECUTABLE} ${QMC_SCRIPT} ${HEADER} ${GENERATED_CC} ${REL_HEADER}
+    DEPENDS ${HEADER} ${QMC_SCRIPT}
+    COMMENT "qmc: meta-compiling ${REL_HEADER}..."
+  )
+  
+  list(APPEND QMC_SOURCES ${GENERATED_CC})
 endforeach()
+
+
+# Engine
+file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/qcl/*.cc")
+
+
+add_library(qaos_qcl_shared SHARED ${SOURCES} ${RES_OBJECTS} ${QMC_SOURCES})
+target_include_directories(qaos_qcl_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(qaos_qcl_shared PUBLIC
+  ext_skia
+)
+
+
+add_library(qaos_qcl_static STATIC ${SOURCES} ${RES_OBJECTS} ${QMC_SOURCES})
+target_include_directories(qaos_qcl_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(qaos_qcl_static PUBLIC
+  ext_skia
+)
+
+
+# Standard
+file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/qstd/*.cc")
+
+
+add_library(qaos_qstd_shared SHARED ${SOURCES} ${RES_OBJECTS})
+target_include_directories(qaos_qstd_shared PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(qaos_qstd_shared PUBLIC
+  qaos_qcl_shared
+)
+
+
+add_library(qaos_qstd_static STATIC ${SOURCES} ${RES_OBJECTS})
+target_include_directories(qaos_qstd_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(qaos_qstd_static PUBLIC
+  qaos_qcl_static
+)
+
+
+# Test App
+add_subdirectory(app)

@@ -129,7 +129,7 @@ def parse_qcl_headers(input_file, output_file, inc_file):
 	with open(output_file, 'w', encoding='utf-8') as out:
 		out.write("// Auto generated file, QCL Meta Compiler\n")
 		out.write("#include <string_view>\n#include <any>\n#include <expected>\n")
-		out.write("#include \"qcl/types.hh\"\n#include \"ds/ds.hh\"\n")
+		out.write("#include \"qcl/types.hh\"\n#include \"qcl/ds/ds.hh\"\n")
 		out.write(f"#include \"{inc_file}\"\n\n")
 
 		out.write("""\n\n
