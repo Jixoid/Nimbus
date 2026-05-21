@@ -1,21 +1,33 @@
-## QCL (QAOS Component Library)
+## QCL
 
-**QCL** is a lightweight and modular user interface framework designed for **QAOS**. It provides a robust event-driven architecture and support for declarative user interface definitions.
+A modern, Skia-based user interface (UI) engine and framework. 
+Developed under the QAOS umbrella, QCL focuses on a clean and layered architecture to simplify interface programming and embrace modern principles.
 
-
-## 📂 Project Structure
-
-  - `Pkgs/lib.qaos.qcl`: Core UI framework (Controls, Views, Windows).
-  - `Pkgs/lib.qaos.qcl.qstd`: QCL standard component library.
-  - `Pkgs/lib.qaos.qcl.qgl`: OpenGL integration.
+Other languages: [tr](README.tr.md)
 
 
-## 📜 License
+## Architecture
 
-QCL project uses multiple licenses:
+The project is structured into highly decoupled modules:
 
-- GPL for **source code**.
-- LGPL for **build system**.
+1. **QCL Core:** Management of fundamental interface components (Controls, Views, Windows) and the virtual file system (VFS).
+2. **QSTD (Standard Library):** A ready-to-use, standardized UI components package.
+3. **Platform:** Operating system-specific integrations and low-level backend connections.
 
-Please see the `LICENSE` file for detailed information.
-You can find the license texts in the `LICENSES` folder.
+
+## Visuals
+
+![QCL Interface Test](/images/test.png)
+*Interface test.*
+
+
+## License
+
+This project is licensed under the GNU General Public License version 3 (GPL3).
+
+Copyright (c) 2025-2026 Kadir Aydın.
+
+
+## QAOS
+
+Built with ❤️ by the open-source community.
