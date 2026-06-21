@@ -35,6 +35,7 @@
 #include "qstd/std_card.hh"
 #include "qstd/std_multi_progbar.hh"
 #include "qstd/std_interval.hh"
+#include "qstd/std_viewport_vk.hh"
 
 
 

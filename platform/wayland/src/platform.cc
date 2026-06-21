@@ -30,11 +30,15 @@
 #include "include/gpu/ganesh/GrTypes.h"
 #include "include/gpu/ganesh/GrBackendSurface.h"
 #include "include/gpu/ganesh/GrDirectContext.h"
-#include "include/gpu/ganesh/gl/GrGLDirectContext.h"
-#include "include/gpu/ganesh/gl/GrGLInterface.h"
+#include "include/gpu/ganesh/GrDirectContext.h"
+#include "include/gpu/ganesh/vk/GrVkDirectContext.h"
+#include "include/gpu/GpuTypes.h"
+#include "src/gpu/vk/vulkanmemoryallocator/VulkanMemoryAllocatorPriv.h"
+#include "include/gpu/ganesh/vk/GrVkBackendSurface.h"
+#include "include/gpu/ganesh/vk/GrVkTypes.h"
 #include "include/gpu/ganesh/SkSurfaceGanesh.h"
-#include "include/gpu/ganesh/gl/GrGLBackendSurface.h"
-#include "include/gpu/ganesh/gl/GrGLAssembleInterface.h"
+#define VK_USE_PLATFORM_WAYLAND_KHR
+#include <vulkan/vulkan.hpp>
 #include "include/ports/SkFontMgr_fontconfig.h"
 #include "include/ports/SkFontMgr_FontConfigInterface.h"
 #include "include/ports/SkFontScanner_FreeType.h"
@@ -64,14 +68,12 @@
 // wayland
 #include <wayland-cursor.h>
 #include <wayland-client.h>
-#include <wayland-egl.h>
 #include <wayland-client-protocol.h>
 #include <xdg-shell-client-protocol.h>
+#include <poll.h>
 // wayland extentions
 #include <xdg-decoration-unstable-v1-client-protocol.h>
 #include <pointer-gestures-unstable-v1-client-protocol.h>
-// egl
-#include <EGL/egl.h>
 // input
 #include <linux/input-event-codes.h>
 
@@ -103,23 +105,18 @@ fun loadGtkCursorConfig(const string& filePath, string& themeName, int& themeSiz
   string line;
   while (std::getline(file, line))
   {
-    // Yorum satırlarını veya boş satırları atla
     if (line.empty() || line[0] == '#' || line[0] == ';')
       continue;
 
-    // Eşittir işaretini bul
     size_t eqPos = line.find('=');
     if (eqPos == string::npos)
       continue;
 
-    // Anahtar ve Değeri ayır
     string key = trim(line.substr(0, eqPos));
     string val = trim(line.substr(eqPos + 1));
 
-    // Kontrol et
     if (key == "gtk-cursor-theme-name")
     {
-      // Tırnak işaretleri varsa temizle (Bazı configlerde "Breeze" şeklinde olabilir)
       if (val.size() >= 2 && val.front() == '"' && val.back() == '"')
         val = val.substr(1, val.size() - 2);
         
@@ -129,9 +126,7 @@ fun loadGtkCursorConfig(const string& filePath, string& themeName, int& themeSiz
     {
       try {
         themeSize = std::stoi(val);
-      } catch (...) {
-        // Sayı parse edilemezse varsayılanı koru
-      }
+      } catch (...) {}
     }
   }
 
@@ -153,18 +148,15 @@ fun get_gnome_font(string &name, int &size) -> bool
 
   if (result.empty()) return false;
 
-  // 1. Temizlik: Tırnakları ve satır sonlarını kaldır
   result.erase(std::remove(result.begin(), result.end(), '\''), result.end());
   result.erase(std::remove(result.begin(), result.end(), '\n'), result.end());
 
-  // 2. Ayıklama: Sondaki boşluğu bul (Font Adı ve Boyut ayrımı)
   size_t last_space = result.find_last_of(' ');
   if (last_space == string::npos) return false;
 
   string name_part = result.substr(0, last_space);
   string size_part = result.substr(last_space + 1);
 
-  // Name kısmının sonundaki olası ekstra boşlukları temizle (Örn: "Roboto Flex  ")
   name_part.erase(name_part.find_last_not_of(' ') + 1);
 
   if (name_part.empty() || size_part.empty()) return false;
@@ -185,7 +177,6 @@ fun get_kde_font(int kde_ver, string &name, int &size, int &wdgt) -> bool
   std::array<char, 128> buffer;
   std::string raw_output;
 
-  // Komutu çalıştır ve çıktıyı oku
   std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
   if (!pipe) return false;
 
@@ -195,7 +186,6 @@ fun get_kde_font(int kde_ver, string &name, int &size, int &wdgt) -> bool
 
   if (raw_output.empty()) return false;
 
-  // Virgüllere göre parçala
   std::stringstream ss(raw_output);
   std::string segment;
   std::vector<std::string> parts;
@@ -204,13 +194,12 @@ fun get_kde_font(int kde_ver, string &name, int &size, int &wdgt) -> bool
     parts.push_back(segment);
   }
 
-  // KDE formatında en az 5 parça olmalı: Name, Size, PixelSize, Hint, Weight...
   if (parts.size() < 5) return false;
 
   try {
-    name = parts[0];              // "Inter"
-    size = std::stoi(parts[1]);   // 10
-    wdgt = std::stoi(parts[4]);   // 400 (Normal), 700 (Bold) vb.
+    name = parts[0];
+    size = std::stoi(parts[1]);
+    wdgt = std::stoi(parts[4]);
     return true;
   } catch (...) {
     return false;
@@ -245,58 +234,85 @@ qcl::platform::api API_Wayland = {
 
 
 
-      // EGL
-      h->egl_display = eglGetDisplay((EGLNativeDisplayType)h->display);
-      if (h->egl_display == EGL_NO_DISPLAY)
-        platform::qcl_error("EGL Display alınamadı");
-
-
-      EGLint major{}, minor{};
-      if (!eglInitialize(h->egl_display, &major, &minor))
-        platform::qcl_error("EGL Initialize başarısız");
+      // Vulkan Initialization
+      uint32_t apiVersion = VK_API_VERSION_1_1;
+      auto enumerateInstanceVersion = (PFN_vkEnumerateInstanceVersion)vkGetInstanceProcAddr(nullptr, "vkEnumerateInstanceVersion");
+      if (enumerateInstanceVersion)
+        enumerateInstanceVersion(&apiVersion);
       
-
-      EGLint config_attribs[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 0,
-        EGL_STENCIL_SIZE, 8,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
-        EGL_NONE
+      vk::ApplicationInfo appInfo("QCL Application", 1, "QAOS", 1, apiVersion);
+      
+      std::vector<const char*> instanceExtensions = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
       };
-
-      EGLint num_configs;
-      if (!eglChooseConfig(h->egl_display, config_attribs, &h->egl_config, 1, &num_configs) || num_configs == 0)
-        platform::qcl_error("Uygun EGL Config bulunamadı");
       
-  
+      vk::InstanceCreateInfo createInfo({}, &appInfo, {}, instanceExtensions);
+      h->vk_instance = vk::createInstance(createInfo);
+
+      auto physicalDevices = h->vk_instance.enumeratePhysicalDevices();
+      if (physicalDevices.empty())
+          platform::qcl_error("Vulkan destekli GPU bulunamadı");
+      h->vk_physical_device = physicalDevices.front();
+
+      std::vector<vk::QueueFamilyProperties> queueFamilies = h->vk_physical_device.getQueueFamilyProperties();
+      uint32_t graphicsQueueFamilyIndex = 0;
+      bool foundQueue = false;
+      for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+        if (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+          graphicsQueueFamilyIndex = i;
+          foundQueue = true;
+          break;
+        }
+      }
+      if (!foundQueue)
+        platform::qcl_error("Vulkan Graphics Queue bulunamadı");
+
+      h->vk_queue_family_index = graphicsQueueFamilyIndex;
+
+      float queuePriority = 1.0f;
+      vk::DeviceQueueCreateInfo queueCreateInfo({}, graphicsQueueFamilyIndex, 1, &queuePriority);
+      std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+      
+      vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, deviceExtensions);
+      h->vk_device = h->vk_physical_device.createDevice(deviceCreateInfo);
+      h->vk_queue = h->vk_device.getQueue(graphicsQueueFamilyIndex, 0);
+
+      auto GetProc = [](const char* name, VkInstance instance, VkDevice device) {
+        PFN_vkVoidFunction proc = nullptr;
+        if (device != VK_NULL_HANDLE)
+          proc = vkGetDeviceProcAddr(device, name);
+        else
+          proc = vkGetInstanceProcAddr(instance, name);
         
-      // EGL Context
-      EGLint context_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE }; // OpenGL 2+
-      eglBindAPI(EGL_OPENGL_API); 
-
-      h->egl_context = eglCreateContext(h->egl_display, h->egl_config, EGL_NO_CONTEXT, context_attribs);
-      if (h->egl_context == EGL_NO_CONTEXT)
-        platform::qcl_error("EGL Context oluşturulamadı");
-
-      eglMakeCurrent(h->egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, h->egl_context);
-
-
-      // Skia
-      auto GetProc = [](void* ctx, const char* name) -> GrGLFuncPtr {
-        return (GrGLFuncPtr)eglGetProcAddress(name);
+        if (!proc) std::cerr << "Skia GetProc failed to load: " << name << std::endl;
+        
+        return proc;
       };
 
-      h->SkInterface = GrGLMakeAssembledInterface(nil, GetProc);
-      if (!h->SkInterface)
-        platform::qcl_error("Skia GL Interface oluşturulamadı");
+      h->vk_extensions.init(
+        GetProc, h->vk_instance, h->vk_physical_device,
+        instanceExtensions.size(), instanceExtensions.data(),
+        deviceExtensions.size(), deviceExtensions.data()
+      );
 
-      h->SkContext = GrDirectContexts::MakeGL(h->SkInterface);
+      h->vk_backend_context.fInstance = h->vk_instance;
+      h->vk_backend_context.fPhysicalDevice = h->vk_physical_device;
+      h->vk_backend_context.fDevice = h->vk_device;
+      h->vk_backend_context.fQueue = h->vk_queue;
+      h->vk_backend_context.fGraphicsQueueIndex = graphicsQueueFamilyIndex;
+      h->vk_backend_context.fMaxAPIVersion = apiVersion;
+      h->vk_backend_context.fGetProc = GetProc;
+      h->vk_backend_context.fVkExtensions = &h->vk_extensions;
+      
+      h->vk_backend_context.fMemoryAllocator = skgpu::VulkanMemoryAllocators::Make(
+        h->vk_backend_context,
+        (skgpu::ThreadSafe)false
+      );
+
+      h->SkContext = GrDirectContexts::MakeVulkan(h->vk_backend_context);
       if (!h->SkContext)
-        platform::qcl_error("Skia Context oluşturulamadı");
+        platform::qcl_error("Skia Vulkan Context oluşturulamadı");
 
 
       // XKB Keypad
@@ -371,15 +387,9 @@ qcl::platform::api API_Wayland = {
       // Font Config
       FcFini();
 
-      // EGL
-      if (h->egl_display != EGL_NO_DISPLAY) {
-        eglMakeCurrent(h->egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        
-        if (h->egl_context != EGL_NO_CONTEXT)
-          eglDestroyContext(h->egl_display, h->egl_context);
-        
-        eglTerminate(h->egl_display);
-      }
+      // Vulkan
+      if (h->vk_device) h->vk_device.destroy();
+      if (h->vk_instance) h->vk_instance.destroy();
 
       // Events
       if (h->WlPointer) wl_pointer_destroy(h->WlPointer);
@@ -407,14 +417,10 @@ qcl::platform::api API_Wayland = {
     .pushMessage = [](handle val, visual* Ctrl, visual::messages Msg) -> void
     {
       Native->pushMsg(app_message(Ctrl, Msg, false));
-
-      //wl_display_flush(Native->display);
     },
     .pushTask = [](handle val, void (*Fun)(u0), u0 Data) -> void
     {
       Native->pushMsg(app_message(Fun, Data, false));
-
-      //wl_display_flush(Native->display);
     },
 
 
@@ -444,7 +450,32 @@ qcl::platform::api API_Wayland = {
           break;
 
 
-        if (wl_display_dispatch(Native->display) == -1) {
+        bool has_animations = !anim::Anims.empty();
+        int timeout = has_animations ? 16 : -1;
+
+        while (wl_display_prepare_read(Native->display) != 0)
+          wl_display_dispatch_pending(Native->display);
+
+        wl_display_flush(Native->display);
+
+        struct pollfd pfd;
+        pfd.fd = wl_display_get_fd(Native->display);
+        pfd.events = POLLIN;
+
+        int ret = poll(&pfd, 1, timeout);
+
+        if (ret < 0) {
+          wl_display_cancel_read(Native->display);
+          break;
+        } else if (ret == 0) {
+          // Timeout
+          wl_display_cancel_read(Native->display);
+        } else {
+          // Event
+          wl_display_read_events(Native->display);
+        }
+
+        if (wl_display_dispatch_pending(Native->display) == -1) {
           platform::qcl_error("Wayland bağlantısı koptu");
           break;
         }
@@ -453,7 +484,7 @@ qcl::platform::api API_Wayland = {
         app_message Ev;
         while (Native->popMsg(Ev))
         {
-          if (Ev.Type == app_msgtyp::amtMessage) [[likely]] switch (Ev.Msg.Msg)
+          if (Ev.Type == AppMsgType::Message) [[likely]] switch (Ev.Msg.Msg)
           {
             case visual::vmPaint: {
               if (auto QWin = dynamic_cast<window*>(Ev.Msg.Ctrl); QWin) {
@@ -463,11 +494,24 @@ qcl::platform::api API_Wayland = {
 
                 auto WWin = (win_handle*)QWin->ohid();
 
-                if (!WWin->SkSur)
+                if (WWin->sk_surfaces.empty())
                   break;
 
+                (void)__CurrentApp->vk_device.waitForFences(1, &WWin->in_flight_fence, VK_TRUE, UINT64_MAX);
+                
+                uint32_t imageIndex;
+                vk::Result res = __CurrentApp->vk_device.acquireNextImageKHR(WWin->vk_swapchain, UINT64_MAX, WWin->image_available_semaphore, nullptr, &imageIndex);
+                if (res != vk::Result::eSuccess && res != vk::Result::eSuboptimalKHR) {
+                  continue;
+                }
+                
+                __CurrentApp->vk_device.resetFences(1, &WWin->in_flight_fence);
+                WWin->current_image_index = imageIndex;
+
+                auto SkSur = WWin->sk_surfaces[imageIndex];
+
                 renderContext Context(
-                  WWin->SkSur->getCanvas(),
+                  SkSur->getCanvas(),
                   SkiaPaint,
                   SkiaFont, __CurrentApp->SkFontType, __CurrentApp->SkFontManager,
                   WWin->ScaleDP, WWin->ScaleSP, 0
@@ -479,18 +523,21 @@ qcl::platform::api API_Wayland = {
                 
                 QWin->handlerPaint(Context);
                
-                
-                // EGL Swap
                 __CurrentApp->SkContext->flush();
-                eglSwapBuffers(__CurrentApp->egl_display, WWin->egl_surface);
+                __CurrentApp->SkContext->submit();
+
+                // Submit to Vulkan Queue
+                vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+                vk::SubmitInfo submitInfo(1, &WWin->image_available_semaphore, waitStages, 0, nullptr, 1, &WWin->render_finished_semaphore);
+                __CurrentApp->vk_queue.submit(1, &submitInfo, WWin->in_flight_fence);
+
+                vk::PresentInfoKHR presentInfo(1, &WWin->render_finished_semaphore, 1, &WWin->vk_swapchain, &imageIndex);
+                (void)__CurrentApp->vk_queue.presentKHR(&presentInfo);
                 
                 #ifdef _QCL_WAYLAND_use_painttime
                 auto __painttime_end = std::chrono::high_resolution_clock::now();
                 
-                std::cout << "PaintTime: "
-                << std::chrono::duration_cast<std::chrono::microseconds>(__painttime_end - __painttime_start)
-                .count()
-                << " μs" << std::endl;
+                std::cout << "PaintTime: " << std::chrono::duration_cast<std::chrono::microseconds>(__painttime_end - __painttime_start).count() << " μs" << std::endl;
                 #endif
               }
 
@@ -569,8 +616,7 @@ qcl::platform::api API_Wayland = {
             }
 
             case visual::vmPlatformSpecific: {
-
-              if (Ev.PS == wmPlatformSpecific::wmpsTouchPinchRotate)
+              if (Ev.PS == PlatformSpecific::TouchPinchRotate)
               {
                 if (Ev.Tou_Pinch_Rotate.Scale != 1)
                   Ev.Msg.Ctrl->handlerTouchPinch(Ev.Tou_Pinch_Rotate.Delta, Ev.Tou_Pinch_Rotate.Scale, Ev.Tou_Pinch_Rotate.State);
@@ -592,7 +638,6 @@ qcl::platform::api API_Wayland = {
 
         if (!anim::Anims.empty())
           anim::AnimWorker();
-
       }
     },
 
@@ -607,7 +652,6 @@ qcl::platform::api API_Wayland = {
       auto h = new win_handle();
       h->app = __CurrentApp;
 
-      // Varsayılan boyutlar
       h->width = 800;
       h->height = 600;
 
@@ -620,10 +664,9 @@ qcl::platform::api API_Wayland = {
       wl_surface_set_user_data(h->surface, h);
 
 
-      // XDG Surface ve Toplevel (Pencere Rolü)
+      // XDG Surface ve Toplevel
       h->xdg_surface = xdg_wm_base_get_xdg_surface(__CurrentApp->shell, h->surface);
       
-
 
       // Listener ekle
       xdg_surface_add_listener(h->xdg_surface, &listeners::xdg_surface_listener, h);
@@ -632,85 +675,78 @@ qcl::platform::api API_Wayland = {
       xdg_toplevel_add_listener(h->toplevel, &listeners::xdg_toplevel_listener, h);
 
 
-
       // Başlık ve App ID
       xdg_toplevel_set_title(h->toplevel, "QCL Application");
       xdg_toplevel_set_app_id(h->toplevel, "com.example.app");
 
-
-
-      // İlk "Commit": Sunucuya "Ben buradayım, beni yapılandır" diyoruz.
       wl_surface_commit(h->surface);
-
-
-      
-      // Sunucudan (Compositor) cevap gelene kadar bekle (Initial Configure)
-      // Bu yapılmazsa buffer boyutu belirsiz kalabilir.
       wl_display_roundtrip(__CurrentApp->display);
 
 
-      // EGL Native Window (Wayland <-> EGL Köprüsü)
-      h->native_window = wl_egl_window_create(h->surface, h->width, h->height);
-      if (!h->native_window)
-        platform::qcl_error("Wayland EGL Window oluşturulamadı");
+      // Vulkan Surface
+      vk::WaylandSurfaceCreateInfoKHR surfaceCreateInfo({}, __CurrentApp->display, h->surface);
+      h->vk_surface = __CurrentApp->vk_instance.createWaylandSurfaceKHR(surfaceCreateInfo);
+      
+      if (!__CurrentApp->vk_physical_device.getSurfaceSupportKHR(__CurrentApp->vk_queue_family_index, h->vk_surface))
+        platform::qcl_error("Vulkan Surface desteği yok");
 
+      vk::SurfaceCapabilitiesKHR capabilities = __CurrentApp->vk_physical_device.getSurfaceCapabilitiesKHR(h->vk_surface);
+      vk::Extent2D extent(h->width, h->height);
+      
+      auto presentModes = __CurrentApp->vk_physical_device.getSurfacePresentModesKHR(h->vk_surface);
+      for (const auto& mode : presentModes) {
+        if (mode == vk::PresentModeKHR::eMailbox) {
+          h->vk_present_mode = mode;
+          break;
+        }
+      }
 
-      // EGL Surface (GLMakeCurrent öncesi hazırlık)
-      h->egl_surface = eglCreateWindowSurface(
-        __CurrentApp->egl_display, 
-        __CurrentApp->egl_config, 
-        (EGLNativeWindowType)h->native_window, 
-        NULL
+      vk::SwapchainCreateInfoKHR swapchainCreateInfo(
+        {}, h->vk_surface, 2, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear,
+        extent, 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled,
+        vk::SharingMode::eExclusive, {}, capabilities.currentTransform,
+        vk::CompositeAlphaFlagBitsKHR::eOpaque, h->vk_present_mode, true, nullptr
       );
 
-      if (h->egl_surface == EGL_NO_SURFACE)
-        platform::qcl_error("EGL Surface oluşturulamadı");
+      h->vk_swapchain = __CurrentApp->vk_device.createSwapchainKHR(swapchainCreateInfo);
+      h->swapchain_images = __CurrentApp->vk_device.getSwapchainImagesKHR(h->vk_swapchain);
 
+      // Create Skia Surfaces for each Swapchain Image
+      for (size_t i = 0; i < h->swapchain_images.size(); i++) {
+        GrVkImageInfo vkInfo;
+        vkInfo.fImage = h->swapchain_images[i];
+        vkInfo.fAlloc = skgpu::VulkanAlloc();
+        vkInfo.fImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vkInfo.fImageTiling = VK_IMAGE_TILING_OPTIMAL;
+        vkInfo.fFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        vkInfo.fImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        vkInfo.fLevelCount = 1;
+        vkInfo.fCurrentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
 
-      // Context'i bu pencereye bağla (GLMakeCurrent karşılığı)
-      if (!eglMakeCurrent(__CurrentApp->egl_display, h->egl_surface, h->egl_surface, __CurrentApp->egl_context))
-        platform::qcl_error("EGL MakeCurrent başarısız");
+        GrBackendRenderTarget renderTarget = GrBackendRenderTargets::MakeVk(h->width, h->height, vkInfo);
+        
+        auto sk_sur = SkSurfaces::WrapBackendRenderTarget(
+          __CurrentApp->SkContext.get(), renderTarget, kTopLeft_GrSurfaceOrigin,
+          kBGRA_8888_SkColorType, nullptr, nullptr
+        );
+        if (!sk_sur) platform::qcl_error("SkSurfaces::WrapBackendRenderTarget failed at initialization!");
+        h->sk_surfaces.push_back(sk_sur);
+      }
 
-
-      // Skia Backend Setup
-      GrGLFramebufferInfo fbInfo;
-      fbInfo.fFBOID = 0; 
-      fbInfo.fFormat = 0x8058; // EGL Config ile uyumlu olmalı (Red 8, Green 8...)
-
-
-      h->SkBackendRenderTarget = GrBackendRenderTargets::MakeGL(
-        h->width, h->height,
-        0, // Sample count (0 = MSAA kapalı)
-        8, // Stencil bits
-        fbInfo
-      );
-
-
-      // Skia Surface
-      h->SkSur = SkSurfaces::WrapBackendRenderTarget(
-        __CurrentApp->SkContext.get(),
-        h->SkBackendRenderTarget,
-        kBottomLeft_GrSurfaceOrigin, // OpenGL genelde BottomLeft'tir
-        kRGBA_8888_SkColorType,
-        nullptr,
-        nullptr
-      );
-      if (!h->SkSur)
-        platform::qcl_error("Skia Surface oluşturulamadı");
+      h->image_available_semaphore = __CurrentApp->vk_device.createSemaphore(vk::SemaphoreCreateInfo());
+      h->render_finished_semaphore = __CurrentApp->vk_device.createSemaphore(vk::SemaphoreCreateInfo());
+      h->in_flight_fence = __CurrentApp->vk_device.createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 
 
       // Decoration
       if (__CurrentApp->xdg_decoration) {
-        // 1. Dekorasyon objesini al
         h->decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
           __CurrentApp->xdg_decoration, 
           h->toplevel
         );
 
-        // 2. Listener'ı bağla
         zxdg_toplevel_decoration_v1_add_listener(h->decoration, &listeners::decoration_listener, h);
 
-        // 3. Server Side Decoration (SSD) iste
         zxdg_toplevel_decoration_v1_set_mode(
           h->decoration, 
           ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
@@ -727,24 +763,14 @@ qcl::platform::api API_Wayland = {
       
 
       // Skia
-      Native->SkSur.reset();
+      Native->sk_surfaces.clear();
 
-      // EGL
-      if (__CurrentApp->egl_display)
-      {
-        eglMakeCurrent(__CurrentApp->egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-
-        if (Native->egl_surface) {
-          eglDestroySurface(__CurrentApp->egl_display, Native->egl_surface);
-          Native->egl_surface = EGL_NO_SURFACE;
-        }
-      }
-
-      // Wayland EGL
-      if (Native->native_window) {
-        wl_egl_window_destroy(Native->native_window);
-        Native->native_window = nullptr;
-      }
+      // Vulkan
+      if (Native->in_flight_fence) __CurrentApp->vk_device.destroyFence(Native->in_flight_fence);
+      if (Native->image_available_semaphore) __CurrentApp->vk_device.destroySemaphore(Native->image_available_semaphore);
+      if (Native->render_finished_semaphore) __CurrentApp->vk_device.destroySemaphore(Native->render_finished_semaphore);
+      if (Native->vk_swapchain) __CurrentApp->vk_device.destroySwapchainKHR(Native->vk_swapchain);
+      if (Native->vk_surface) __CurrentApp->vk_instance.destroySurfaceKHR(Native->vk_surface);
 
       // XDG Shell
       if (Native->toplevel) {
@@ -769,30 +795,20 @@ qcl::platform::api API_Wayland = {
 
     .show = [](handle val)
     {
-      if (!Native->surface || !Native->egl_surface) return;
+      if (!Native->surface || !Native->vk_surface) return;
 
-      // 1. Context'i Aktif Et
-      eglMakeCurrent(__CurrentApp->egl_display, Native->egl_surface, Native->egl_surface, __CurrentApp->egl_context);
-
-      // 2. Zorunlu Yeniden Çizim (Force Repaint)
-      // Wayland'de pencere "buffer" gönderilene kadar görünmezdir. 
-      // Show çağrıldığında hemen görünmesi için bir kare çizip göndermeliyiz.
-      
       SkPaint SkiaPaint;
       SkiaPaint.setAntiAlias(true);
 
       SkFont SkiaFont(__CurrentApp->SkFontType);
-      SkiaFont.setEdging(SkFont::Edging::kSubpixelAntiAlias); // LCD pürüzsüzlüğü
-      SkiaFont.setHinting(SkFontHinting::kSlight);           // Modern fontlar için ideal
-      SkiaFont.setSubpixel(true);                            // Karakter aralıklarını hassaslaştırır
-      SkiaFont.setBaselineSnap(true);                         //
+      SkiaFont.setEdging(SkFont::Edging::kSubpixelAntiAlias);
+      SkiaFont.setHinting(SkFontHinting::kSlight);
+      SkiaFont.setSubpixel(true);
+      SkiaFont.setBaselineSnap(true);
 
-      // Canvas'ı temizle (isteğe bağlı, handlerPaint zaten tamamını boyuyorsa gerek yok)
-      // Native->SkSur->getCanvas()->clear(SK_ColorWHITE);
-
-      // Kullanıcının çizim fonksiyonunu çağır
+      if (Native->sk_surfaces.empty() || Native->current_image_index >= Native->sk_surfaces.size() || !Native->sk_surfaces[Native->current_image_index]) return;
       renderContext Context(
-        Native->SkSur->getCanvas(), 
+        Native->sk_surfaces[Native->current_image_index]->getCanvas(), 
         SkiaPaint, SkiaFont,
         __CurrentApp->SkFontType,
         __CurrentApp->SkFontManager,
@@ -803,27 +819,15 @@ qcl::platform::api API_Wayland = {
       Context.canvas()->clear(SK_ColorTRANSPARENT);
       
       __CurrentApp->SkContext->flush();
-
-      eglSwapBuffers(__CurrentApp->egl_display, Native->egl_surface);
+      __CurrentApp->SkContext->submit();
     },
 
     .hide = [](handle val)
     {
       if (!Native->surface) return;
 
-      // Wayland'de pencereyi yok etmeden gizlemenin (Unmap) yolu,
-      // yüzeye "NULL" buffer atamaktır.
-      
-      // 1. İçeriği kaldır
       wl_surface_attach(Native->surface, NULL, 0, 0);
-
-      // 2. Değişikliği onayla
-      // Bu komuttan sonra pencere ekrandan kaybolur ama nesneler (xdg_surface, egl) yaşamaya devam eder.
       wl_surface_commit(Native->surface);
-      
-      // Not: Uygulama mantığında bu pencere için "is_visible = false" set edilmeli
-      // ve render döngüsü bu pencere için durdurulmalıdır. 
-      // Gizli pencereye eglSwapBuffers yapmaya devam etmek gereksiz yük oluşturur.
     },
 
     .size = [](handle val) -> qcl::size<i32>
@@ -833,11 +837,10 @@ qcl::platform::api API_Wayland = {
 
     .setSize = [](handle val, qcl::size<i32> Size)
     {
-      // 1. Gereksiz güncellemeyi ve hatalı boyutları engelle
       if (Size.W <= 0 || Size.H <= 0 || (Size.W == Native->width && Size.H == Native->height))
         return;
 
-      if (!Native->native_window || !__CurrentApp->SkContext)
+      if (!Native->vk_surface || !__CurrentApp->SkContext)
         return;
 
       Size = qcl::size<i32>((f32)Size.W*Native->ScaleDP, (f32)Size.H*Native->ScaleDP);
@@ -845,81 +848,70 @@ qcl::platform::api API_Wayland = {
       Native->width = Size.W;
       Native->height = Size.H;
 
-      // 2. Wayland-EGL Penceresini Boyutlandır
-      // Bu fonksiyon, bir sonraki swapBuffers işleminde allocate edilecek
-      // buffer'ların boyutunu belirler. (dx, dy genellikle 0 verilir)
-      wl_egl_window_resize(Native->native_window, Size.W, Size.H, 0, 0);
+      __CurrentApp->SkContext->flush();
+      (void)__CurrentApp->vk_device.waitForFences(1, &Native->in_flight_fence, VK_TRUE, UINT64_MAX);
 
 
-      // 3. Skia Surface'ı Yeniden Oluştur (Recreation)
-      // Eski surface eski boyuttadır, onu yok edip yeni boyutta oluşturmalıyız.
+      Native->sk_surfaces.clear();
       
-      // a. Eskiyi temizle
-      Native->SkSur.reset(); 
-      // Not: SkBackendRenderTarget, Skia tarafından genellikle value type olarak tutulur 
-      // ama wrap işlemi için yenisini oluşturacağız.
+      vk::Extent2D extent(Native->width, Native->height);
 
-      // b. Yeni Framebuffer Bilgisi
-      GrGLFramebufferInfo fbInfo;
-      fbInfo.fFBOID = 0; // EGL Surface için her zaman 0
-      fbInfo.fFormat = 0x8058;
-
-      // c. Yeni Render Target
-      Native->SkBackendRenderTarget = GrBackendRenderTargets::MakeGL(
-        Native->width,
-        Native->height,
-        0, // sample count
-        8, // stencil bits
-        fbInfo
+      vk::SwapchainCreateInfoKHR swapchainCreateInfo(
+        {}, Native->vk_surface, 2, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear,
+        extent, 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled,
+        vk::SharingMode::eExclusive, {}, vk::SurfaceTransformFlagBitsKHR::eIdentity,
+        vk::CompositeAlphaFlagBitsKHR::eOpaque, Native->vk_present_mode, true, Native->vk_swapchain
       );
 
-      // d. Yeni Skia Surface
-      Native->SkSur = SkSurfaces::WrapBackendRenderTarget(
-        __CurrentApp->SkContext.get(),
-        Native->SkBackendRenderTarget,
-        kBottomLeft_GrSurfaceOrigin,
-        kRGBA_8888_SkColorType,
-        nullptr,
-        nullptr
-      );
+      vk::SwapchainKHR old_swapchain = Native->vk_swapchain;
+      Native->vk_swapchain = __CurrentApp->vk_device.createSwapchainKHR(swapchainCreateInfo);
+      if (old_swapchain) __CurrentApp->vk_device.destroySwapchainKHR(old_swapchain);
 
-      if (!Native->SkSur)
+      Native->swapchain_images = __CurrentApp->vk_device.getSwapchainImagesKHR(Native->vk_swapchain);
+
+      for (size_t i = 0; i < Native->swapchain_images.size(); i++) {
+        GrVkImageInfo vkInfo;
+        vkInfo.fImage = Native->swapchain_images[i];
+        vkInfo.fAlloc = skgpu::VulkanAlloc();
+        vkInfo.fImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vkInfo.fImageTiling = VK_IMAGE_TILING_OPTIMAL;
+        vkInfo.fFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        vkInfo.fImageUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        vkInfo.fLevelCount = 1;
+        vkInfo.fCurrentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+
+        GrBackendRenderTarget renderTarget = GrBackendRenderTargets::MakeVk(Native->width, Native->height, vkInfo);
+        
+        auto sk_sur = SkSurfaces::WrapBackendRenderTarget(
+          __CurrentApp->SkContext.get(), renderTarget, kTopLeft_GrSurfaceOrigin,
+          kBGRA_8888_SkColorType, nullptr, nullptr
+        );
+        if (!sk_sur) platform::qcl_error("SkSurfaces::WrapBackendRenderTarget failed at resize!");
+        Native->sk_surfaces.push_back(sk_sur);
+      }
+
+      if (Native->sk_surfaces.empty())
         platform::qcl_error("Resize sonrası Skia Surface oluşturulamadı!");
-
-      // 4. İsteğe Bağlı: Hemen bir 'Paint' tetiklemesi yapılabilir.
-      // Eğer yapmazsan, bir sonraki döngüde çizim yapılana kadar 
-      // pencere içeriği eski boyutta (crop veya stretch) görünebilir 
-      // ya da siyah kalabilir.
-      // window_invalidate(val) gibi bir çağrı buraya eklenebilir.
     },
 
 
-    .getSurface = [](handle val) -> SkSurface* {return Native->SkSur.get();},
-    .getCanvas  = [](handle val) -> SkCanvas*  {return Native->SkSur->getCanvas();},
+    .getSurface = [](handle val) -> SkSurface* {return Native->sk_surfaces.empty() || Native->current_image_index >= Native->sk_surfaces.size() ? nullptr : Native->sk_surfaces[Native->current_image_index].get();},
+    .getCanvas  = [](handle val) -> SkCanvas*  {return Native->sk_surfaces.empty() || Native->current_image_index >= Native->sk_surfaces.size() ? nullptr : Native->sk_surfaces[Native->current_image_index]->getCanvas();},
 
     
     .startResize = [](handle val, poit<i32> Pos, platform::resizeOp OP)
     {
-      // Eğer gerekli Wayland objeleri yoksa çık
       if (!__CurrentApp->seat || !Native->toplevel)
         return;
 
-      // ÖNEMLİ: Wayland'de bu işlemi başlatmak için Mouse Down olayından gelen
-      // 'serial' numarası zorunludur. Bunu pointer listener'da kaydetmiş olmalısın.
-      uint32_t serial = __CurrentApp->last_serial; 
+      u32 serial = __CurrentApp->last_serial; 
 
-      // 1. TAŞIMA (MOVE) İŞLEMİ
       if (OP == platform::resizeOp::wrlMove)
-      {
-        // Wayland koordinat sormaz, o anki mouse pozisyonunu baz alır.
         xdg_toplevel_move(Native->toplevel, __CurrentApp->seat, serial);
-      }
-      // 2. BOYUTLANDIRMA (RESIZE) İŞLEMİ
-      else
-      {
-        uint32_t wl_edge = 0;
+      
+      else {
+        u32 wl_edge = 0;
 
-        // QCL enumlarını Wayland XDG enumlarına eşle
         switch (OP)
         {
           case platform::resizeOp::wrlTop:     wl_edge = XDG_TOPLEVEL_RESIZE_EDGE_TOP;          break;
@@ -944,14 +936,10 @@ qcl::platform::api API_Wayland = {
 
     .openFile = [](string_view Title, span<const string_view> Filters) -> string
     {
-      string Cac = "zenity --file-selection";
-
-      Cac += " --title=\""+string(Title)+"\"";
-
+      string Cac = "zenity --file-selection --title=\""+string(Title)+"\"";
       
       for (auto &X: Filters)
         Cac += " --file-filter=\""+string(X)+"\"";
-
 
       FILE *fp = popen(Cac.c_str(), "r");
       if (fp == nil)
@@ -968,30 +956,22 @@ qcl::platform::api API_Wayland = {
       if (ret != 0 || Ret.empty())
         return "";
 
-
-      // sonundaki \n karakterini kaldır
       if (!Ret.empty() && Ret.back() == '\n')
         Ret.pop_back();
-
 
       return Ret;
     },
 
     .saveFile = [](string_view Title, span<const string_view> Filters) -> string
     {
-      string Cac = "zenity --file-selection --save";
-
-      Cac += " --title=\""+string(Title)+"\"";
-
+      string Cac = "zenity --file-selection --save --title=\""+string(Title)+"\"";
       
       for  (auto &X: Filters)
         Cac += " --file-filter=\""+string(X)+"\"";
 
-
       FILE *fp = popen(Cac.c_str(), "r");
       if (fp == nil)
         return "";
-
 
       string Ret;
 
@@ -1003,11 +983,8 @@ qcl::platform::api API_Wayland = {
       if (ret != 0 || Ret.empty())
         return "";
 
-
-      // sonundaki \n karakterini kaldır
       if (!Ret.empty() && Ret.back() == '\n')
         Ret.pop_back();
-
 
       return Ret;
     },
@@ -1015,7 +992,6 @@ qcl::platform::api API_Wayland = {
     .message = [](string_view Text)
     {
       string Cac = "zenity --info --text=\""+string(Text)+"\"";
-
 
       FILE *fp = popen(Cac.c_str(), "r");
       if (fp == nil)

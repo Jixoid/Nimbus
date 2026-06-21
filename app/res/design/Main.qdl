@@ -284,6 +284,26 @@ root qstd::form "root" {
         }
         effects: [qstd::noise {}]
       }
+
+      node qstd::chip {
+        style: "choice"
+        autoSize: true,
+        color: "monet(Tertiary)"
+        effects: [qstd::noise {}]
+        onClick: "TestVKClick"
+
+        paddings: {top: 4, bot: 4, left: 6, righ: 6}
+        node qstd::text { text: "Test viewPortVK" anchors: {left: @^ "<-", top: @^ "<-"} transparent: yes }
+      }
+
+      node qstd::viewPortVK "TestVK" {
+        style: "choice"
+        size: {w: 160, h: 160}
+        anchors: {
+          left: @^ "<-"
+          righ: @^ "->"
+        }
+      }
     }
 
   }

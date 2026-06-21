@@ -27,6 +27,16 @@
 #include "qstd/monet.hh"
 #include "qstd/standard.hh"
 
+#include "include/gpu/ganesh/SkSurfaceGanesh.h"
+#include "include/gpu/ganesh/GrBackendSurface.h"
+#include "include/gpu/ganesh/vk/GrVkBackendSurface.h"
+#include "include/gpu/ganesh/vk/GrVkTypes.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkSurface.h"
+#include "include/core/SkPaint.h"
+#include "qcl/platform.hh"
+
+
 using namespace std;
 using namespace qcl;
 
@@ -51,11 +61,13 @@ class MainForm: public qstd::form
 public:
   #define COMPONENTS(DO) \
     DO(ProgBar1, qstd::progbar) \
-    DO(ProgBar2, qstd::progbar)
+    DO(ProgBar2, qstd::progbar) \
+    DO(TestVK, qstd::viewPortVK)
 
 
   #define EVENTS(DO) \
-    DO(MainForm, StartAnim)
+    DO(MainForm, StartAnim) \
+    DO(MainForm, TestVKClick)
 
   
   SUBCOM_GENERATE("embed://design/Main.qdl"_vfs_ro, MainForm, EVENTS, COMPONENTS)
@@ -83,6 +95,65 @@ public:
       500,
       AnimID_2
     );
+  }
+
+  void TestVKClick(object*)
+  {
+    if (TestVK) {
+      cout << "Testing viewPortVK component..." << endl;
+      
+      auto grContext = qcl::platform::API->Application.skiaGrContext(CurrentApp->ohid());
+      if (grContext) {
+        static GrBackendTexture backendTex;
+        if (!backendTex.isValid()) {
+          backendTex = grContext->createBackendTexture(
+            256, 256, kRGBA_8888_SkColorType,
+            SkColors::kBlue,
+            skgpu::Mipmapped::kNo,
+            GrRenderable::kYes,
+            skgpu::Protected::kNo
+          );
+              
+          if (backendTex.isValid()) {
+            sk_sp<SkSurface> wrapperSurface = SkSurfaces::WrapBackendTexture(
+              grContext, backendTex, kTopLeft_GrSurfaceOrigin, 0, 
+              kRGBA_8888_SkColorType, nullptr, nullptr
+            );
+            
+            if (wrapperSurface) {
+              SkCanvas* canvas = wrapperSurface->getCanvas();
+              SkPaint paint;
+              paint.setColor(SK_ColorYELLOW);
+              paint.setAntiAlias(true);
+              canvas->drawCircle(128, 128, 64, paint);
+              grContext->flushAndSubmit(wrapperSurface.get(), GrSyncCpu::kNo);
+            }
+          }
+        }
+        
+        if (backendTex.isValid()) {
+          static GrVkImageInfo staticVkInfo;
+          if (GrBackendTextures::GetVkImageInfo(backendTex, &staticVkInfo)) {
+            TestVK->setTextureWidth(256);
+            TestVK->setTextureHeight(256);
+            TestVK->setTextureFormat(staticVkInfo.fFormat);
+            TestVK->setImageLayout(staticVkInfo.fImageLayout);
+            TestVK->setImageUsageFlags(staticVkInfo.fImageUsageFlags);
+            TestVK->setImageHandle(reinterpret_cast<u64>(staticVkInfo.fImage));
+            TestVK->setVkInfoPtr(reinterpret_cast<u64>(&staticVkInfo));
+            
+            cout << "Vulkan image created and mapped to viewPortVK!" << endl;
+            cout << "  - Format: " << staticVkInfo.fFormat << endl;
+            cout << "  - Layout: " << staticVkInfo.fImageLayout << endl;
+            cout << "  - Usage flags: " << staticVkInfo.fImageUsageFlags << endl;
+            cout << "  - Level count: " << staticVkInfo.fLevelCount << endl;
+            cout << "  - Sample count: " << staticVkInfo.fSampleCount << endl;
+          }
+        } else {
+          cout << "Failed to create Vulkan surface!" << endl;
+        }
+      }
+    }
   }
 
 };

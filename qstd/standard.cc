@@ -49,6 +49,7 @@ namespace qstd
     regO(card),
     regO(multi_progbar),
     regO(interval),
+    regO(viewPortVK),
   };
 
   #undef regO

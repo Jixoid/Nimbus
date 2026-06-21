@@ -15,13 +15,13 @@ find_package(JPEG REQUIRED)
 
 pkg_check_modules(WAYLAND REQUIRED 
   wayland-client 
-  wayland-egl 
   wayland-cursor 
   wayland-protocols
 )
 pkg_check_modules(WAYLAND_CURSOR REQUIRED wayland-cursor)
 pkg_check_modules(XKB REQUIRED xkbcommon)
-pkg_check_modules(EGL REQUIRED egl)
+
+find_package(Vulkan REQUIRED)
 
 
 
@@ -32,8 +32,7 @@ target_link_libraries(${TARGET_NAME}_shared PUBLIC
   qaos_qcl_shared
   ext_skia
 
-  EGL
-  GLESv2
+  Vulkan::Vulkan
 
   harfbuzz
   icuuc
@@ -48,7 +47,6 @@ target_link_libraries(${TARGET_NAME}_shared PUBLIC
   ${WAYLAND_LIBRARIES}
   ${WAYLAND_CURSOR_LIBRARIES}
   ${XKB_LIBRARIES}
-  ${EGL_LIBRARIES}
 )
 
 set_target_properties(${TARGET_NAME}_shared PROPERTIES 
@@ -63,8 +61,7 @@ target_link_libraries(${TARGET_NAME}_static PUBLIC
   qaos_qcl_static
   ext_skia
 
-  EGL
-  GLESv2
+  Vulkan::Vulkan
 
   harfbuzz
   icuuc
@@ -79,7 +76,6 @@ target_link_libraries(${TARGET_NAME}_static PUBLIC
   ${WAYLAND_LIBRARIES}
   ${WAYLAND_CURSOR_LIBRARIES}
   ${XKB_LIBRARIES}
-  ${EGL_LIBRARIES}
 )
 set_target_properties(${TARGET_NAME}_static PROPERTIES 
   OUTPUT_NAME "${TARGET_NAME}"
