@@ -1,0 +1,30 @@
+cc="gcc"
+cxx="g++"
+
+target_os="linux"
+target_cpu="x64"
+
+is_debug=false
+is_official_build=true
+is_component_build=false
+
+skia_enable_svg = true
+
+skia_use_expat = true
+skia_use_gl = true
+skia_use_egl = true
+skia_use_x11 = false
+skia_use_vulkan=true
+
+skia_use_system_libpng = true
+skia_use_system_libjpeg_turbo = true
+skia_use_system_zlib = true
+skia_use_system_expat = true
+skia_use_system_freetype2 = true
+skia_use_system_harfbuzz = true
+skia_use_system_icu = true
+
+extra_cflags=[
+  "-O3",
+  "-fvisibility=default"
+]

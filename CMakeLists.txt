@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 4.3)
 project(QCL C CXX)
 
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_C_STANDARD 23)
@@ -48,13 +48,29 @@ endif()
 find_package(Python3 REQUIRED) 
 
 add_subdirectory(platform)
-add_subdirectory(thirdparty/skia)
+
+
+# Skia
+add_library(ext_skia INTERFACE)
+
+target_include_directories(ext_skia INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/skia")
+
+set(SKIA_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/skia/out/skbin")
+
+target_link_libraries(ext_skia INTERFACE
+  "${SKIA_LIBS}/libskia.a"
+  "${SKIA_LIBS}/libsvg.a"
+  "${SKIA_LIBS}/libskshaper.a"
+  "${SKIA_LIBS}/libskunicode_core.a"
+  "${SKIA_LIBS}/libskunicode_icu.a"
+)
+
 
 
 # QMC begin
 file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/qcl/*.hh" "${CMAKE_CURRENT_SOURCE_DIR}/qstd/*.hh")
 
-set(QMC_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/script/qmc.py")
+set(QMC_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/qmc.py")
 set(QMC_SOURCES "")
 
 foreach(HEADER ${HEADERS})

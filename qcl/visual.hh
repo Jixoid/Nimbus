@@ -270,7 +270,7 @@ namespace qcl
       /**
        * @brief Width and height dimension of the visual.
        */
-      inline fun size() const noexcept -> size<i32> {return m_size;}
+      inline fun size() const noexcept -> qcl::size<i32> {return m_size;}
       inline virtual fun setSize(qcl::size<i32> Val) -> void { if (m_size != Val) { m_size = Val; update(visDirtyResize); } }
       inline fun propSize(const ds::value& Prop) -> std::expected<bool, std::string> {
         if (!Prop.isStruct()) return std::unexpected("was expected struct");

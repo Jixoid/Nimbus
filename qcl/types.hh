@@ -25,8 +25,6 @@
 #include "include/core/SkFourByteTag.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkTypeface.h"
-#include "include/private/base/SkPoint_impl.h"
-#include "include/private/base/SkSpan_impl.h"
 #include <algorithm>
 #include <array>
 #include <concepts>
