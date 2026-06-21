@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -34,48 +35,47 @@
 
 
 /// Int
-using i8   = int8_t;
-using i16  = int16_t;
-using i32  = int32_t;
-using i64  = int64_t;
-using i128 = signed __int128;
+using i8  = std::int8_t;
+using i16 = std::int16_t;
+using i32 = std::int32_t;
+using i64 = std::int64_t;
 
-#if INTPTR_MAX == INT64_MAX
-  using i0 = i64;
-#else
-  using i0 = i32;
+using u8  = std::uint8_t;
+using u16 = std::uint16_t;
+using u32 = std::uint32_t;
+using u64 = std::uint64_t;
+
+#ifdef __SIZEOF_INT128__
+  using i128 = signed __int128;
+  using u128 = unsigned __int128;
 #endif
 
+using i0 = std::ptrdiff_t;
+using u0 = std::size_t;
 
-/// UInt
-using u8   = uint8_t;
-using u16  = uint16_t;
-using u32  = uint32_t;
-using u64  = uint64_t;
-using u128 = unsigned __int128;
-
-#if INTPTR_MAX == INT64_MAX
-  using u0 = u64;
-#else
-  using u0 = u32;
-#endif
+using isize = i0; // like rust
+using usize = u0; // like rust
 
 using handle = u0;
 using ohid = u0;
 
 
 /// Float
+using f32 = float;
+using f64 = double;
+
 using bf16 = __bf16;
-using f16  = __fp16;
-using f32  = float;
-using f64  = double;
-using f128 = __float128;
+using f16  = _Float16;
+using f128 = _Float128;
 
 #if INTPTR_MAX == INT64_MAX
   using f0 = f64;
 #else
   using f0 = f32;
 #endif
+
+using fsize = f0; // like rust
+
 
 
 /// Norm Types
@@ -148,6 +148,13 @@ using ni32 = __norm<i32>;
 
 /// Vector
 
+template <typename T, u0 S>
+struct vec_traits
+{
+  typedef T type __attribute__((vector_size(sizeof(T) * S)));
+};
+
+
 /**
  * @brief A generic SIMD vector structure.
  * @tparam T The element type.
@@ -157,108 +164,99 @@ template <typename T, u0 S>
   requires std::is_arithmetic_v<T>
 struct alignas(sizeof(T) *S) vec
 {
-private:
-  using vector_t = T __attribute__((vector_size(sizeof(T)*S)));
-  vector_t _elems;
+  private:
+    using vector_t = typename vec_traits<T, S>::type;
+    vector_t _elems;
 
+  public:
+    vec() : _elems{} {}
+    vec(vector_t _) : _elems(_) {}
 
-public:
-  vec(): _elems{0} {}
-  
-  vec(vector_t V) : _elems(V) {}
-
-  vec(T val)
-  {
-    std::vector<T> Data(S);
-
-    for (auto &X: Data) X = val;
-
-    __builtin_memcpy(&_elems, Data.data(), sizeof(vector_t));
-  }
-  
-  vec(std::array<T,S> V)
-  {
-    __builtin_memcpy(&_elems, V.data(), sizeof(vector_t));
-  }
-
-  vec(std::initializer_list<T> V)
-  {
-    if (V.size() > S)
-      throw std::out_of_range("List size out of bounds");
-
+    vec(T val) {
+      for (u0 i{}; i < S; i++) _elems[i] = val;
+    }
     
-    std::copy(V.begin(), V.end(), (T*)&_elems);
-  }
+    vec(std::array<T, S> V) {
+      for (u0 i{}; i < S; i++) _elems[i] = V[i];
+    }
 
-  vec(T *V)
-  {
-    __builtin_memcpy(&_elems, V, sizeof(vector_t));
-  }
+    vec(std::initializer_list<T> V) : _elems{} {
+      if (V.size() > S) throw std::out_of_range("Liste boyutu vektör sınırını aştı!");
+      u0 i{};
+      for (auto val: V) _elems[i++] = val;
+    }
 
+    vec(const T* V) {
+      for (u0 i{}; i < S; i++) _elems[i] = V[i];
+    }
 
-public:
-  [[nodiscard]] inline bool is_equal(const vec<T,S> &It) const
-  {
-    auto Mask = (_elems == It._elems);
-    for (u0 i = 0; i < S; ++i)
-      if (!Mask[i])
-        return false;
+  public:
+    [[nodiscard]] inline bool is_equal(const vec<T, S> &It) const {
+      auto Mask = (_elems == It._elems);
+      for (u0 i{}; i < S; i++) {
+        if (!Mask[i]) return false;
+      }
+      return true;
+    }
     
-    return true;
-  }
-  
-  [[nodiscard]] inline std::array<T,S> to_array() const
-  {
-    std::array<T,S> Arr;
-    
-    __builtin_memcpy(Arr.data(), &_elems, sizeof(vector_t));
-    return Arr;
-  }
+    [[nodiscard]] inline std::array<T, S> to_array() const {
+      std::array<T, S> Arr;
+      for (u0 i{}; i < S; i++) Arr[i] = _elems[i];
+      return Arr;
+    }
 
-  [[nodiscard]] inline std::vector<T> to_vector() const
-  {
-    std::vector<T> Vec(S);
-    
-    __builtin_memcpy(Vec.data(), &_elems, sizeof(vector_t));
-    return Vec;
-  }
+    [[nodiscard]] inline std::vector<T> to_vector() const {
+      std::vector<T> Vec(S);
+      for (u0 i{}; i < S; i++) Vec[i] = _elems[i];
+      return Vec;
+    }
 
-  inline u0 size() const { return S; }
-  
-  inline void set(u0 index, T val)
-  {
-    if (index >= S) throw std::out_of_range("Index out of bounds");
+    inline u0 size() const { return S; }
+    
+    inline void set(u0 index, T val) {
+      if (index >= S) throw std::out_of_range("Index out of bounds");
       _elems[index] = val;
-  }
+    }
 
-  [[nodiscard]] inline T get(size_t index)
-  {
-    if (index >= S) throw std::out_of_range("Index out of bounds");
-    return _elems[index];
-  }
+    [[nodiscard]] inline T get(u0 index) const {
+      if (index >= S) throw std::out_of_range("Index out of bounds");
+      return _elems[index];
+    }
 
+    inline vec min(const vec &It) const {
+      vec result;
+      for (u0 i = 0; i < S; i++) result._elems[i] = (_elems[i] < It._elems[i]) ? _elems[i] : It._elems[i];
+      return result;
+    }
 
-  inline vec min(const vec &It) const { return (_elems < It._elems) ? _elems : It._elems; }
-  inline vec max(const vec &It) const { return (_elems > It._elems) ? _elems : It._elems; }
-
+    inline vec max(const vec &It) const {
+      vec result;
+      for (u0 i = 0; i < S; i++) result._elems[i] = (_elems[i] > It._elems[i]) ? _elems[i] : It._elems[i];
+      return result;
+    }
 
 public:  
-  inline T operator[](u0 __n) const { return _elems[__n]; }
-  
-  inline vec operator== (const vec &It) const { return (_elems == It._elems); }
+    inline fun operator[](u0 __n) const -> T { return _elems[__n]; }
+    
+    inline fun operator== (const vec &It) const -> bool { return is_equal(It); }
 
-  inline vec operator+ (const vec &It) const { return (_elems + It._elems); }
-  inline vec operator- (const vec &It) const { return (_elems - It._elems); }
-  inline vec operator* (const vec &It) const { return (_elems * It._elems); }
-  inline vec operator/ (const vec &It) const { return (_elems / It._elems); }
-  inline vec operator% (const vec &It) const { return (_elems % It._elems); }
+    inline fun operator+ (const vec &It) const -> vec { return (_elems + It._elems); }
+    inline fun operator- (const vec &It) const -> vec { return (_elems - It._elems); }
+    inline fun operator* (const vec &It) const -> vec { return (_elems * It._elems); }
+    inline fun operator/ (const vec &It) const -> vec { return (_elems / It._elems); }
+    
+    inline fun operator% (const vec &It) const -> vec requires std::is_integral_v<T> { 
+      return (_elems % It._elems); 
+    }
 
-  inline vec& operator+=  (const vec &It) { _elems += It._elems; return *this; }
-  inline vec& operator-=  (const vec &It) { _elems -= It._elems; return *this; }
-  inline vec& operator*=  (const vec &It) { _elems *= It._elems; return *this; }
-  inline vec& operator/=  (const vec &It) { _elems /= It._elems; return *this; }
-  inline vec& operator%=  (const vec &It) { _elems %= It._elems; return *this; }
-
+    inline fun operator+= (const vec &It) -> vec& { _elems += It._elems; return *this; }
+    inline fun operator-= (const vec &It) -> vec& { _elems -= It._elems; return *this; }
+    inline fun operator*= (const vec &It) -> vec& { _elems *= It._elems; return *this; }
+    inline fun operator/= (const vec &It) -> vec& { _elems /= It._elems; return *this; }
+    
+    inline fun operator%= (const vec &It) -> vec& requires std::is_integral_v<T> { 
+      _elems %= It._elems; return *this; 
+    }
 };
 
 

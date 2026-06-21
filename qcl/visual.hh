@@ -186,12 +186,12 @@ namespace qcl
 
     private:
       poit<i32> m_poit{0, 0};
-      size<i32> m_size{20, 10};
+      qcl::size<i32> m_size{20, 10};
       poit<i32> m_endPoit{m_poit+m_size};
 
-      size<i32> m_preferedSize{};
-      size<i32> m_minSize{};
-      size<i32> m_maxSize{};
+      qcl::size<i32> m_preferedSize{};
+      qcl::size<i32> m_minSize{};
+      qcl::size<i32> m_maxSize{};
 
       vector<effect*> m_effects{};
 
@@ -205,7 +205,7 @@ namespace qcl
       bool m_autoSizeVert{false}, m_autoSizeHorz{false};
 
     protected:
-      inline fun setPreferedSize(size<i32> Val) -> void {
+      inline fun setPreferedSize(qcl::size<i32> Val) -> void {
         if (m_preferedSize == Val)
           return;
         

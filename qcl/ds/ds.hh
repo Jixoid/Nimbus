@@ -52,13 +52,11 @@ namespace ds
   };
 
 
-  namespace {
-    struct payload {
-      void* ptr{};
-      etype type{};
-      bool view{};
-    };
-  }
+  struct payload {
+    void* ptr{};
+    etype type{};
+    bool view{};
+  };
 
   struct type_str  { string val{}; };
   struct type_vstr { string_view val{}; };

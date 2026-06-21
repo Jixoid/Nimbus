@@ -234,7 +234,7 @@ struct win_handle
 
   // Wayland
   wl_surface* surface{};
-  xdg_surface* xdg_surface{};
+  ::xdg_surface* xdg_surface{};
   xdg_toplevel* toplevel{};
   
   // Vulkan Swapchain
@@ -325,9 +325,9 @@ struct app_handle
   zwp_pointer_gesture_pinch_v1 *WlGestures_Pinch{};
 
   // XKB Keypad
-  xkb_context *xkb_context{};
-  xkb_keymap *xkb_keymap{};
-  xkb_state *xkb_state{};
+  ::xkb_context *xkb_context{};
+  ::xkb_keymap *xkb_keymap{};
+  ::xkb_state *xkb_state{};
 
   u32 last_serial;
 

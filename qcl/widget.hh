@@ -157,7 +157,7 @@ namespace qcl
       widgetAnchors m_anchors;
       widgetMargins m_margins;
       
-      contextMenu* m_contextMenu{};
+      qcl::contextMenu* m_contextMenu{};
       
       f32 m_opacity{1.0};
 

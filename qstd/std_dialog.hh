@@ -88,6 +88,7 @@ namespace qstd
         }
 
         default:
+          break;
       }}
   };
 
