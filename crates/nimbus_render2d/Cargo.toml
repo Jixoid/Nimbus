@@ -1,0 +1,12 @@
+[package]
+name = "nimbus_render2d"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+nimbus_math = { path = "../nimbus_math" }
+nimbus_rhi = { path = "../nimbus_rhi" }
+nimbus_rhi_ash = { path = "../nimbus_rhi_ash" }
+nimbus_except = { path = "../nimbus_except" }
+fontdue = "0.9"

@@ -1,0 +1,13 @@
+[package]
+name = "nimbus_platform"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+winit = "0.30"
+raw-window-handle = "0.6"
+nimbus_math = { path = "../nimbus_math" }
+nimbus_rhi = { path = "../nimbus_rhi" }
+nimbus_rhi_ash = { path = "../nimbus_rhi_ash" }
+nimbus_except = { path = "../nimbus_except" }

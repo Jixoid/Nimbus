@@ -1,0 +1,15 @@
+[package]
+name = "nimbus_rhi_ash"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+bitflags = "2.13.2"
+raw-window-handle = "0.6"
+nimbus_math = { path = "../nimbus_math" }
+nimbus_rhi = { path = "../nimbus_rhi" }
+nimbus_except = { path = "../nimbus_except" }
+ash = "0.38"
+ash-window = "0.13"
+gpu-allocator = { version = "0.28", default-features = false, features = ["vulkan", "std"] }
