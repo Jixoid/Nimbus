@@ -13,6 +13,7 @@
 use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, Widget};
 use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
+use nimbus_theme::MonetRole;
 
 
 pub struct ProgressBar {
@@ -45,11 +46,16 @@ impl Widget for ProgressBar {
 		let radius = ctx.bounds.height() * 0.5;
 
 		// Track
-		canvas.draw(RectShape::new(ctx.bounds, Color::new(0.12, 0.14, 0.20, 1.0)).radius(radius));
+		canvas.draw(
+			RectShape::new(ctx.bounds, theme.monet.get(MonetRole::SurfaceContainerHighest))
+				.radius(radius),
+		);
 
 		// Fill
 		let fill_width = (ctx.bounds.width() * self.progress).max(radius * 2.0);
-		let fill_color = self.color.unwrap_or(theme.primary);
+		let fill_color = self
+			.color
+			.unwrap_or_else(|| theme.monet.get(MonetRole::Primary));
 
 		if self.progress > 0.001 {
 			canvas.draw(
@@ -82,7 +88,7 @@ impl Widget for ProgressBar {
 			}
 
 			"color" => {
-				if let Some(c) = value.resolve_color(ctx.theme) {
+				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
 					self.color = Some(c);
 					return true;
 				}

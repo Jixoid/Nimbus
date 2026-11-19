@@ -11,8 +11,8 @@
 
 
 use nimbus_math::Rect;
-use crate::id::ObjectID;
-use crate::theme::Theme;
+use nimbus_theme::Theme;
+use crate::ObjectID;
 
 
 pub struct DrawCtx<'a> {

@@ -11,6 +11,7 @@
 
 
 use std::collections::HashMap;
+use nimbus_theme::Theme;
 use slotmap::SlotMap;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -22,7 +23,6 @@ use nimbus_rhi::manager::allocator::Allocator;
 use nimbus_rhi_ash::{AshVulkanBackend, CommandManager, Device};
 
 use crate::id::WindowHandle;
-use crate::theme::Theme;
 use crate::window::Window;
 
 
@@ -32,16 +32,11 @@ pub struct Application {
 }
 
 impl Application {
-	pub fn new() -> Self {
+	pub fn new(theme: Theme) -> Self {
 		Self {
-			theme: Theme::dark(),
+			theme,
 			windows: SlotMap::with_key(),
 		}
-	}
-
-	pub fn new_with_theme(mut self, theme: Theme) -> Self {
-		self.theme = theme;
-		self
 	}
 
 
@@ -90,12 +85,6 @@ impl Application {
 			.map_err(|e| format!("Event loop exited with error: {e}"))?;
 
 		Ok(())
-	}
-}
-
-impl Default for Application {
-	fn default() -> Self {
-		Self::new()
 	}
 }
 

@@ -10,6 +10,7 @@
 */
 
 
+use nimbus_theme::Theme;
 use slotmap::{SecondaryMap, SlotMap};
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::Canvas2D;
@@ -19,7 +20,6 @@ use crate::event::{ButtonState, EventCtx, EventResponse, InputEvent, MouseButton
 use crate::id::ObjectID;
 use crate::layout::{BoxConstraints, LayoutCtx};
 use crate::node::NodeData;
-use crate::theme::Theme;
 use crate::widget::Widget;
 
 

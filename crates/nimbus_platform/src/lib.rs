@@ -13,4 +13,3 @@
 pub mod display;
 
 pub use display::*;
-pub use winit;

@@ -11,6 +11,7 @@
 
 
 use nimbus_core::{Application, EventRegistry, WidgetRegistry, Window};
+use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens, Theme};
 use nimbus_except::*;
 
 
@@ -18,8 +19,16 @@ fn main() {
 	nimbus_except::start();
 	nimbus_ui::register_widgets(&mut WidgetRegistry::global().write().unwrap());
 
+	let theme = Theme {
+		elevation: ElevationTokens::default(),
+		radius: RadiusTokens::default(),
+		state: StateTokens::default(),
+		stroke: StrokeTokens::default(),
+		monet: Monet::from_system().unwrap(),
+	};
+
 	// Application
-	let mut app = Application::new();
+	let mut app = Application::new(theme);
 	let theme = app.theme.clone();
 
 	// Window
@@ -39,21 +48,52 @@ fn main() {
 
 		node qstd::text {
 			style: "tool_header"
-			text: "QDL Declarative Inspector"
+			text: "Nimbus UI Component Showcase"
 			color: "monet(Primary)"
 		}
 
-		node qstd::text {
-			text: "Loaded dynamically from QDL"
+		node qstd::check {
+			text: "Checkbox Component"
+			checked: true
 		}
 
-		node qstd::progbar {
-			value: 0.65
+		node qstd::radio {
+			text: "Radio Button Option"
+			checked: true
 		}
 
-		node qstd::button {
-			text: "Trigger QDL Action"
-			on_click: "ToolAction"
+		node qstd::switch {
+			text: "Toggle Switch"
+			checked: true
+		}
+
+		node qstd::slider {
+			value: 45
+			min: 0
+			max: 100
+		}
+
+		node qstd::interval {
+			pos1: 25
+			pos2: 75
+			min: 0
+			max: 100
+		}
+
+		node qstd::multiprogress {
+			vals: [40, 30, 20]
+		}
+
+		node qstd::flow {
+			spacing: 8
+			node qstd::button {
+				text: "Flow Item 1"
+				on_click: "ToolAction"
+			}
+			node qstd::button {
+				text: "Flow Item 2"
+				on_click: "ToolAction"
+			}
 		}
 	}
 	"#;

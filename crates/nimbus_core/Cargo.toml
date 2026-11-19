@@ -8,6 +8,7 @@ license.workspace = true
 slotmap = "1.1.1"
 winit = "0.30"
 nimbus_math = { path = "../nimbus_math" }
+nimbus_theme = { path = "../nimbus_theme" }
 nimbus_except = { path = "../nimbus_except" }
 nimbus_rhi = { path = "../nimbus_rhi" }
 nimbus_rhi_ash = { path = "../nimbus_rhi_ash" }

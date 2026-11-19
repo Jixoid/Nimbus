@@ -15,6 +15,7 @@ use std::any;
 use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
 use nimbus_math::Vec2;
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
+use nimbus_theme::MonetRole;
 
 
 pub struct Button {
@@ -48,15 +49,27 @@ impl Widget for Button {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let theme = ctx.theme;
-		let bg_color = if ctx.pressed {
-			theme.primary_active
+		let monet = &theme.monet;
+
+		let (bg_color, fg_color) = if ctx.pressed {
+			(
+				monet.get(MonetRole::PrimaryFixedDim),
+				monet.get(MonetRole::OnPrimaryFixedVariant),
+			)
 		} else if ctx.hovered {
-			theme.primary_hover
+			(
+				monet.get(MonetRole::PrimaryContainer),
+				monet.get(MonetRole::OnPrimaryContainer),
+			)
 		} else {
-			theme.primary
+			(
+				monet.get(MonetRole::Primary),
+				monet.get(MonetRole::OnPrimary),
+			)
 		};
 
-		canvas.draw(RectShape::new(ctx.bounds, bg_color).radius(theme.button_radius));
+		let radius = theme.radius.small;
+		canvas.draw(RectShape::new(ctx.bounds, bg_color).radius(radius));
 
 		let (text_w, text_h) = canvas.measure_text(&self.label, self.font_size);
 		let text_x = ctx.bounds.x() + (ctx.bounds.width() - text_w) * 0.5;
@@ -72,7 +85,7 @@ impl Widget for Button {
 			font,
 			self.font_size,
 			Vec2::new(text_x, text_y),
-			theme.text_primary,
+			fg_color,
 		));
 	}
 
@@ -87,8 +100,7 @@ impl Widget for Button {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
-		let _ = ctx;
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
 		match key {
 			"text" => {
 				if let Some(s) = value.as_str() {
@@ -113,7 +125,7 @@ impl Widget for Button {
 					return true;
 				}
 			}
-			
+
 			_ => {}
 		}
 		false

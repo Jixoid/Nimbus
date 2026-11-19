@@ -38,6 +38,7 @@ impl<T: Number> Color<T> {
 		b: T::ZERO,
 		a: T::ONE,
 	};
+	
 	pub const WHITE: Self = Self {
 		r: T::ONE,
 		g: T::ONE,
@@ -51,12 +52,14 @@ impl<T: Number> Color<T> {
 		b: T::ZERO,
 		a: T::ONE,
 	};
+
 	pub const GREEN: Self = Self {
 		r: T::ZERO,
 		g: T::ONE,
 		b: T::ZERO,
 		a: T::ONE,
 	};
+
 	pub const BLUE: Self = Self {
 		r: T::ZERO,
 		g: T::ZERO,
@@ -70,12 +73,14 @@ impl<T: Number> Color<T> {
 		b: T::ZERO,
 		a: T::ONE,
 	};
+
 	pub const CYAN: Self = Self {
 		r: T::ZERO,
 		g: T::ONE,
 		b: T::ONE,
 		a: T::ONE,
 	};
+
 	pub const MAGENTA: Self = Self {
 		r: T::ONE,
 		g: T::ZERO,
@@ -113,20 +118,83 @@ impl<T: Number> Color<T> {
 }
 
 impl<T: Float> Color<T> {
-	pub fn from_hex(hex: u32) -> Self {
-		let r = ((hex >> 24) & 0xFF) as f32 / 255.0;
-		let g = ((hex >> 16) & 0xFF) as f32 / 255.0;
-		let b = ((hex >> 8) & 0xFF) as f32 / 255.0;
-		let a = (hex & 0xFF) as f32 / 255.0;
+	pub fn from_oklch(light: f32, chroma: f32, hue: f32) -> Self {
+		// OKLCH -> OKLAB
+		let h = hue.to_radians();
+		let a = chroma * f32::cos(h);
+		let b = chroma * f32::sin(h);
+
+		// OKLAB -> Linear sRGB
+		let l_ = light +(0.3963377774 *a) +(0.2158037573 *b);
+		let m_ = light -(0.1055613458 *a) -(0.0638541728 *b);
+		let s_ = light -(0.0894841775 *a) -(1.2914855480 *b);
+
+		let l = l_ *l_ *l_;
+		let m = m_ *m_ *m_;
+		let s = s_ *s_ *s_;
+
+		let r_lin = ( 4.0767416621 *l) -(3.3077115913 *m) +(0.2309699292 *s);
+		let g_lin = (-1.2684380046 *l) +(2.6097574011 *m) -(0.3413193965 *s);
+		let b_lin = (-0.0041960863 *l) -(0.7034186147 *m) +(1.7076147010 *s);
+
+		// Linear sRGB -> sRGB (Gamma Correction)
+		let gamma_correct = |c: f32| -> f32 {
+			if c <= 0.0031308 {
+				12.92 *c
+			} else {
+				1.055 *c.powf(1.0 / 2.4) -0.055
+			}
+		};
 
 		Self {
-			r: T::from_f32(r),
-			g: T::from_f32(g),
-			b: T::from_f32(b),
-			a: T::from_f32(a),
+			r: T::from_f32(gamma_correct(r_lin).clamp(0.0, 1.0)),
+			g: T::from_f32(gamma_correct(g_lin).clamp(0.0, 1.0)),
+			b: T::from_f32(gamma_correct(b_lin).clamp(0.0, 1.0)),
+			a: T::ONE,
 		}
 	}
 
+	pub fn to_oklch(&self) -> (f32, f32, f32) {
+		// sRGB -> Linear sRGB (Gamma Expansion)
+		let to_linear = |c: f32| -> f32 {
+			if c <= 0.04045 {
+				c / 12.92
+			} else {
+				f32::powf((c + 0.055) / 1.055, 2.4)
+			}
+		};
+
+		let r_lin = to_linear(self.r.to_f32());
+		let g_lin = to_linear(self.g.to_f32());
+		let b_lin = to_linear(self.b.to_f32());
+
+		// Linear sRGB -> LMS
+		let l = (0.4122214708 *r_lin) +(0.5363325363 *g_lin) +(0.0514459929 *b_lin);
+		let m = (0.2119034982 *r_lin) +(0.6806995451 *g_lin) +(0.1073969566 *b_lin);
+		let s = (0.0883024619 *r_lin) +(0.2817188976 *g_lin) +(0.6299787005 *b_lin);
+
+		// LMS -> Non-linear LMS (Cube Root)
+		let l_ = f32::powf(l, 1.0 / 3.0);
+		let m_ = f32::powf(m, 1.0 / 3.0);
+		let s_ = f32::powf(s, 1.0 / 3.0);
+
+		// Non-linear LMS -> OKLAB (L, a, b)
+		let l = (0.2104542553 *l_) +(0.7936177850 *m_) -(0.0040720468 *s_);
+		let a = (1.9779984951 *l_) -(2.4285922050 *m_) +(0.4505937099 *s_);
+		let b = (0.0259040371 *l_) +(0.7827717662 *m_) -(0.8086757660 *s_);
+
+		// OKLAB -> OKLCH (L, C, h)
+		let c = f32::sqrt(a * a + b * b);
+		let mut h = f32::atan2(b, a).to_degrees();
+
+		if h < 0.0 {
+			h += 360.0;
+		}
+		
+		(l, c, h)
+	}
+
+	
 	pub fn to_rgba_u8(&self) -> [u8; 4] {
 		let clamp_u8 = |v: T| -> u8 {
 			let clamped = T::clamp(v, T::ZERO, T::ONE);
@@ -272,11 +340,5 @@ impl<T: Number> From<Color<T>> for [T; 4] {
 impl<T: Number> From<Color<T>> for (T, T, T, T) {
 	fn from(c: Color<T>) -> Self {
 		(c.r, c.g, c.b, c.a)
-	}
-}
-
-impl From<u32> for Color<f32> {
-	fn from(hex: u32) -> Self {
-		Self::from_hex(hex)
 	}
 }

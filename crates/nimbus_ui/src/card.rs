@@ -13,6 +13,7 @@
 use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, Widget};
 use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
+use nimbus_theme::MonetRole;
 
 
 pub struct Card {
@@ -63,15 +64,22 @@ impl Widget for Card {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let theme = ctx.theme;
-		let radius = self.corner_radius.unwrap_or(theme.card_radius);
-		let bg = self.background.unwrap_or(theme.surface);
-		let border_col = self.border_color.unwrap_or(theme.border);
+		let radius = self.corner_radius.unwrap_or(theme.radius.medium);
+		let bg = self
+			.background
+			.unwrap_or_else(|| theme.monet.get(MonetRole::SurfaceContainer));
+
+		let border_col = self
+			.border_color
+			.unwrap_or_else(|| theme.monet.get(MonetRole::OutlineVariant));
+		
+		let shadow_col = theme.monet.get(MonetRole::Shadow);
 
 		canvas.draw(
 			RectShape::new(ctx.bounds, bg)
 				.radius(radius)
 				.border(border_col, self.border_width)
-				.shadow(theme.shadow, Vec2::new(0.0, 4.0), self.shadow_blur),
+				.shadow(shadow_col, Vec2::new(0.0, 4.0), self.shadow_blur),
 		);
 	}
 
@@ -105,14 +113,14 @@ impl Widget for Card {
 			}
 
 			"color" => {
-				if let Some(c) = value.resolve_color(ctx.theme) {
+				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
 					self.background = Some(c);
 					return true;
 				}
 			}
 
 			"border_color" => {
-				if let Some(c) = value.resolve_color(ctx.theme) {
+				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
 					self.border_color = Some(c);
 					return true;
 				}

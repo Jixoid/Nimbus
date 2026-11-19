@@ -21,3 +21,4 @@ nimbus_platform = { path = "crates/nimbus_platform" }
 nimbus_render2d = { path = "crates/nimbus_render2d" }
 nimbus_rhi_ash = { path = "crates/nimbus_rhi_ash" }
 nimbus_qdl = { path = "crates/nimbus_qdl" }
+nimbus_theme = { path = "crates/nimbus_theme" }

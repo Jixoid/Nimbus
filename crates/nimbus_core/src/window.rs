@@ -10,6 +10,7 @@
 */
 
 
+use nimbus_theme::Theme;
 use winit::event::{ElementState, MouseButton as WinitMouseButton, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::WindowId;
@@ -23,7 +24,6 @@ use nimbus_rhi_ash::{AshVulkanBackend, Command, CommandManager, Device, Synchron
 
 use crate::event::{ButtonState, MouseButton};
 use crate::id::WindowHandle;
-use crate::theme::Theme;
 use crate::tree::UiTree;
 
 
@@ -280,9 +280,9 @@ impl Window {
 		cmd.begin();
 
 		let clear_color = Vec4::new(
-			theme.background.r,
-			theme.background.g,
-			theme.background.b,
+			theme.monet.surface.container_lowest.r,
+			theme.monet.surface.container_lowest.g,
+			theme.monet.surface.container_lowest.b,
 			1.0,
 		);
 		cmd.begin_rendering(&target, clear_color);

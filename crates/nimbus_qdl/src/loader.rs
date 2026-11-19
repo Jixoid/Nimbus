@@ -13,9 +13,10 @@
 use std::collections::HashMap;
 
 use nimbus_core::{
-	MethodTable, ObjectID, PropertyCtx, PropertyValue, Theme, UiTree, Widget, WidgetRegistry,
+	MethodTable, ObjectID, PropertyCtx, PropertyValue, UiTree, Widget, WidgetRegistry,
 };
 use nimbus_except::{nimbus_log, nimbus_warn};
+use nimbus_theme::Theme;
 
 use crate::ast::{QdlDocument, QdlNode};
 use crate::parser::parse;

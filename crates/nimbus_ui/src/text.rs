@@ -15,6 +15,7 @@ use std::any;
 use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, Widget};
 use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, TextShape};
+use nimbus_theme::MonetRole;
 
 
 pub struct Text {
@@ -43,7 +44,9 @@ impl Widget for Text {
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let color = self.color.unwrap_or(ctx.theme.text_primary);
+		let color = self
+			.color
+			.unwrap_or_else(|| ctx.theme.monet.get(MonetRole::OnSurface));
 		let fface = FontManager::default_font();
 		let font = match self.font {
 			Some(id) => Font::with_id(id, fface, self.font_size),
@@ -80,7 +83,7 @@ impl Widget for Text {
 			}
 
 			"color" => {
-				if let Some(c) = value.resolve_color(ctx.theme) {
+				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
 					self.color = Some(c);
 					return true;
 				}
