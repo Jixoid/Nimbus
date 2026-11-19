@@ -13,11 +13,9 @@
 pub mod atlas;
 pub mod canvas;
 pub mod font;
-pub mod rect;
-pub mod text;
+pub mod shape;
 
 pub use atlas::*;
 pub use canvas::*;
 pub use font::*;
-pub use rect::*;
-pub use text::*;
+pub use shape::*;

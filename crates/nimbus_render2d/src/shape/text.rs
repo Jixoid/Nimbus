@@ -10,15 +10,18 @@
 */
 
 
+use nimbus_math::{Color, Vec2};
 use nimbus_rhi::format::Format;
 use nimbus_rhi::pipeline::{Pipeline, PipelineMeta, PolygonMode, PrimitiveTopology};
 use nimbus_rhi::shader::{Shader, ShaderStage};
 use nimbus_rhi::types::MsaaSamples;
 use nimbus_rhi_ash::{AshVulkanBackend, Device};
 
+use crate::Font;
 
-pub static TEXT_VERT_SPV: &[u8] = include_bytes!("../shaders/text.vert.spv");
-pub static TEXT_FRAG_SPV: &[u8] = include_bytes!("../shaders/text.frag.spv");
+
+pub static TEXT_VERT_SPV: &[u8] = include_bytes!("../../shaders/text.vert.spv");
+pub static TEXT_FRAG_SPV: &[u8] = include_bytes!("../../shaders/text.frag.spv");
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -32,6 +35,34 @@ const _: () = {
 	assert!(std::mem::size_of::<GlyphInstance>() == 48);
 	assert!(std::mem::align_of::<GlyphInstance>() == 16);
 };
+
+
+pub struct TextShape<'a, 'fface> {
+	pub(crate) text: &'a str,
+	pub(crate) font: Font<'fface>,
+	pub(crate) size: f32,
+	pub(crate) pos: Vec2<f32>,
+	pub(crate) color: Color<f32>,
+}
+
+impl<'a, 'fface> TextShape<'a, 'fface> {
+	pub fn new(
+		text: &'a str,
+		font: Font<'fface>,
+		size: f32,
+		pos: Vec2<f32>,
+		color: Color<f32>,
+	) -> Self {
+		Self {
+			text,
+			font,
+			size,
+			pos,
+			color,
+		}
+	}
+}
+
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Default)]

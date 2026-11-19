@@ -9,51 +9,68 @@
 	Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
+use nimbus_math::Rect;
+use nimbus_rhi::types::Rect2D;
+use nimbus_rhi::{AllocationCreate, AllocationLocation, BufferUsage, Format, ShaderStage};
+use nimbus_rhi_ash::{AshCommandQueue, Command, Device, Allocator, Buffer, RenderTarget};
 
-use nimbus_rhi::{AllocationCreate, AllocationLocation, Buffer, BufferUsage};
-use nimbus_rhi::format::Format;
-use nimbus_rhi::manager::allocator::Allocator;
-use nimbus_rhi::render_target::RenderTarget;
-use nimbus_rhi::shader::ShaderStage;
-use nimbus_rhi_ash::{AshCommandQueue, AshVulkanBackend, Command, Device};
-
+use crate::{RectShape, TextShape};
 use crate::atlas::GlyphAtlas;
-use crate::font::Font;
-use crate::rect::{RectInstance, RectPipeline, RectPushConstants};
-use crate::text::{GlyphInstance, TextPipeline, TextPushConstants};
+use crate::{RectInstance, RectPipeline, RectPushConstants};
+use crate::{GlyphInstance, TextPipeline, TextPushConstants};
 
 const INITIAL_BUFFER_CAPACITY: usize = 1024;
+
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum DrawBatch {
+	Rects {
+		start: u32,
+		count: u32,
+		clip: Option<Rect<f32>>,
+	},
+	Text {
+		start: u32,
+		count: u32,
+		clip: Option<Rect<f32>>,
+	},
+}
+
+impl DrawBatch {
+	pub fn clip(&self) -> Option<Rect<f32>> {
+		match self {
+			DrawBatch::Rects { clip, .. } | DrawBatch::Text { clip, .. } => *clip,
+		}
+	}
+}
 
 
 pub struct Canvas2D {
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
 	atlas: GlyphAtlas,
-	font: Font,
 	rect_instances: Vec<RectInstance>,
 	glyph_instances: Vec<GlyphInstance>,
-	rect_buffer: Option<Buffer<AshVulkanBackend>>,
-	glyph_buffer: Option<Buffer<AshVulkanBackend>>,
+	batches: Vec<DrawBatch>,
+	clip_stack: Vec<Rect<f32>>,
+	rect_buffer: Option<Buffer>,
+	glyph_buffer: Option<Buffer>,
 }
 
 impl Canvas2D {
-	pub fn new(
-		device: &Device,
-		allocator: &Allocator<AshVulkanBackend>,
-		color_format: Format,
-	) -> Self {
+	pub fn new(device: &Device, allocator: &Allocator, color_format: Format) -> Self {
 		let rect_pipeline = RectPipeline::new(device, color_format);
 		let text_pipeline = TextPipeline::new(device, color_format);
 		let atlas = GlyphAtlas::new(device, allocator);
-		let font = Font::default_font();
 
 		Self {
 			rect_pipeline,
 			text_pipeline,
 			atlas,
-			font,
 			rect_instances: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			glyph_instances: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
+			batches: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
+			clip_stack: Vec::new(),
 			rect_buffer: None,
 			glyph_buffer: None,
 		}
@@ -62,141 +79,64 @@ impl Canvas2D {
 	pub fn clear_batches(&mut self) {
 		self.rect_instances.clear();
 		self.glyph_instances.clear();
+		self.batches.clear();
+		self.clip_stack.clear();
 	}
 
-	pub fn draw_rect(&mut self, rect: [f32; 4], fill: [f32; 4]) {
-		self.rect_instances.push(RectInstance {
-			rect,
-			radii: [0.0; 4],
-			fill_color: fill,
-			border_color: [0.0; 4],
-			shadow_color: [0.0; 4],
-			shadow_offset: [0.0; 2],
-			border_width: 0.0,
-			shadow_blur: 0.0,
-		});
+	pub fn push_clip(&mut self, clip: Rect<f32>) {
+		let effective = match self.clip_stack.last() {
+			Some(parent) => parent.intersection(&clip).unwrap_or(Rect::ZERO),
+			None => clip,
+		};
+		self.clip_stack.push(effective);
 	}
 
-	pub fn draw_rounded_rect(&mut self, rect: [f32; 4], radius: f32, fill: [f32; 4]) {
-		self.rect_instances.push(RectInstance {
-			rect,
-			radii: [radius; 4],
-			fill_color: fill,
-			border_color: [0.0; 4],
-			shadow_color: [0.0; 4],
-			shadow_offset: [0.0; 2],
-			border_width: 0.0,
-			shadow_blur: 0.0,
-		});
+	pub fn pop_clip(&mut self) {
+		self.clip_stack.pop();
 	}
 
-	pub fn draw_rounded_rect_varying(&mut self, rect: [f32; 4], radii: [f32; 4], fill: [f32; 4]) {
-		self.rect_instances.push(RectInstance {
-			rect,
-			radii,
-			fill_color: fill,
-			border_color: [0.0; 4],
-			shadow_color: [0.0; 4],
-			shadow_offset: [0.0; 2],
-			border_width: 0.0,
-			shadow_blur: 0.0,
-		});
+	pub fn current_clip(&self) -> Option<Rect<f32>> {
+		self.clip_stack.last().copied()
 	}
 
-	#[allow(clippy::too_many_arguments)]
-	pub fn draw_card(
-		&mut self,
-		rect: [f32; 4],
-		radius: f32,
-		fill: [f32; 4],
-		border_width: f32,
-		border_color: [f32; 4],
-		shadow_blur: f32,
-		shadow_offset: [f32; 2],
-		shadow_color: [f32; 4],
-	) {
-		self.rect_instances.push(RectInstance {
-			rect,
-			radii: [radius; 4],
-			fill_color: fill,
-			border_color,
-			shadow_color,
-			shadow_offset,
-			border_width,
-			shadow_blur,
-		});
-	}
-
-	pub fn draw_circle(&mut self, center: [f32; 2], radius: f32, fill: [f32; 4]) {
-		self.draw_rounded_rect(
-			[
-				center[0] - radius,
-				center[1] - radius,
-				radius * 2.0,
-				radius * 2.0,
-			],
-			radius,
-			fill,
-		);
-	}
-
-	pub fn draw_text(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4]) {
-		let mut pen_x = x;
-		let line_height = self
-			.font
-			.raw()
-			.horizontal_line_metrics(font_size)
-			.map(|m| m.new_line_size)
-			.unwrap_or(font_size * 1.2);
-		let mut pen_y = y + line_height * 0.8; // baseline offset
-
-		for ch in text.chars() {
-			if ch == '\n' {
-				pen_x = x;
-				pen_y += line_height;
-				continue;
-			}
-
-			if let Some(glyph) = self
-				.atlas
-				.get_or_cache(ch, font_size as u32, self.font.raw())
-			{
-				if glyph.size[0] > 0.0 && glyph.size[1] > 0.0 {
-					let gx = pen_x + glyph.offset[0];
-					let gy = pen_y - glyph.offset[1] - glyph.size[1];
-
-					self.glyph_instances.push(GlyphInstance {
-						rect: [gx, gy, glyph.size[0], glyph.size[1]],
-						uv_rect: glyph.uv_rect,
-						color,
-					});
-				}
-				pen_x += glyph.advance;
-			}
-		}
+	// Draw API
+	pub fn draw<T>(&mut self, shape: T)
+	where
+		T: DrawShape,
+	{
+		DrawShape::draw(self, shape);
 	}
 
 	pub fn measure_text(&self, text: &str, font_size: f32) -> (f32, f32) {
-		self.font.measure_text(text, font_size)
+		crate::FontManager::default_font().measure_text(text, font_size)
 	}
 
+	pub fn batches(&self) -> &[DrawBatch] {
+		&self.batches
+	}
+
+	#[allow(clippy::too_many_arguments)]
 	pub fn render(
 		&mut self,
 		cmd: &mut Command,
-		_target: &RenderTarget<AshVulkanBackend>,
+		_target: &RenderTarget,
 		width: u32,
 		height: u32,
 		device: &Device,
-		allocator: &Allocator<AshVulkanBackend>,
+		allocator: &Allocator,
 		queue: &AshCommandQueue,
 	) {
-		// 1. Flush any new glyphs to the GPU atlas texture
+		if self.batches.is_empty() {
+			return;
+		}
+
+		// Flush any new glyphs to the GPU atlas texture
 		self.atlas.update_gpu(device, allocator, queue);
 
 		let screen_size = [width as f32, height as f32];
 		cmd.set_viewport_and_scissor(width, height);
 
-		// 2. Render all rectangle & card instances
+		// Prepare rect buffer if needed
 		if !self.rect_instances.is_empty() {
 			let byte_size = (self.rect_instances.len() * std::mem::size_of::<RectInstance>()) as u64;
 
@@ -227,19 +167,10 @@ impl Canvas2D {
 				buf
 					.write_bytes(0, slice)
 					.expect("Failed to write rect instances to GPU buffer");
-
-				cmd.bind_pipeline(self.rect_pipeline.pipeline());
-
-				let pc = RectPushConstants {
-					instance_addr: buf.address(),
-					screen_size,
-				};
-				cmd.push_constant(ShaderStage::Vertex, 0, &pc);
-				cmd.draw(6, self.rect_instances.len() as u32, 0, 0);
 			}
 		}
 
-		// 3. Render all text glyph instances
+		// Prepare glyph buffer if needed
 		if !self.glyph_instances.is_empty() {
 			let byte_size = (self.glyph_instances.len() * std::mem::size_of::<GlyphInstance>()) as u64;
 
@@ -270,18 +201,201 @@ impl Canvas2D {
 				buf
 					.write_bytes(0, slice)
 					.expect("Failed to write glyph instances to GPU buffer");
-
-				cmd.bind_pipeline(self.text_pipeline.pipeline());
-
-				let pc = TextPushConstants {
-					glyph_addr: buf.address(),
-					screen_size,
-					texture_id: self.atlas.texture_id(),
-					_pad: 0,
-				};
-				cmd.push_constant(ShaderStage::Vertex | ShaderStage::Pixel, 0, &pc);
-				cmd.draw(6, self.glyph_instances.len() as u32, 0, 0);
 			}
 		}
+
+		let mut current_scissor: Option<Rect2D> = None;
+		let mut current_is_rect: Option<bool> = None;
+
+		for batch in &self.batches {
+			let desired_scissor = match batch.clip() {
+				Some(c) => {
+					let x0 = (c.x().max(0.0).min(width as f32) as i32).max(0);
+					let y0 = (c.y().max(0.0).min(height as f32) as i32).max(0);
+					let x1 = (c.max.x.max(0.0).min(width as f32) as i32).max(x0);
+					let y1 = (c.max.y.max(0.0).min(height as f32) as i32).max(y0);
+					let w = (x1 - x0) as u32;
+					let h = (y1 - y0) as u32;
+					Rect2D::new(x0, y0, w, h)
+				}
+				None => Rect2D::new(0, 0, width, height),
+			};
+
+			if current_scissor != Some(desired_scissor) {
+				cmd.set_scissor(
+					desired_scissor.x,
+					desired_scissor.y,
+					desired_scissor.width,
+					desired_scissor.height,
+				);
+				current_scissor = Some(desired_scissor);
+			}
+
+			match batch {
+				DrawBatch::Rects { start, count, .. } => {
+					if let Some(buf) = &self.rect_buffer {
+						if current_is_rect != Some(true) {
+							cmd.bind_pipeline(self.rect_pipeline.pipeline());
+							let pc = RectPushConstants {
+								instance_addr: buf.address(),
+								screen_size,
+							};
+							cmd.push_constant(ShaderStage::Vertex, 0, &pc);
+							current_is_rect = Some(true);
+						}
+						cmd.draw(6, *count, 0, *start);
+					}
+				}
+				DrawBatch::Text { start, count, .. } => {
+					if let Some(buf) = &self.glyph_buffer {
+						if current_is_rect != Some(false) {
+							cmd.bind_pipeline(self.text_pipeline.pipeline());
+							let pc = TextPushConstants {
+								glyph_addr: buf.address(),
+								screen_size,
+								texture_id: self.atlas.texture_id(),
+								_pad: 0,
+							};
+							cmd.push_constant(ShaderStage::Vertex | ShaderStage::Pixel, 0, &pc);
+							current_is_rect = Some(false);
+						}
+						cmd.draw(6, *count, 0, *start);
+					}
+				}
+			}
+		}
+	}
+}
+
+
+pub trait DrawShape {
+	fn draw(canvas: &mut Canvas2D, shape: Self);
+}
+
+impl DrawShape for RectShape {
+	fn draw(canvas: &mut Canvas2D, shape: Self) {
+		let clip = canvas.current_clip();
+		let idx = canvas.rect_instances.len() as u32;
+		canvas.rect_instances.push(shape.inst);
+
+		if let Some(DrawBatch::Rects {
+			count,
+			clip: batch_clip,
+			..
+		}) = canvas.batches.last_mut()
+			&& *batch_clip == clip
+		{
+			*count += 1;
+			return;
+		}
+
+		canvas.batches.push(DrawBatch::Rects {
+			start: idx,
+			count: 1,
+			clip,
+		});
+	}
+}
+
+impl<'a, 'fface> DrawShape for TextShape<'a, 'fface> {
+	fn draw(canvas: &mut Canvas2D, shape: Self) {
+		let line_height = shape
+			.font
+			.face()
+			.inner
+			.horizontal_line_metrics(shape.size)
+			.map(|m| m.new_line_size)
+			.unwrap_or(shape.size * 1.2);
+
+		let mut pen_x = shape.pos[0];
+		let mut pen_y = shape.pos[1] + line_height * 0.8;
+		let clip = canvas.current_clip();
+		let start_glyph_idx = canvas.glyph_instances.len() as u32;
+
+		for ch in shape.text.chars() {
+			if ch == '\n' {
+				pen_x = shape.pos[0];
+				pen_y += line_height;
+				continue;
+			}
+
+			if let Some(glyph) = canvas.atlas.get_or_cache(
+				shape.font.id(),
+				ch,
+				shape.size as u32,
+				&shape.font.face().inner,
+			) {
+				if glyph.size[0] > 0.0 && glyph.size[1] > 0.0 {
+					let gx = pen_x + glyph.offset[0];
+					let gy = pen_y - glyph.offset[1] - glyph.size[1];
+
+					canvas.glyph_instances.push(GlyphInstance {
+						rect: [gx, gy, glyph.size[0], glyph.size[1]],
+						uv_rect: glyph.uv_rect,
+						color: shape.color.to_array(),
+					});
+				}
+				pen_x += glyph.advance;
+			}
+		}
+
+		let glyph_count = (canvas.glyph_instances.len() as u32) - start_glyph_idx;
+		if glyph_count == 0 {
+			return;
+		}
+
+		if let Some(DrawBatch::Text {
+			count,
+			clip: batch_clip,
+			..
+		}) = canvas.batches.last_mut()
+			&& *batch_clip == clip
+		{
+			*count += glyph_count;
+			return;
+		}
+
+		canvas.batches.push(DrawBatch::Text {
+			start: start_glyph_idx,
+			count: glyph_count,
+			clip,
+		});
+	}
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use nimbus_math::Rect;
+
+	#[test]
+	fn test_draw_batch_clip_accessor() {
+		let clip_rect = Rect::new(10.0, 20.0, 100.0, 200.0);
+		let batch_rect = DrawBatch::Rects {
+			start: 0,
+			count: 5,
+			clip: Some(clip_rect),
+		};
+		assert_eq!(batch_rect.clip(), Some(clip_rect));
+
+		let batch_text = DrawBatch::Text {
+			start: 5,
+			count: 10,
+			clip: None,
+		};
+		assert_eq!(batch_text.clip(), None);
+	}
+
+	#[test]
+	fn test_nested_clipping_intersection() {
+		let parent = Rect::new(0.0, 0.0, 100.0, 100.0);
+		let child = Rect::new(50.0, 50.0, 100.0, 100.0);
+		let intersected = parent.intersection(&child).unwrap();
+
+		assert_eq!(intersected.x(), 50.0);
+		assert_eq!(intersected.y(), 50.0);
+		assert_eq!(intersected.width(), 50.0);
+		assert_eq!(intersected.height(), 50.0);
 	}
 }

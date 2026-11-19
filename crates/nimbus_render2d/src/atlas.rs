@@ -12,12 +12,13 @@
 
 use std::collections::HashMap;
 
+use crate::FontId;
 use nimbus_rhi::format::Format;
-use nimbus_rhi::image::{Image2, Image2Desc, ImageTiling, ImageUsage, ImageView2};
-use nimbus_rhi::manager::allocator::{AllocationCreate, AllocationLocation, Allocator};
-use nimbus_rhi::sampler::{Sampler2, SamplerAddressMode, SamplerFilter};
+use nimbus_rhi::image::{Image2Desc, ImageTiling, ImageUsage};
+use nimbus_rhi::manager::allocator::{AllocationCreate, AllocationLocation};
+use nimbus_rhi::sampler::{SamplerAddressMode, SamplerFilter};
 use nimbus_rhi::types::MsaaSamples;
-use nimbus_rhi_ash::{AshCommandQueue, AshVulkanBackend, Device};
+use nimbus_rhi_ash::{Allocator, AshCommandQueue, Device, Image2, ImageView2, Sampler2};
 use nimbus_except::*;
 
 
@@ -32,11 +33,11 @@ pub struct CachedGlyph {
 }
 
 pub struct GlyphAtlas {
-	image: Image2<AshVulkanBackend>,
+	image: Image2,
 	#[allow(dead_code)]
-	view: ImageView2<AshVulkanBackend>,
+	view: ImageView2,
 	#[allow(dead_code)]
-	sampler: Sampler2<AshVulkanBackend>,
+	sampler: Sampler2,
 	texture_id: u32,
 	width: u32,
 	height: u32,
@@ -44,12 +45,12 @@ pub struct GlyphAtlas {
 	cursor_y: u32,
 	row_height: u32,
 	cpu_buffer: Vec<u8>,
-	cache: HashMap<(char, u32), CachedGlyph>,
+	cache: HashMap<(FontId, char, u32), CachedGlyph>,
 	dirty: bool,
 }
 
 impl GlyphAtlas {
-	pub fn new(device: &Device, allocator: &Allocator<AshVulkanBackend>) -> Self {
+	pub fn new(device: &Device, allocator: &Allocator) -> Self {
 		let desc = Image2Desc {
 			width: ATLAS_SIZE,
 			height: ATLAS_SIZE,
@@ -104,11 +105,12 @@ impl GlyphAtlas {
 
 	pub fn get_or_cache(
 		&mut self,
+		font_id: FontId,
 		ch: char,
 		size_px: u32,
 		font: &fontdue::Font,
 	) -> Option<CachedGlyph> {
-		if let Some(glyph) = self.cache.get(&(ch, size_px)) {
+		if let Some(glyph) = self.cache.get(&(font_id, ch, size_px)) {
 			return Some(*glyph);
 		}
 
@@ -123,7 +125,7 @@ impl GlyphAtlas {
 				offset: [metrics.xmin as f32, metrics.ymin as f32],
 				advance: metrics.advance_width,
 			};
-			self.cache.insert((ch, size_px), cached);
+			self.cache.insert((font_id, ch, size_px), cached);
 			return Some(cached);
 		}
 
@@ -165,16 +167,11 @@ impl GlyphAtlas {
 		self.row_height = self.row_height.max(h);
 		self.dirty = true;
 
-		self.cache.insert((ch, size_px), cached);
+		self.cache.insert((font_id, ch, size_px), cached);
 		Some(cached)
 	}
 
-	pub fn update_gpu(
-		&mut self,
-		device: &Device,
-		allocator: &Allocator<AshVulkanBackend>,
-		queue: &AshCommandQueue,
-	) {
+	pub fn update_gpu(&mut self, device: &Device, allocator: &Allocator, queue: &AshCommandQueue) {
 		if self.dirty {
 			let res = device.upload_image_data(
 				allocator,

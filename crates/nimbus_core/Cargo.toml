@@ -1,0 +1,15 @@
+[package]
+name = "nimbus_core"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+slotmap = "1.1.1"
+winit = "0.30"
+nimbus_math = { path = "../nimbus_math" }
+nimbus_except = { path = "../nimbus_except" }
+nimbus_rhi = { path = "../nimbus_rhi" }
+nimbus_rhi_ash = { path = "../nimbus_rhi_ash" }
+nimbus_render2d = { path = "../nimbus_render2d" }
+nimbus_platform = { path = "../nimbus_platform" }
