@@ -56,8 +56,8 @@ impl Widget for Radio {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
-		let circle_size = 20.0f32;
-		let circle_x = ctx.bounds.x() + 1.0;
+		let circle_size = 22.0f32;
+		let circle_x = ctx.bounds.x();
 		let circle_y = ctx.bounds.y() + (ctx.bounds.height() - circle_size) * 0.5;
 		let outer_rect = Rect::new(circle_x, circle_y, circle_size, circle_size);
 

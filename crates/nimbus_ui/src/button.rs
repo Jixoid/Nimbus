@@ -13,13 +13,23 @@
 use std::any;
 
 use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
-use nimbus_math::Vec2;
+use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
 use nimbus_theme::MonetRole;
 
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonVariant {
+	#[default]
+	Filled,
+	Tonal,
+	Elevated,
+	Outlined,
+}
+
 pub struct Button {
 	pub label: String,
+	pub variant: ButtonVariant,
 	pub font: Option<FontId>,
 	pub font_size: f32,
 	pub padding: Vec2<f32>,
@@ -30,6 +40,7 @@ impl Default for Button {
 	fn default() -> Self {
 		Self {
 			label: any::type_name::<Self>().to_string(),
+			variant: ButtonVariant::default(),
 			font: None,
 			font_size: 15.0,
 			padding: Vec2::new(16.0, 8.0),
@@ -51,25 +62,102 @@ impl Widget for Button {
 		let theme = ctx.theme;
 		let monet = &theme.monet;
 
-		let (bg_color, fg_color) = if ctx.pressed {
-			(
-				monet[MonetRole::PrimaryFixedDim],
-				monet[MonetRole::OnPrimaryFixedVariant],
-			)
-		} else if ctx.hovered {
-			(
-				monet[MonetRole::PrimaryContainer],
-				monet[MonetRole::OnPrimaryContainer],
-			)
-		} else {
-			(
-				monet[MonetRole::Primary],
-				monet[MonetRole::OnPrimary],
-			)
+		let (bg_color, fg_color, border_color, border_width, shadow_blur) = match self.variant {
+			ButtonVariant::Filled => {
+				if ctx.pressed {
+					(
+						monet[MonetRole::PrimaryFixedDim],
+						monet[MonetRole::OnPrimaryFixedVariant],
+						monet[MonetRole::PrimaryFixed], 2.0, 0.0
+					)
+				} else if ctx.hovered {
+					(
+						monet[MonetRole::PrimaryFixed],
+						monet[MonetRole::OnPrimary],
+						Color::TRANSPARENT, 0.0, 0.0
+					)
+				} else {
+					(
+						monet[MonetRole::Primary],
+						monet[MonetRole::OnPrimary],
+						Color::TRANSPARENT, 0.0, 0.0
+					)
+				}
+			}
+			ButtonVariant::Tonal => {
+				if ctx.pressed {
+					(
+						monet[MonetRole::SecondaryFixedDim],
+						monet[MonetRole::OnSecondaryFixedVariant],
+						monet[MonetRole::SecondaryFixed], 2.0, 0.0
+					)
+				} else if ctx.hovered {
+					(
+						monet[MonetRole::SecondaryFixed],
+						monet[MonetRole::OnSecondary],
+						Color::TRANSPARENT, 0.0, 0.0
+					)
+				} else {
+					(
+						monet[MonetRole::Secondary],
+						monet[MonetRole::OnSecondary],
+						Color::TRANSPARENT, 0.0, 0.0
+					)
+				}
+			}
+			ButtonVariant::Elevated => {
+				let (bg, fg) = if ctx.pressed {
+					(
+						monet[MonetRole::SurfaceContainerHighest],
+						monet[MonetRole::OnSurface],
+					)
+				} else if ctx.hovered {
+					(
+						monet[MonetRole::SurfaceContainerHigh],
+						monet[MonetRole::OnSurface],
+					)
+				} else {
+					(
+						monet[MonetRole::SurfaceContainerLow],
+						monet[MonetRole::OnSurface],
+					)
+				};
+				let shadow = if ctx.hovered { 6.0 } else { 3.0 };
+				(bg, fg, Color::TRANSPARENT, 0.0, shadow)
+			}
+			ButtonVariant::Outlined => {
+				let (bg, fg, border) = if ctx.pressed {
+					(
+						monet[MonetRole::SurfaceContainerHigh],
+						monet[MonetRole::OnSurface],
+						monet[MonetRole::Secondary],
+					)
+				} else if ctx.hovered {
+					(
+						monet[MonetRole::SurfaceContainerLow],
+						monet[MonetRole::OnSurface],
+						monet[MonetRole::Secondary],
+					)
+				} else {
+					(
+						Color::TRANSPARENT,
+						monet[MonetRole::OnSurface],
+						monet[MonetRole::SurfaceOutline],
+					)
+				};
+				(bg, fg, border, 2.0, 0.0)
+			}
 		};
 
 		let radius = (ctx.bounds.height() * 0.5).min(14.0);
-		canvas.draw(RectShape::new(ctx.bounds, bg_color).radius(radius));
+		let mut shape = RectShape::new(ctx.bounds, bg_color).radius(radius);
+		if border_width > 0.0 {
+			shape = shape.border(border_color, border_width);
+		}
+		if shadow_blur > 0.0 {
+			shape = shape.shadow(monet[MonetRole::Shadow], Vec2::new(0.0, 2.0), shadow_blur);
+		}
+		canvas.draw(shape);
 
 		let (text_w, text_h) = canvas.measure_text(&self.label, self.font_size);
 		let text_x = ctx.bounds.x() + (ctx.bounds.width() - text_w) * 0.5;
@@ -105,6 +193,19 @@ impl Widget for Button {
 			"text" => {
 				if let Some(s) = value.as_str() {
 					self.label = s.to_string();
+					return true;
+				}
+			}
+
+			"variant" => {
+				if let Some(s) = value.as_str() {
+					self.variant = match s {
+						"filled" => ButtonVariant::Filled,
+						"tonal" => ButtonVariant::Tonal,
+						"elevated" => ButtonVariant::Elevated,
+						"outlined" => ButtonVariant::Outlined,
+						_ => ButtonVariant::Filled,
+					};
 					return true;
 				}
 			}

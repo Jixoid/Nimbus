@@ -22,7 +22,7 @@ use nimbus_render2d::Canvas2D;
 use nimbus_rhi::manager::allocator::Allocator;
 use nimbus_rhi_ash::{AshVulkanBackend, Command, CommandManager, Device, Synchronizer};
 
-use crate::event::{ButtonState, MouseButton};
+use crate::event::{ButtonState, InputEvent, MouseButton};
 use crate::id::WindowHandle;
 use crate::tree::UiTree;
 
@@ -227,6 +227,41 @@ impl Window {
 					.tree
 					.dispatch_pointer_button(btn, btn_state, self.last_cursor)
 				{
+					redraw_needed = true;
+				}
+			}
+
+			WindowEvent::KeyboardInput { event, .. } => {
+				use winit::keyboard::Key;
+				let key_name = match &event.logical_key {
+					Key::Named(named) => format!("{:?}", named),
+					Key::Character(s) => s.as_str().to_string(),
+					Key::Unidentified(_) => "Unidentified".to_string(),
+					Key::Dead(c) => format!("Dead({:?})", c),
+				};
+
+				let text = event.text.as_ref().map(|s| s.as_str().to_string());
+				let pressed = event.state == ElementState::Pressed;
+
+				let input_event = InputEvent::Key {
+					key_name,
+					text,
+					pressed,
+				};
+
+				if self.tree.dispatch_key(&input_event) {
+					redraw_needed = true;
+				}
+			}
+
+			WindowEvent::Ime(winit::event::Ime::Commit(text)) => {
+				let input_event = InputEvent::Key {
+					key_name: "Ime".to_string(),
+					text: Some(text.clone()),
+					pressed: true,
+				};
+
+				if self.tree.dispatch_key(&input_event) {
 					redraw_needed = true;
 				}
 			}

@@ -73,7 +73,6 @@ fn main() {
 				text: "Radio 1"
 				checked: false
 			}
-
 			node qstd::radio {
 				text: "Radio 2"
 				checked: true
@@ -83,7 +82,6 @@ fn main() {
 				text: "Check 1"
 				checked: false
 			}
-
 			node qstd::check {
 				text: "Check 2"
 				checked: true
@@ -93,10 +91,41 @@ fn main() {
 				text: "Switch 1"
 				checked: false
 			}
-
 			node qstd::switch {
 				text: "Switch 2"
 				checked: true
+			}
+			
+			node qstd::button {
+				text: "filled"
+				variant: "filled"
+			}
+			node qstd::button {
+				text: "tonal"
+				variant: "tonal"
+			}
+			node qstd::button {
+				text: "elevated"
+				variant: "elevated"
+			}
+			node qstd::button {
+				text: "outlined"
+				variant: "outlined"
+			}
+		}
+
+		node qstd::vbox {
+			spacing: 10
+			paddings: 16
+			color: "monet(SurfaceContainer)"
+			corner_radius: 16
+
+			node qstd::edit {
+				text: "Edit 1"
+				title: "edit 1"
+			}
+			node qstd::edit {
+				text: "Edit 2"
 			}
 
 			node qstd::slider {
@@ -104,7 +133,6 @@ fn main() {
 				min: 0
 				max: 100
 			}
-
 			node qstd::interval {
 				pos1: 25
 				pos2: 75
@@ -115,19 +143,8 @@ fn main() {
 			node qstd::multiprogress {
 				values: [40, 30, 20]
 			}
-
-			node qstd::flow {
-				spacing: 8
-				node qstd::button {
-					text: "Flow Item 1"
-					on_click: "ToolAction"
-				}
-				node qstd::button {
-					text: "Flow Item 2"
-					on_click: "ToolAction"
-				}
-			}
 		}
+
 	}
 	"#;
 

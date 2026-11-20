@@ -18,7 +18,7 @@ use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape}
 use nimbus_theme::MonetRole;
 
 
-pub struct Toggle {
+pub struct Switch {
 	pub label: String,
 	pub checked: bool,
 	pub font: Option<FontId>,
@@ -27,7 +27,7 @@ pub struct Toggle {
 	pub on_changed: Option<MethodCallback>,
 }
 
-impl Default for Toggle {
+impl Default for Switch {
 	fn default() -> Self {
 		Self {
 			label: any::type_name::<Self>().to_string(),
@@ -40,44 +40,45 @@ impl Default for Toggle {
 	}
 }
 
-impl Widget for Toggle {
+impl Widget for Switch {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
-		let switch_w = 49.0f32;
+		let switch_w = 51.0f32;
+		let switch_h = 26.0f32;
 
 		if self.label.is_empty() {
-			constraints.constrain(Vec2::new(switch_w, 26.0))
+			constraints.constrain(Vec2::new(switch_w, switch_h))
 		} else {
 			let (text_w, text_h) = ctx.measure_text_with_font(&self.label, self.font, self.font_size);
-			let total_w = if constraints.max_width.is_finite() && constraints.max_width > (text_w + 8.0 + 70.0) {
+			let total_w = if constraints.max_width.is_finite() && constraints.max_width > (text_w + 8.0 + switch_w) {
 				constraints.max_width
 			} else {
-				text_w + 8.0 + 70.0
+				text_w + 8.0 + switch_w
 			};
-			let total_h = (text_h + 8.0).max(26.0);
+			let total_h = (text_h + 8.0).max(switch_h);
 			constraints.constrain(Vec2::new(total_w.ceil(), total_h.ceil()))
 		}
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
-		let switch_w = 49.0f32;
-		let switch_h = 24.0f32;
+		let switch_w = 51.0f32;
+		let switch_h = 26.0f32;
 
 		let track_x = if self.label.is_empty() {
 			ctx.bounds.x()
 		} else {
-			ctx.bounds.x() + ctx.bounds.width() - 50.0
+			ctx.bounds.x() + ctx.bounds.width() - switch_w
 		};
 		let track_y = ctx.bounds.y() + (ctx.bounds.height() - switch_h) * 0.5;
 		let track_rect = Rect::new(track_x, track_y, switch_w, switch_h);
 
 		if self.checked {
 			canvas.draw(
-				RectShape::new(track_rect, monet[MonetRole::Primary]).radius(12.0),
+				RectShape::new(track_rect, monet[MonetRole::Primary]).radius(13.0),
 			);
 
-			let thumb_x = track_x + 28.0;
-			let thumb_y = track_y + 3.0;
+			let thumb_x = track_x + switch_w - 18.0 - 4.0;
+			let thumb_y = track_y + (switch_h - 18.0) * 0.5;
 			canvas.draw(
 				RectShape::new(Rect::new(thumb_x, thumb_y, 18.0, 18.0), monet[MonetRole::SurfaceContainerLow]).radius(9.0),
 			);
@@ -89,12 +90,12 @@ impl Widget for Toggle {
 			};
 			canvas.draw(
 				RectShape::new(track_rect, Color::TRANSPARENT)
-					.radius(12.0)
+					.radius(13.0)
 					.border(border_color, 2.0),
 			);
 
-			let thumb_x = track_x + 5.0;
-			let thumb_y = track_y + 5.0;
+			let thumb_x = track_x + 6.0;
+			let thumb_y = track_y + (switch_h - 14.0) * 0.5;
 			canvas.draw(
 				RectShape::new(Rect::new(thumb_x, thumb_y, 14.0, 14.0), monet[MonetRole::Primary]).radius(7.0),
 			);

@@ -48,6 +48,7 @@ pub enum InputEvent {
 	},
 	Key {
 		key_name: String,
+		text: Option<String>,
 		pressed: bool,
 	},
 }

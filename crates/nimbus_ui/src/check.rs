@@ -54,9 +54,10 @@ impl Widget for Check {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
-		let box_x = ctx.bounds.x() + 1.0;
-		let box_y = ctx.bounds.y() + (ctx.bounds.height() - 20.0) * 0.5;
-		let box_rect = Rect::new(box_x, box_y, 20.0, 20.0);
+		let box_size = 22.0f32;
+		let box_x = ctx.bounds.x();
+		let box_y = ctx.bounds.y() + (ctx.bounds.height() - box_size) * 0.5;
+		let box_rect = Rect::new(box_x, box_y, box_size, box_size);
 
 		let border_color = if ctx.hovered {
 			monet[MonetRole::Primary]
@@ -71,9 +72,9 @@ impl Widget for Check {
 		);
 
 		if self.checked {
-			let inner_rect = Rect::new(box_x + 5.0, box_y + 5.0, 10.0, 10.0);
+			let inner_rect = Rect::new(box_x + 6.0, box_y + 6.0, 10.0, 10.0);
 			canvas.draw(
-				RectShape::new(inner_rect, monet[MonetRole::Primary]).radius(4.0),
+				RectShape::new(inner_rect, monet[MonetRole::Primary]).radius(3.0),
 			);
 		}
 

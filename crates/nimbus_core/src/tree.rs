@@ -368,6 +368,15 @@ impl UiTree {
 		match state {
 			ButtonState::Pressed => {
 				let hit = self.hit_test(pos);
+				if let Some(prev) = self.focused_node {
+					if hit != Some(prev) {
+						if let Some(node) = self.nodes.get_mut(prev) {
+							node.focused = false;
+						}
+						self.focused_node = None;
+						redraw_requested = true;
+					}
+				}
 				if let Some(target) = hit {
 					if let Some(node) = self.nodes.get_mut(target) {
 						node.pressed = true;
@@ -419,6 +428,22 @@ impl UiTree {
 					redraw_requested = true;
 				}
 			}
+		}
+
+		redraw_requested
+	}
+
+	pub fn dispatch_key(&mut self, event: &InputEvent) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+
+		if let Some(target) = self.focused_node {
+			self.send_event(
+				target,
+				event,
+				&mut redraw_requested,
+				&mut layout_requested,
+			);
 		}
 
 		redraw_requested

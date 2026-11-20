@@ -30,6 +30,7 @@ impl ProgressSegment {
 
 pub struct MultiProgressBar {
 	pub segments: Vec<ProgressSegment>,
+	pub max: Option<f32>,
 	pub height: f32,
 	pub corner_radius: Option<f32>,
 }
@@ -38,7 +39,8 @@ impl Default for MultiProgressBar {
 	fn default() -> Self {
 		Self {
 			segments: Vec::new(),
-			height: 16.0,
+			max: None,
+			height: 24.0,
 			corner_radius: None,
 		}
 	}
@@ -56,44 +58,78 @@ impl Widget for MultiProgressBar {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
-		let radius = self.corner_radius.unwrap_or(ctx.bounds.height() * 0.5);
-
-		// Background track
-		canvas.draw(
-			RectShape::new(ctx.bounds, monet[MonetRole::SurfaceContainerHighest])
-				.radius(radius),
-		);
-
-		let total: f32 = self.segments.iter().map(|s| s.value.max(0.0)).sum();
-		if total <= 0.0001 || self.segments.is_empty() {
-			return;
-		}
+		let pill_rad = self.corner_radius.unwrap_or(ctx.bounds.height() * 0.5);
+		let inner_rad = 5.0f32;
 
 		let default_palette = [
 			monet[MonetRole::Primary],
 			monet[MonetRole::Secondary],
 			monet[MonetRole::Tertiary],
-			monet[MonetRole::PrimaryContainer],
+			monet[MonetRole::PrimaryOutline],
 		];
 
+		let total: f32 = self.segments.iter().map(|s| s.value.max(0.0)).sum();
+		if total <= 0.0001 && self.segments.is_empty() {
+			canvas.draw(
+				RectShape::new(ctx.bounds, monet[MonetRole::PrimaryOutline]).radius(pill_rad),
+			);
+			return;
+		}
+
+		let scale_total = if let Some(m) = self.max {
+			m.max(total)
+		} else if total <= 1.0 {
+			1.0f32
+		} else {
+			total.max(100.0)
+		};
+
+		let mut items: Vec<(f32, Color)> = Vec::new();
+		for (i, seg) in self.segments.iter().enumerate() {
+			if seg.value > 0.0 {
+				let color = seg
+					.color
+					.unwrap_or_else(|| default_palette[i % default_palette.len()]);
+				items.push((seg.value, color));
+			}
+		}
+
+		let remaining = scale_total - total;
+		if remaining > 0.001 {
+			let rem_color = default_palette[items.len() % default_palette.len()];
+			items.push((remaining, rem_color));
+		}
+
+		if items.is_empty() {
+			return;
+		}
+
 		let gap = 3.0f32;
-		let num_gaps = (self.segments.len().saturating_sub(1)) as f32;
-		let usable_width = (ctx.bounds.width() - num_gaps * gap).max(0.0);
+		let num_items = items.len();
+		let total_gap = (num_items.saturating_sub(1)) as f32 * gap;
+		let usable_width = (ctx.bounds.width() - total_gap).max(0.0);
 
 		let mut current_x = ctx.bounds.x();
 
-		for (i, seg) in self.segments.iter().enumerate() {
-			if seg.value <= 0.0 {
+		for (i, (val, color)) in items.into_iter().enumerate() {
+			let seg_w = (val / scale_total) * usable_width;
+			if seg_w <= 0.0 {
 				continue;
 			}
-			let seg_w = (seg.value / total) * usable_width;
-			let color = seg
-				.color
-				.unwrap_or_else(|| default_palette[i % default_palette.len()]);
 
 			let seg_rect = Rect::new(current_x, ctx.bounds.y(), seg_w, ctx.bounds.height());
-			canvas.draw(RectShape::new(seg_rect, color).radius(5.0));
 
+			let shape = if num_items == 1 {
+				RectShape::new(seg_rect, color).radius(pill_rad)
+			} else if i == 0 {
+				RectShape::new(seg_rect, color).radius4([pill_rad, inner_rad, inner_rad, pill_rad])
+			} else if i == num_items - 1 {
+				RectShape::new(seg_rect, color).radius4([inner_rad, pill_rad, pill_rad, inner_rad])
+			} else {
+				RectShape::new(seg_rect, color).radius(inner_rad)
+			};
+
+			canvas.draw(shape);
 			current_x += seg_w + gap;
 		}
 	}
@@ -141,6 +177,13 @@ impl Widget for MultiProgressBar {
 				}
 			}
 			
+			"max" => {
+				if let Some(m) = value.as_f32() {
+					self.max = Some(m);
+					return true;
+				}
+			}
+
 			"height" => {
 				if let Some(h) = value.as_f32() {
 					self.height = h;

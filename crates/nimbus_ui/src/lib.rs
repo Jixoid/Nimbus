@@ -9,9 +9,11 @@
 	Copyright (c) 2025-2026 by Kadir Aydın.
 */
 
+
 pub mod button;
 pub mod card;
 pub mod check;
+pub mod edit;
 pub mod flex;
 pub mod flow;
 pub mod interval;
@@ -20,11 +22,12 @@ pub mod progress;
 pub mod radio;
 pub mod slider;
 pub mod text;
-pub mod toggle;
+pub mod switch;
 
-pub use button::Button;
+pub use button::{Button, ButtonVariant};
 pub use card::Card;
 pub use check::Check;
+pub use edit::Edit;
 pub use flex::{HBox, VBox};
 pub use flow::Flow;
 pub use interval::Interval;
@@ -33,13 +36,15 @@ pub use progress::ProgressBar;
 pub use radio::Radio;
 pub use slider::Slider;
 pub use text::Text;
-pub use toggle::Toggle;
+pub use switch::Switch;
 
 use nimbus_core::WidgetRegistry;
+
 
 pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::button", || Box::new(Button::default()));
 	registry.register("qstd::card", || Box::new(Card::default()));
+	registry.register("qstd::edit", || Box::new(Edit::default()));
 	registry.register("qstd::text", || Box::new(Text::default()));
 	registry.register("qstd::vbox", || Box::new(VBox::default()));
 	registry.register("qstd::flow", || Box::new(Flow::default()));
@@ -47,8 +52,7 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::progbar", || Box::new(ProgressBar::default()));
 	registry.register("qstd::check", || Box::new(Check::default()));
 	registry.register("qstd::radio", || Box::new(Radio::default()));
-	registry.register("qstd::toggle", || Box::new(Toggle::default()));
-	registry.register("qstd::switch", || Box::new(Toggle::default()));
+	registry.register("qstd::switch", || Box::new(Switch::default()));
 	registry.register("qstd::slider", || Box::new(Slider::default()));
 	registry.register("qstd::interval", || Box::new(Interval::default()));
 	registry.register("qstd::multi_progbar", || Box::new(MultiProgressBar::default()));
