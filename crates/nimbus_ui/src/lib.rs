@@ -13,6 +13,7 @@
 pub mod button;
 pub mod card;
 pub mod check;
+pub mod choice;
 pub mod edit;
 pub mod flex;
 pub mod flow;
@@ -23,10 +24,12 @@ pub mod radio;
 pub mod slider;
 pub mod text;
 pub mod switch;
+pub mod tabs;
 
 pub use button::{Button, ButtonVariant};
 pub use card::Card;
 pub use check::Check;
+pub use choice::Choice;
 pub use edit::Edit;
 pub use flex::{HBox, VBox};
 pub use flow::Flow;
@@ -37,6 +40,7 @@ pub use radio::Radio;
 pub use slider::Slider;
 pub use text::Text;
 pub use switch::Switch;
+pub use tabs::Tabs;
 
 use nimbus_core::WidgetRegistry;
 
@@ -57,4 +61,6 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::interval", || Box::new(Interval::default()));
 	registry.register("qstd::multi_progbar", || Box::new(MultiProgressBar::default()));
 	registry.register("qstd::multiprogress", || Box::new(MultiProgressBar::default()));
+	registry.register("qstd::tabs", || Box::new(Tabs::default()));
+	registry.register("qstd::choice", || Box::new(Choice::default()));
 }

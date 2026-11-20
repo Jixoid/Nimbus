@@ -143,6 +143,10 @@ fn main() {
 			node qstd::multiprogress {
 				values: [40, 30, 20]
 			}
+
+			node qstd::choice {
+				tabs: ["cho1", "cho2", "cho3"]
+			}
 		}
 
 	}
