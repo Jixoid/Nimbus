@@ -77,52 +77,58 @@ impl Widget for Slider {
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		self.last_bounds.set(ctx.bounds);
 
-		let theme = ctx.theme;
+		let monet = &ctx.theme.monet;
 		let bounds = ctx.bounds;
-		let track_height = 8.0f32;
-		let track_y = bounds.y() + (bounds.height() - track_height) * 0.5;
+		let w = bounds.width();
+		let h = bounds.height();
 
 		let range = (self.max - self.min).max(0.001);
 		let ratio = ((self.value - self.min) / range).clamp(0.0, 1.0);
+		let val_pos = ((w - 4.0) * ratio) + 2.0;
 
-		let handle_w = 12.0f32;
-		let handle_h = 20.0f32;
-		let handle_x = bounds.x() + ratio * (bounds.width() - handle_w);
-		let handle_y = bounds.y() + (bounds.height() - handle_h) * 0.5;
+		let is_hover = ctx.hovered || self.is_dragging;
+		let gap = if is_hover { 7.0 } else { 6.0 };
+		let handle_half_w = if is_hover { 3.0 } else { 2.0 };
 
-		// Inactive Background Track
-		let full_track = Rect::new(bounds.x(), track_y, bounds.width(), track_height);
-		canvas.draw(
-			RectShape::new(full_track, theme.monet.get(MonetRole::SurfaceContainerHighest))
-				.radius(track_height * 0.5),
-		);
-
-		// Active Filled Track (Left side)
-		let active_w = handle_x - bounds.x() + handle_w * 0.5;
-		if active_w > 0.0 {
-			let active_track = Rect::new(bounds.x(), track_y, active_w, track_height);
-			let fill_color = if self.is_dragging || ctx.hovered {
-				theme.monet.get(MonetRole::PrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::Primary)
-			};
-			canvas.draw(RectShape::new(active_track, fill_color).radius(track_height * 0.5));
+		// Filled (Left)
+		let left_w = (val_pos - gap - 1.0).max(0.0);
+		if left_w > 0.0 {
+			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + 4.0, left_w, (h - 8.0).max(0.0));
+			canvas.draw(
+				RectShape::new(left_rect, monet[MonetRole::Secondary])
+					.radius4([14.0, 4.0, 4.0, 14.0]),
+			);
 		}
 
-		// Thumb Handle
-		let handle_rect = Rect::new(handle_x, handle_y, handle_w, handle_h);
+		// Handle (Middle)
 		let handle_color = if self.is_dragging {
-			theme.monet.get(MonetRole::PrimaryFixedDim)
-		} else if ctx.hovered {
-			theme.monet.get(MonetRole::PrimaryContainer)
+			monet[MonetRole::PrimaryFixedDim]
 		} else {
-			theme.monet.get(MonetRole::Primary)
+			monet[MonetRole::Primary]
 		};
-		canvas.draw(
-			RectShape::new(handle_rect, handle_color)
-				.radius(theme.radius.xsmall)
-				.border(theme.monet.get(MonetRole::Outline), theme.stroke.thin),
+		let handle_rect = Rect::new(
+			bounds.x() + val_pos - handle_half_w,
+			bounds.y() + 1.0,
+			handle_half_w * 2.0,
+			(h - 2.0).max(0.0),
 		);
+		canvas.draw(RectShape::new(handle_rect, handle_color).radius(4.0));
+
+		// Empty Part (Right)
+		let right_start = val_pos + gap;
+		let right_w = (w - 1.0 - right_start).max(0.0);
+		if right_w > 0.0 {
+			let right_rect = Rect::new(
+				bounds.x() + right_start,
+				bounds.y() + 4.0,
+				right_w,
+				(h - 8.0).max(0.0),
+			);
+			canvas.draw(
+				RectShape::new(right_rect, monet[MonetRole::PrimaryOutline] *0.5)
+					.radius4([4.0, 14.0, 14.0, 4.0]),
+			);
+		}
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {

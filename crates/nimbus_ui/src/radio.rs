@@ -35,7 +35,7 @@ impl Default for Radio {
 			checked: false,
 			group: None,
 			font: None,
-			font_size: 14.0,
+			font_size: 15.0,
 			color: None,
 			on_changed: None,
 		}
@@ -44,37 +44,34 @@ impl Default for Radio {
 
 impl Widget for Radio {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
-		let circle_size = 20.0f32;
-		let gap = 8.0f32;
-
 		if self.label.is_empty() {
-			constraints.constrain(Vec2::new(circle_size, circle_size))
+			constraints.constrain(Vec2::new(22.0, 22.0))
 		} else {
 			let (text_w, text_h) = ctx.measure_text_with_font(&self.label, self.font, self.font_size);
-			let total_w = circle_size + gap + text_w;
-			let total_h = circle_size.max(text_h);
+			let total_w = text_w + 30.0 + 8.0;
+			let total_h = (text_h + 8.0).max(22.0);
 			constraints.constrain(Vec2::new(total_w.ceil(), total_h.ceil()))
 		}
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
+		let monet = &ctx.theme.monet;
 		let circle_size = 20.0f32;
-		let circle_x = ctx.bounds.x();
+		let circle_x = ctx.bounds.x() + 1.0;
 		let circle_y = ctx.bounds.y() + (ctx.bounds.height() - circle_size) * 0.5;
 		let outer_rect = Rect::new(circle_x, circle_y, circle_size, circle_size);
 
-		let border_color = if ctx.hovered || self.checked {
-			theme.monet.get(MonetRole::Primary)
+		let border_color = if ctx.hovered {
+			monet[MonetRole::Primary]
 		} else {
-			theme.monet.get(MonetRole::Outline)
+			monet[MonetRole::PrimaryOutline]
 		};
 
 		// Outer circle
 		canvas.draw(
 			RectShape::new(outer_rect, Color::TRANSPARENT)
 				.radius(circle_size * 0.5)
-				.border(border_color, theme.stroke.thick),
+				.border(border_color, 2.0),
 		);
 
 		// Inner circle if checked
@@ -86,19 +83,16 @@ impl Widget for Radio {
 				inner_size,
 				inner_size,
 			);
-			let fill_color = if ctx.hovered {
-				theme.monet.get(MonetRole::PrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::Primary)
-			};
-			canvas.draw(RectShape::new(inner_rect, fill_color).radius(inner_size * 0.5));
+			canvas.draw(
+				RectShape::new(inner_rect, monet[MonetRole::Primary])
+					.radius(inner_size * 0.5),
+			);
 		}
 
 		// Text label
 		if !self.label.is_empty() {
-			let (text_w, text_h) = canvas.measure_text(&self.label, self.font_size);
-			let _ = text_w;
-			let text_x = circle_x + circle_size + 8.0;
+			let (_, text_h) = canvas.measure_text(&self.label, self.font_size);
+			let text_x = ctx.bounds.x() + 27.0;
 			let text_y = ctx.bounds.y() + (ctx.bounds.height() - text_h) * 0.5;
 
 			let fface = FontManager::default_font();
@@ -109,7 +103,7 @@ impl Widget for Radio {
 
 			let text_color = self
 				.color
-				.unwrap_or_else(|| theme.monet.get(MonetRole::OnSurface));
+				.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 			canvas.draw(TextShape::new(
 				&self.label,
 				font,

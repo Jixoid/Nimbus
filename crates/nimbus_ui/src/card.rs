@@ -10,7 +10,7 @@
 */
 
 
-use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, Widget};
+use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, PropertyCtx, PropertyValue, Widget};
 use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
 use nimbus_theme::MonetRole;
@@ -31,9 +31,9 @@ impl Default for Card {
 			padding: 16.0,
 			corner_radius: None,
 			background: None,
-			border_width: 1.0,
+			border_width: 0.0,
 			border_color: None,
-			shadow_blur: 16.0,
+			shadow_blur: 0.0,
 		}
 	}
 }
@@ -63,32 +63,33 @@ impl Widget for Card {
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
-		let radius = self.corner_radius.unwrap_or(theme.radius.medium);
+		let monet = &ctx.theme.monet;
+		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
 		let bg = self
 			.background
-			.unwrap_or_else(|| theme.monet.get(MonetRole::SurfaceContainer));
+			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 
-		let border_col = self
-			.border_color
-			.unwrap_or_else(|| theme.monet.get(MonetRole::OutlineVariant));
-		
-		let shadow_col = theme.monet.get(MonetRole::Shadow);
+		let mut shape = RectShape::new(ctx.bounds, bg).radius(radius);
 
-		canvas.draw(
-			RectShape::new(ctx.bounds, bg)
-				.radius(radius)
-				.border(border_col, self.border_width)
-				.shadow(shadow_col, Vec2::new(0.0, 4.0), self.shadow_blur),
-		);
+		if self.border_width > 0.0 {
+			let border_col = self
+				.border_color
+				.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
+			shape = shape.border(border_col, self.border_width);
+		}
+
+		if self.shadow_blur > 0.0 {
+			shape = shape.shadow(
+				monet[MonetRole::Shadow],
+				Vec2::new(0.0, 4.0),
+				self.shadow_blur,
+			);
+		}
+
+		canvas.draw(shape);
 	}
 
-	fn set_property(
-		&mut self,
-		key: &str,
-		value: &nimbus_core::PropertyValue,
-		ctx: &nimbus_core::PropertyCtx,
-	) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
 		match key {
 			"paddings" => {
 				if let Some(p) = value.as_f32() {

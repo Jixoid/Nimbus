@@ -30,7 +30,7 @@ impl Default for Text {
 		Self {
 			text: any::type_name::<Self>().to_string(),
 			font: None,
-			font_size: 14.0,
+			font_size: 15.0,
 			color: None,
 		}
 	}
@@ -46,7 +46,7 @@ impl Widget for Text {
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let color = self
 			.color
-			.unwrap_or_else(|| ctx.theme.monet.get(MonetRole::OnSurface));
+			.unwrap_or_else(|| ctx.theme.monet[MonetRole::OnSurface]);
 		let fface = FontManager::default_font();
 		let font = match self.font {
 			Some(id) => Font::with_id(id, fface, self.font_size),

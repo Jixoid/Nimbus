@@ -137,7 +137,7 @@ impl<T: Float> Color<T> {
 		let g_lin = (-1.2684380046 *l) +(2.6097574011 *m) -(0.3413193965 *s);
 		let b_lin = (-0.0041960863 *l) -(0.7034186147 *m) +(1.7076147010 *s);
 
-		// Linear sRGB -> sRGB (Gamma Correction)
+		// Linear sRGB -> sRGB
 		let gamma_correct = |c: f32| -> f32 {
 			if c <= 0.0031308 {
 				12.92 *c
@@ -155,7 +155,7 @@ impl<T: Float> Color<T> {
 	}
 
 	pub fn to_oklch(&self) -> (f32, f32, f32) {
-		// sRGB -> Linear sRGB (Gamma Expansion)
+		// sRGB -> Linear sRGB
 		let to_linear = |c: f32| -> f32 {
 			if c <= 0.04045 {
 				c / 12.92
@@ -173,17 +173,17 @@ impl<T: Float> Color<T> {
 		let m = (0.2119034982 *r_lin) +(0.6806995451 *g_lin) +(0.1073969566 *b_lin);
 		let s = (0.0883024619 *r_lin) +(0.2817188976 *g_lin) +(0.6299787005 *b_lin);
 
-		// LMS -> Non-linear LMS (Cube Root)
+		// LMS -> Non-linear LMS
 		let l_ = f32::powf(l, 1.0 / 3.0);
 		let m_ = f32::powf(m, 1.0 / 3.0);
 		let s_ = f32::powf(s, 1.0 / 3.0);
 
-		// Non-linear LMS -> OKLAB (L, a, b)
+		// Non-linear LMS -> OKLAB
 		let l = (0.2104542553 *l_) +(0.7936177850 *m_) -(0.0040720468 *s_);
 		let a = (1.9779984951 *l_) -(2.4285922050 *m_) +(0.4505937099 *s_);
 		let b = (0.0259040371 *l_) +(0.7827717662 *m_) -(0.8086757660 *s_);
 
-		// OKLAB -> OKLCH (L, C, h)
+		// OKLAB -> OKLCH
 		let c = f32::sqrt(a * a + b * b);
 		let mut h = f32::atan2(b, a).to_degrees();
 

@@ -47,8 +47,10 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::progbar", || Box::new(ProgressBar::default()));
 	registry.register("qstd::check", || Box::new(Check::default()));
 	registry.register("qstd::radio", || Box::new(Radio::default()));
+	registry.register("qstd::toggle", || Box::new(Toggle::default()));
 	registry.register("qstd::switch", || Box::new(Toggle::default()));
 	registry.register("qstd::slider", || Box::new(Slider::default()));
 	registry.register("qstd::interval", || Box::new(Interval::default()));
+	registry.register("qstd::multi_progbar", || Box::new(MultiProgressBar::default()));
 	registry.register("qstd::multiprogress", || Box::new(MultiProgressBar::default()));
 }

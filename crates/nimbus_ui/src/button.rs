@@ -31,8 +31,8 @@ impl Default for Button {
 		Self {
 			label: any::type_name::<Self>().to_string(),
 			font: None,
-			font_size: 14.0,
-			padding: Vec2::new(20.0, 10.0),
+			font_size: 15.0,
+			padding: Vec2::new(16.0, 8.0),
 			on_click: None,
 		}
 	}
@@ -53,22 +53,22 @@ impl Widget for Button {
 
 		let (bg_color, fg_color) = if ctx.pressed {
 			(
-				monet.get(MonetRole::PrimaryFixedDim),
-				monet.get(MonetRole::OnPrimaryFixedVariant),
+				monet[MonetRole::PrimaryFixedDim],
+				monet[MonetRole::OnPrimaryFixedVariant],
 			)
 		} else if ctx.hovered {
 			(
-				monet.get(MonetRole::PrimaryContainer),
-				monet.get(MonetRole::OnPrimaryContainer),
+				monet[MonetRole::PrimaryContainer],
+				monet[MonetRole::OnPrimaryContainer],
 			)
 		} else {
 			(
-				monet.get(MonetRole::Primary),
-				monet.get(MonetRole::OnPrimary),
+				monet[MonetRole::Primary],
+				monet[MonetRole::OnPrimary],
 			)
 		};
 
-		let radius = theme.radius.small;
+		let radius = (ctx.bounds.height() * 0.5).min(14.0);
 		canvas.draw(RectShape::new(ctx.bounds, bg_color).radius(radius));
 
 		let (text_w, text_h) = canvas.measure_text(&self.label, self.font_size);

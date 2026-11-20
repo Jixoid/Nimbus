@@ -33,7 +33,7 @@ impl Default for Toggle {
 			label: any::type_name::<Self>().to_string(),
 			checked: false,
 			font: None,
-			font_size: 14.0,
+			font_size: 15.0,
 			color: None,
 			on_changed: None,
 		}
@@ -42,74 +42,61 @@ impl Default for Toggle {
 
 impl Widget for Toggle {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
-		let switch_w = 48.0f32;
-		let switch_h = 24.0f32;
+		let switch_w = 49.0f32;
 
 		if self.label.is_empty() {
-			constraints.constrain(Vec2::new(switch_w, switch_h))
+			constraints.constrain(Vec2::new(switch_w, 26.0))
 		} else {
 			let (text_w, text_h) = ctx.measure_text_with_font(&self.label, self.font, self.font_size);
-			let total_w = if constraints.max_width.is_finite() && constraints.max_width > (text_w + switch_w + 12.0) {
+			let total_w = if constraints.max_width.is_finite() && constraints.max_width > (text_w + 8.0 + 70.0) {
 				constraints.max_width
 			} else {
-				text_w + switch_w + 12.0
+				text_w + 8.0 + 70.0
 			};
-			let total_h = switch_h.max(text_h);
+			let total_h = (text_h + 8.0).max(26.0);
 			constraints.constrain(Vec2::new(total_w.ceil(), total_h.ceil()))
 		}
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
-		let switch_w = 48.0f32;
+		let monet = &ctx.theme.monet;
+		let switch_w = 49.0f32;
 		let switch_h = 24.0f32;
-		let thumb_size = 18.0f32;
-		let thumb_radius = thumb_size * 0.5;
 
 		let track_x = if self.label.is_empty() {
 			ctx.bounds.x()
 		} else {
-			ctx.bounds.x() + ctx.bounds.width() - switch_w
+			ctx.bounds.x() + ctx.bounds.width() - 50.0
 		};
 		let track_y = ctx.bounds.y() + (ctx.bounds.height() - switch_h) * 0.5;
 		let track_rect = Rect::new(track_x, track_y, switch_w, switch_h);
 
-		let border_color = if ctx.hovered {
-			theme.monet.get(MonetRole::Primary)
-		} else {
-			theme.monet.get(MonetRole::Outline)
-		};
-
 		if self.checked {
-			let fill_color = if ctx.hovered {
-				theme.monet.get(MonetRole::PrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::Primary)
-			};
-			canvas.draw(RectShape::new(track_rect, fill_color).radius(12.0));
-
-			let thumb_x = track_x + switch_w - thumb_size - 3.0;
-			let thumb_y = track_y + (switch_h - thumb_size) * 0.5;
-			let thumb_color = theme.monet.get(MonetRole::OnPrimary);
 			canvas.draw(
-				RectShape::new(Rect::new(thumb_x, thumb_y, thumb_size, thumb_size), thumb_color)
-					.radius(thumb_radius),
+				RectShape::new(track_rect, monet[MonetRole::Primary]).radius(12.0),
+			);
+
+			let thumb_x = track_x + 28.0;
+			let thumb_y = track_y + 3.0;
+			canvas.draw(
+				RectShape::new(Rect::new(thumb_x, thumb_y, 18.0, 18.0), monet[MonetRole::SurfaceContainerLow]).radius(9.0),
 			);
 		} else {
+			let border_color = if ctx.hovered {
+				monet[MonetRole::Primary]
+			} else {
+				monet[MonetRole::PrimaryOutline]
+			};
 			canvas.draw(
-				RectShape::new(track_rect, theme.monet.get(MonetRole::SurfaceContainerHighest))
+				RectShape::new(track_rect, Color::TRANSPARENT)
 					.radius(12.0)
-					.border(border_color, theme.stroke.thick),
+					.border(border_color, 2.0),
 			);
 
-			let thumb_x = track_x + 3.0;
-			let thumb_y = track_y + (switch_h - thumb_size) * 0.5;
+			let thumb_x = track_x + 5.0;
+			let thumb_y = track_y + 5.0;
 			canvas.draw(
-				RectShape::new(
-					Rect::new(thumb_x, thumb_y, thumb_size, thumb_size),
-					theme.monet.get(MonetRole::Outline),
-				)
-				.radius(thumb_radius),
+				RectShape::new(Rect::new(thumb_x, thumb_y, 14.0, 14.0), monet[MonetRole::Primary]).radius(7.0),
 			);
 		}
 
@@ -126,7 +113,7 @@ impl Widget for Toggle {
 
 			let text_color = self
 				.color
-				.unwrap_or_else(|| theme.monet.get(MonetRole::OnSurface));
+				.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 			canvas.draw(TextShape::new(
 				&self.label,
 				font,

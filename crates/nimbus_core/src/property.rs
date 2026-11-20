@@ -11,6 +11,7 @@
 
 
 use std::collections::HashMap;
+use nimbus_except::nimbus_log;
 use nimbus_math::{Color, Vec2};
 use nimbus_theme::{Monet, MonetRole, Theme};
 
@@ -110,90 +111,84 @@ impl PropertyValue {
 					(inner.trim(), 1.0)
 				};
 
+				use MonetRole::*;
 				let role = match target {
 					// Primary
-					"Primary" => Some(MonetRole::Primary),
-					"OnPrimary" => Some(MonetRole::OnPrimary),
-					"PrimaryContainer" => Some(MonetRole::PrimaryContainer),
-					"OnPrimaryContainer" => Some(MonetRole::OnPrimaryContainer),
-					"PrimaryFixed" => Some(MonetRole::PrimaryFixed),
-					"PrimaryFixedDim" => Some(MonetRole::PrimaryFixedDim),
-					"OnPrimaryFixed" => Some(MonetRole::OnPrimaryFixed),
-					"OnPrimaryFixedVariant" => Some(MonetRole::OnPrimaryFixedVariant),
-					"PrimaryVariant" => Some(MonetRole::PrimaryFixedDim),
-					"OnPrimaryVariant" => Some(MonetRole::OnPrimaryFixedVariant),
+					"Primary" => Some(Primary),
+					"OnPrimary" => Some(OnPrimary),
+					"PrimaryContainer" => Some(PrimaryContainer),
+					"OnPrimaryContainer" => Some(OnPrimaryContainer),
+					"PrimaryFixed" => Some(PrimaryFixed),
+					"PrimaryFixedDim" => Some(PrimaryFixedDim),
+					"OnPrimaryFixed" => Some(OnPrimaryFixed),
+					"OnPrimaryFixedVariant" => Some(OnPrimaryFixedVariant),
+					"PrimaryOutline" => Some(PrimaryOutline),
 
 					// Secondary
-					"Secondary" => Some(MonetRole::Secondary),
-					"OnSecondary" => Some(MonetRole::OnSecondary),
-					"SecondaryContainer" => Some(MonetRole::SecondaryContainer),
-					"OnSecondaryContainer" => Some(MonetRole::OnSecondaryContainer),
-					"SecondaryFixed" => Some(MonetRole::SecondaryFixed),
-					"SecondaryFixedDim" => Some(MonetRole::SecondaryFixedDim),
-					"OnSecondaryFixed" => Some(MonetRole::OnSecondaryFixed),
-					"OnSecondaryFixedVariant" => Some(MonetRole::OnSecondaryFixedVariant),
-					"SecondaryVariant" => Some(MonetRole::SecondaryFixedDim),
-					"OnSecondaryVariant" => Some(MonetRole::OnSecondaryFixedVariant),
+					"Secondary" => Some(Secondary),
+					"OnSecondary" => Some(OnSecondary),
+					"SecondaryContainer" => Some(SecondaryContainer),
+					"OnSecondaryContainer" => Some(OnSecondaryContainer),
+					"SecondaryFixed" => Some(SecondaryFixed),
+					"SecondaryFixedDim" => Some(SecondaryFixedDim),
+					"OnSecondaryFixed" => Some(OnSecondaryFixed),
+					"OnSecondaryFixedVariant" => Some(OnSecondaryFixedVariant),
+					"SecondaryOutline" => Some(SecondaryOutline),
 
 					// Tertiary
-					"Tertiary" => Some(MonetRole::Tertiary),
-					"OnTertiary" => Some(MonetRole::OnTertiary),
-					"TertiaryContainer" => Some(MonetRole::TertiaryContainer),
-					"OnTertiaryContainer" => Some(MonetRole::OnTertiaryContainer),
-					"TertiaryFixed" => Some(MonetRole::TertiaryFixed),
-					"TertiaryFixedDim" => Some(MonetRole::TertiaryFixedDim),
-					"OnTertiaryFixed" => Some(MonetRole::OnTertiaryFixed),
-					"OnTertiaryFixedVariant" => Some(MonetRole::OnTertiaryFixedVariant),
-					"TertiaryVariant" => Some(MonetRole::TertiaryFixedDim),
-					"OnTertiaryVariant" => Some(MonetRole::OnTertiaryFixedVariant),
+					"Tertiary" => Some(Tertiary),
+					"OnTertiary" => Some(OnTertiary),
+					"TertiaryContainer" => Some(TertiaryContainer),
+					"OnTertiaryContainer" => Some(OnTertiaryContainer),
+					"TertiaryFixed" => Some(TertiaryFixed),
+					"TertiaryFixedDim" => Some(TertiaryFixedDim),
+					"OnTertiaryFixed" => Some(OnTertiaryFixed),
+					"OnTertiaryFixedVariant" => Some(OnTertiaryFixedVariant),
+					"TertiaryOutline" => Some(TertiaryOutline),
 
 					// Error
-					"Error" => Some(MonetRole::Error),
-					"OnError" => Some(MonetRole::OnError),
-					"ErrorContainer" => Some(MonetRole::ErrorContainer),
-					"OnErrorContainer" => Some(MonetRole::OnErrorContainer),
-					"ErrorFixed" => Some(MonetRole::ErrorFixed),
-					"ErrorFixedDim" => Some(MonetRole::ErrorFixedDim),
-					"OnErrorFixed" => Some(MonetRole::OnErrorFixed),
-					"OnErrorFixedVariant" => Some(MonetRole::OnErrorFixedVariant),
-					"ErrorVariant" => Some(MonetRole::ErrorFixedDim),
-					"OnErrorVariant" => Some(MonetRole::OnErrorFixedVariant),
+					"Error" => Some(Error),
+					"OnError" => Some(OnError),
+					"ErrorContainer" => Some(ErrorContainer),
+					"OnErrorContainer" => Some(OnErrorContainer),
+					"ErrorFixed" => Some(ErrorFixed),
+					"ErrorFixedDim" => Some(ErrorFixedDim),
+					"OnErrorFixed" => Some(OnErrorFixed),
+					"OnErrorFixedVariant" => Some(OnErrorFixedVariant),
+					"ErrorOutline" => Some(ErrorOutline),
 
 					// Surface
-					"Surface" => Some(MonetRole::Surface),
-					"OnSurface" => Some(MonetRole::OnSurface),
-					"SurfaceVariant" => Some(MonetRole::SurfaceVariant),
-					"OnSurfaceVariant" => Some(MonetRole::OnSurfaceVariant),
-					"SurfaceDim" => Some(MonetRole::SurfaceDim),
-					"OnSurfaceDim" => Some(MonetRole::OnSurface),
-					"SurfaceBright" => Some(MonetRole::SurfaceBright),
-					"OnSurfaceBright" => Some(MonetRole::OnSurface),
+					"Surface" => Some(Surface),
+					"OnSurface" => Some(OnSurface),
+					"SurfaceVariant" => Some(SurfaceVariant),
+					"OnSurfaceVariant" => Some(OnSurfaceVariant),
+					"SurfaceDim" => Some(SurfaceDim),
+					"SurfaceBright" => Some(SurfaceBright),
 
 					// Surface Containers
-					"SurfaceContainerLowest" => Some(MonetRole::SurfaceContainerLowest),
-					"OnSurfaceContainerLowest" => Some(MonetRole::OnSurface),
-					"SurfaceContainerLow" => Some(MonetRole::SurfaceContainerLow),
-					"OnSurfaceContainerLow" => Some(MonetRole::OnSurface),
-					"SurfaceContainer" => Some(MonetRole::SurfaceContainer),
-					"OnSurfaceContainer" => Some(MonetRole::OnSurface),
-					"SurfaceContainerHigh" => Some(MonetRole::SurfaceContainerHigh),
-					"OnSurfaceContainerHigh" => Some(MonetRole::OnSurface),
-					"SurfaceContainerHighest" => Some(MonetRole::SurfaceContainerHighest),
-					"OnSurfaceContainerHighest" => Some(MonetRole::OnSurface),
+					"SurfaceContainerLowest" => Some(SurfaceContainerLowest),
+					"SurfaceContainerLow" => Some(SurfaceContainerLow),
+					"SurfaceContainer" => Some(SurfaceContainer),
+					"SurfaceContainerHigh" => Some(SurfaceContainerHigh),
+					"SurfaceContainerHighest" => Some(SurfaceContainerHighest),
+					"SurfaceOutline" => Some(SurfaceOutline),
+					"SurfaceOutlineVariant" => Some(SurfaceOutlineVariant),
 
-					// Outlines & Shadows
-					"Outline" | "SurfaceOutline" => Some(MonetRole::Outline),
-					"OutlineVariant" | "SurfaceOutlineVariant" => Some(MonetRole::OutlineVariant),
+					// Shadows
 					"Shadow" => Some(MonetRole::Shadow),
 
 					// Aliases
 					"Background" => Some(MonetRole::SurfaceContainerLowest),
-					_ => None,
+
+					_ => {
+						nimbus_log!("Monet '{}' is not found", target);
+						None
+					}
 				};
 
 				let mut color = match role {
-					Some(r) => monet.get(r),
-					None => monet.get(MonetRole::Primary),
+					Some(r) => monet[r],
+					None => monet[MonetRole::Primary],
 				};
 
 				if alpha < 1.0 {

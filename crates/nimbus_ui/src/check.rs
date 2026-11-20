@@ -33,7 +33,7 @@ impl Default for Check {
 			label: any::type_name::<Self>().to_string(),
 			checked: false,
 			font: None,
-			font_size: 14.0,
+			font_size: 15.0,
 			color: None,
 			on_changed: None,
 		}
@@ -42,60 +42,44 @@ impl Default for Check {
 
 impl Widget for Check {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
-		let box_size = 20.0f32;
-		let gap = 8.0f32;
-
 		if self.label.is_empty() {
-			constraints.constrain(Vec2::new(box_size, box_size))
+			constraints.constrain(Vec2::new(22.0, 22.0))
 		} else {
 			let (text_w, text_h) = ctx.measure_text_with_font(&self.label, self.font, self.font_size);
-			let total_w = box_size + gap + text_w;
-			let total_h = box_size.max(text_h);
+			let total_w = text_w + 30.0 + 8.0;
+			let total_h = (text_h + 8.0).max(22.0);
 			constraints.constrain(Vec2::new(total_w.ceil(), total_h.ceil()))
 		}
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
-		let box_size = 20.0f32;
-		let box_x = ctx.bounds.x();
-		let box_y = ctx.bounds.y() + (ctx.bounds.height() - box_size) * 0.5;
-		let box_rect = Rect::new(box_x, box_y, box_size, box_size);
+		let monet = &ctx.theme.monet;
+		let box_x = ctx.bounds.x() + 1.0;
+		let box_y = ctx.bounds.y() + (ctx.bounds.height() - 20.0) * 0.5;
+		let box_rect = Rect::new(box_x, box_y, 20.0, 20.0);
 
 		let border_color = if ctx.hovered {
-			theme.monet.get(MonetRole::Primary)
+			monet[MonetRole::Primary]
 		} else {
-			theme.monet.get(MonetRole::Outline)
+			monet[MonetRole::PrimaryOutline]
 		};
 
-		if self.checked {
-			let fill_color = if ctx.hovered {
-				theme.monet.get(MonetRole::PrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::Primary)
-			};
-			let check_mark_color = if ctx.hovered {
-				theme.monet.get(MonetRole::OnPrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::OnPrimary)
-			};
-			canvas.draw(RectShape::new(box_rect, fill_color).radius(theme.radius.xsmall));
+		canvas.draw(
+			RectShape::new(box_rect, Color::TRANSPARENT)
+				.radius(8.0)
+				.border(border_color, 2.0),
+		);
 
-			// Inner check indicator
+		if self.checked {
 			let inner_rect = Rect::new(box_x + 5.0, box_y + 5.0, 10.0, 10.0);
-			canvas.draw(RectShape::new(inner_rect, check_mark_color).radius(2.0));
-		} else {
 			canvas.draw(
-				RectShape::new(box_rect, Color::TRANSPARENT)
-					.radius(theme.radius.xsmall)
-					.border(border_color, theme.stroke.thick),
+				RectShape::new(inner_rect, monet[MonetRole::Primary]).radius(4.0),
 			);
 		}
 
 		if !self.label.is_empty() {
-			let (text_w, text_h) = canvas.measure_text(&self.label, self.font_size);
-			let _ = text_w;
-			let text_x = box_x + box_size + 8.0;
+			let (_, text_h) = canvas.measure_text(&self.label, self.font_size);
+			let text_x = ctx.bounds.x() + 27.0;
 			let text_y = ctx.bounds.y() + (ctx.bounds.height() - text_h) * 0.5;
 
 			let fface = FontManager::default_font();
@@ -106,7 +90,7 @@ impl Widget for Check {
 
 			let text_color = self
 				.color
-				.unwrap_or_else(|| theme.monet.get(MonetRole::OnSurface));
+				.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 			canvas.draw(TextShape::new(
 				&self.label,
 				font,

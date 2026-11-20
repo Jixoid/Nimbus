@@ -42,33 +42,32 @@ impl Widget for ProgressBar {
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
-		let radius = ctx.bounds.height() * 0.5;
+		let monet = &ctx.theme.monet;
+		let radius = (ctx.bounds.height() * 0.5).min(14.0);
 
 		// Track
 		canvas.draw(
-			RectShape::new(ctx.bounds, theme.monet.get(MonetRole::SurfaceContainerHighest))
-				.radius(radius),
+			RectShape::new(ctx.bounds, monet[MonetRole::SurfaceContainerHighest]).radius(radius),
 		);
 
 		// Fill
-		let fill_width = (ctx.bounds.width() * self.progress).max(radius * 2.0);
+		let fill_width = ctx.bounds.width() * self.progress.clamp(0.0, 1.0);
 		let fill_color = self
 			.color
-			.unwrap_or_else(|| theme.monet.get(MonetRole::Primary));
+			.unwrap_or_else(|| monet[MonetRole::Primary]);
 
-		if self.progress > 0.001 {
+		if fill_width > 0.001 {
 			canvas.draw(
 				RectShape::new(
 					nimbus_math::Rect::new(
 						ctx.bounds.x(),
 						ctx.bounds.y(),
-						fill_width.min(ctx.bounds.width()),
+						fill_width,
 						ctx.bounds.height(),
 					),
 					fill_color,
 				)
-				.radius(radius),
+				.radius(radius.min(fill_width * 0.5)),
 			);
 		}
 	}

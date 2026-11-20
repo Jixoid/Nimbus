@@ -78,57 +78,79 @@ impl Widget for Interval {
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		self.last_bounds.set(ctx.bounds);
 
-		let theme = ctx.theme;
+		let monet = &ctx.theme.monet;
 		let bounds = ctx.bounds;
-		let track_height = 8.0f32;
-		let track_y = bounds.y() + (bounds.height() - track_height) * 0.5;
+		let w = bounds.width();
+		let h = bounds.height();
+
+		let is_hover = ctx.hovered || self.active_handle.is_some();
+		let handle_half_w = if is_hover { 3.0 } else { 2.0 };
+		let gap = if is_hover { 7.0 } else { 6.0 };
+		let track_padding = 4.0f32;
 
 		let range = (self.max - self.min).max(0.001);
-		let ratio1 = ((self.pos1 - self.min) / range).clamp(0.0, 1.0);
-		let ratio2 = ((self.pos2 - self.min) / range).clamp(0.0, 1.0);
+		let usable_w = w - 4.0;
+		let p1 = self.pos1.min(self.pos2);
+		let p2 = self.pos1.max(self.pos2);
+		let pos1 = (usable_w / range * (p1 - self.min)) + 2.0;
+		let pos2 = (usable_w / range * (p2 - self.min)) + 2.0;
 
-		let handle_w = 10.0f32;
-		let handle_h = 20.0f32;
-		let handle_y = bounds.y() + (bounds.height() - handle_h) * 0.5;
+		let track_h = (h - track_padding * 2.0).max(0.0);
+		let empty_color = monet[MonetRole::SurfaceContainerHighest];
 
-		let h1_x = bounds.x() + ratio1 * (bounds.width() - handle_w);
-		let h2_x = bounds.x() + ratio2 * (bounds.width() - handle_w);
-
-		// Inactive Background Track
-		let full_track = Rect::new(bounds.x(), track_y, bounds.width(), track_height);
-		canvas.draw(
-			RectShape::new(full_track, theme.monet.get(MonetRole::SurfaceContainerHighest))
-				.radius(track_height * 0.5),
-		);
-
-		// Middle Active Track
-		let seg_start = (h1_x + handle_w * 0.5).min(h2_x + handle_w * 0.5);
-		let seg_end = (h1_x + handle_w * 0.5).max(h2_x + handle_w * 0.5);
-		let seg_w = seg_end - seg_start;
-		if seg_w > 0.0 {
-			let middle_track = Rect::new(seg_start, track_y, seg_w, track_height);
-			canvas.draw(RectShape::new(middle_track, theme.monet.get(MonetRole::Primary)).radius(4.0));
+		// Sol Boş Kısım (Start -> Pos1)
+		let left_w = (pos1 - gap - 1.0).max(0.0);
+		if left_w > 0.0 {
+			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + track_padding, left_w, track_h);
+			canvas.draw(RectShape::new(left_rect, empty_color).radius4([14.0, 4.0, 4.0, 14.0]));
 		}
 
-		// Handles
-		let draw_handle = |canvas: &mut Canvas2D, h_x: f32, is_active: bool| {
-			let h_rect = Rect::new(h_x, handle_y, handle_w, handle_h);
-			let color = if is_active {
-				theme.monet.get(MonetRole::PrimaryFixedDim)
-			} else if ctx.hovered {
-				theme.monet.get(MonetRole::PrimaryContainer)
-			} else {
-				theme.monet.get(MonetRole::Primary)
-			};
+		// Orta Dolu Kısım (Pos1 -> Pos2)
+		let mid_start = pos1 + gap;
+		let mid_w = (pos2 - gap - mid_start).max(0.0);
+		if mid_w > 0.0 {
+			let mid_rect = Rect::new(bounds.x() + mid_start, bounds.y() + track_padding, mid_w, track_h);
 			canvas.draw(
-				RectShape::new(h_rect, color)
-					.radius(theme.radius.xsmall)
-					.border(theme.monet.get(MonetRole::Outline), theme.stroke.thin),
+				RectShape::new(mid_rect, monet[MonetRole::Secondary]).radius(4.0),
 			);
+		}
+
+		// Sağ Boş Kısım (Pos2 -> End)
+		let right_start = pos2 + gap;
+		let right_w = (w - 1.0 - right_start).max(0.0);
+		if right_w > 0.0 {
+			let right_rect = Rect::new(bounds.x() + right_start, bounds.y() + track_padding, right_w, track_h);
+			canvas.draw(RectShape::new(right_rect, empty_color).radius4([4.0, 14.0, 14.0, 4.0]));
+		}
+
+		// Handles (Pos1 ve Pos2)
+		let handle_h = (h - 2.0).max(0.0);
+		let h1_color = if self.active_handle == Some(1) {
+			monet[MonetRole::PrimaryFixedDim]
+		} else {
+			monet[MonetRole::Primary]
+		};
+		let h2_color = if self.active_handle == Some(2) {
+			monet[MonetRole::PrimaryFixedDim]
+		} else {
+			monet[MonetRole::Primary]
 		};
 
-		draw_handle(canvas, h1_x, self.active_handle == Some(1));
-		draw_handle(canvas, h2_x, self.active_handle == Some(2));
+		let h1_rect = Rect::new(
+			bounds.x() + pos1 - handle_half_w,
+			bounds.y() + 1.0,
+			handle_half_w * 2.0,
+			handle_h,
+		);
+		canvas.draw(RectShape::new(h1_rect, h1_color).radius(4.0));
+
+		let h2_rect = Rect::new(
+			bounds.x() + pos2 - handle_half_w,
+			bounds.y() + 1.0,
+			handle_half_w * 2.0,
+			handle_h,
+		);
+		canvas.draw(RectShape::new(h2_rect, h2_color).radius(4.0));
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
@@ -213,30 +235,35 @@ impl Widget for Interval {
 					return true;
 				}
 			}
+
 			"pos2" => {
 				if let Some(v) = value.as_f32() {
 					self.pos2 = v.clamp(self.pos1, self.max);
 					return true;
 				}
 			}
+
 			"min" => {
 				if let Some(v) = value.as_f32() {
 					self.min = v;
 					return true;
 				}
 			}
+
 			"max" => {
 				if let Some(v) = value.as_f32() {
 					self.max = v;
 					return true;
 				}
 			}
+
 			"step" => {
 				if let Some(v) = value.as_f32() {
 					self.step = Some(v);
 					return true;
 				}
 			}
+			
 			_ => {}
 		}
 		false

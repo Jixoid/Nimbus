@@ -55,12 +55,12 @@ impl Widget for MultiProgressBar {
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
-		let theme = ctx.theme;
+		let monet = &ctx.theme.monet;
 		let radius = self.corner_radius.unwrap_or(ctx.bounds.height() * 0.5);
 
 		// Background track
 		canvas.draw(
-			RectShape::new(ctx.bounds, theme.monet.get(MonetRole::SurfaceContainerHighest))
+			RectShape::new(ctx.bounds, monet[MonetRole::SurfaceContainerHighest])
 				.radius(radius),
 		);
 
@@ -70,14 +70,13 @@ impl Widget for MultiProgressBar {
 		}
 
 		let default_palette = [
-			theme.monet.get(MonetRole::Primary),
-			theme.monet.get(MonetRole::Secondary),
-			theme.monet.get(MonetRole::Tertiary),
-			theme.monet.get(MonetRole::PrimaryContainer),
-			theme.monet.get(MonetRole::Outline),
+			monet[MonetRole::Primary],
+			monet[MonetRole::Secondary],
+			monet[MonetRole::Tertiary],
+			monet[MonetRole::PrimaryContainer],
 		];
 
-		let gap = 2.0f32;
+		let gap = 3.0f32;
 		let num_gaps = (self.segments.len().saturating_sub(1)) as f32;
 		let usable_width = (ctx.bounds.width() - num_gaps * gap).max(0.0);
 
@@ -93,7 +92,7 @@ impl Widget for MultiProgressBar {
 				.unwrap_or_else(|| default_palette[i % default_palette.len()]);
 
 			let seg_rect = Rect::new(current_x, ctx.bounds.y(), seg_w, ctx.bounds.height());
-			canvas.draw(RectShape::new(seg_rect, color).radius(radius.min(seg_w * 0.5)));
+			canvas.draw(RectShape::new(seg_rect, color).radius(5.0));
 
 			current_x += seg_w + gap;
 		}
