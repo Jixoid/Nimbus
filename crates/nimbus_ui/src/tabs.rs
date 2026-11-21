@@ -11,11 +11,10 @@
 
 
 use std::cell::{Cell, RefCell};
-use std::time::Duration;
 
 use nimbus_core::{
-	Animated, BoxConstraints, ButtonState, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
+	Animated, BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent,
+	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Spring, Widget,
 };
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -50,16 +49,16 @@ impl Default for Tabs {
 }
 
 impl Tabs {
-	fn tab_rect(&self, bounds: Rect<f32>, index: usize) -> Option<Rect<f32>> {
+	pub fn local_tab_rect(&self, height: f32, index: usize) -> Option<Rect<f32>> {
 		let fface = FontManager::default_font();
-		let mut x_off = bounds.x() + 16.0;
+		let mut x_off = 16.0;
 
 		for (i, tab) in self.tabs.iter().enumerate() {
 			let (tab_w, tab_h) = fface.measure_text(tab, self.font_size);
 			if i == index {
 				return Some(Rect::new(
 					x_off - 6.0,
-					bounds.y() + (bounds.height() * 0.5) - (tab_h * 0.5) - 6.0,
+					(height * 0.5) - (tab_h * 0.5) - 6.0,
 					tab_w + 12.0,
 					tab_h + 12.0,
 				));
@@ -69,7 +68,13 @@ impl Tabs {
 		None
 	}
 
-	fn tab_at_x(&self, bounds: Rect<f32>, x: f32) -> Option<usize> {
+	pub fn tab_rect(&self, bounds: Rect<f32>, index: usize) -> Option<Rect<f32>> {
+		self.local_tab_rect(bounds.height(), index).map(|r| {
+			Rect::new(bounds.x() + r.x(), bounds.y() + r.y(), r.width(), r.height())
+		})
+	}
+
+	pub fn tab_at_x(&self, bounds: Rect<f32>, x: f32) -> Option<usize> {
 		let fface = FontManager::default_font();
 		let mut x_off = bounds.x() + 16.0;
 
@@ -111,23 +116,35 @@ impl Widget for Tabs {
 		);
 
 		// Animate indicator pill sliding/morphing
-		let cur_pill = self.indicator.borrow().value();
+		let cur_local_pill = self.indicator.borrow().value();
 		if self.indicator.borrow().is_animating() {
 			ctx.request_redraw();
 		}
 
-		if cur_pill != Rect::ZERO {
-			let pill_radius = cur_pill.height() * 0.5;
+		if cur_local_pill != Rect::ZERO {
+			let pill_rect = Rect::new(
+				bounds.x() + cur_local_pill.x(),
+				bounds.y() + cur_local_pill.y(),
+				cur_local_pill.width(),
+				cur_local_pill.height(),
+			);
+			let pill_radius = pill_rect.height() * 0.5;
 			canvas.draw(
-				RectShape::new(cur_pill, monet[MonetRole::Primary])
+				RectShape::new(pill_rect, monet[MonetRole::Primary])
 					.radius(pill_radius)
 					.noise(0.15),
 			);
-		} else if let Some(target_rect) = self.tab_rect(bounds, self.tab_id as usize) {
-			self.indicator.borrow_mut().snap_to(target_rect);
-			let pill_radius = target_rect.height() * 0.5;
+		} else if let Some(target_local) = self.local_tab_rect(bounds.height(), self.tab_id as usize) {
+			self.indicator.borrow_mut().snap_to(target_local);
+			let pill_rect = Rect::new(
+				bounds.x() + target_local.x(),
+				bounds.y() + target_local.y(),
+				target_local.width(),
+				target_local.height(),
+			);
+			let pill_radius = pill_rect.height() * 0.5;
 			canvas.draw(
-				RectShape::new(target_rect, monet[MonetRole::Primary])
+				RectShape::new(pill_rect, monet[MonetRole::Primary])
 					.radius(pill_radius)
 					.noise(0.15),
 			);
@@ -175,15 +192,15 @@ impl Widget for Tabs {
 				if let Some(tab_idx) = self.tab_at_x(bounds, position.x) {
 					if self.tab_id != tab_idx as i32 {
 						self.tab_id = tab_idx as i32;
-						if let Some(target_rect) = self.tab_rect(bounds, tab_idx) {
+						let h = if bounds != Rect::ZERO { bounds.height() } else { 32.0 };
+						if let Some(target_local) = self.local_tab_rect(h, tab_idx) {
 							let mut ind = self.indicator.borrow_mut();
 							if *ind.target() == Rect::ZERO {
-								ind.snap_to(target_rect);
+								ind.snap_to(target_local);
 							} else {
-								ind.set_target(
-									target_rect,
-									Duration::from_millis(180),
-									Easing::Emphasized,
+								ind.set_target_spring(
+									target_local,
+									Spring::INTERACTIVE,
 								);
 							}
 						}
@@ -226,10 +243,9 @@ impl Widget for Tabs {
 					if self.tab_id != new_id {
 						self.tab_id = new_id;
 						let bounds = self.last_bounds.get();
-						if bounds != Rect::ZERO {
-							if let Some(target_rect) = self.tab_rect(bounds, new_id as usize) {
-								self.indicator.borrow_mut().snap_to(target_rect);
-							}
+						let h = if bounds != Rect::ZERO { bounds.height() } else { 32.0 };
+						if let Some(target_local) = self.local_tab_rect(h, new_id as usize) {
+							self.indicator.borrow_mut().snap_to(target_local);
 						}
 					}
 					return true;
@@ -245,6 +261,11 @@ impl Widget for Tabs {
 						}
 					}
 					self.tabs = list;
+					let bounds = self.last_bounds.get();
+					let h = if bounds != Rect::ZERO { bounds.height() } else { 32.0 };
+					if let Some(target_local) = self.local_tab_rect(h, self.tab_id as usize) {
+						self.indicator.borrow_mut().snap_to(target_local);
+					}
 					return true;
 				}
 			}
@@ -272,5 +293,42 @@ impl Widget for Tabs {
 		} else {
 			false
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_tabs_local_tab_rect_and_scroll() {
+		let mut tabs = Tabs::default();
+		tabs.tabs = vec!["Home".to_string(), "Settings".to_string(), "Profile".to_string()];
+
+		let local_0 = tabs.local_tab_rect(32.0, 0).expect("Tab 0 exists");
+		let local_1 = tabs.local_tab_rect(32.0, 1).expect("Tab 1 exists");
+
+		// Local coordinates are relative to widget origin
+		assert!(local_0.x() >= 0.0);
+		assert!(local_1.x() > local_0.x());
+
+		// Verify indicator tracks bounds correctly on scroll
+		let bounds_a = Rect::new(0.0, 50.0, 300.0, 32.0);
+		let bounds_b = Rect::new(0.0, 250.0, 300.0, 32.0);
+
+		let screen_a = Rect::new(
+			bounds_a.x() + local_0.x(),
+			bounds_a.y() + local_0.y(),
+			local_0.width(),
+			local_0.height(),
+		);
+		let screen_b = Rect::new(
+			bounds_b.x() + local_0.x(),
+			bounds_b.y() + local_0.y(),
+			local_0.width(),
+			local_0.height(),
+		);
+
+		assert_eq!(screen_b.y() - screen_a.y(), 200.0);
 	}
 }

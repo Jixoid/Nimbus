@@ -11,11 +11,10 @@
 
 
 use std::any;
-use std::time::Duration;
 
 use nimbus_core::{
-	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+	Animated, BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent,
+	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Spring, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -83,23 +82,24 @@ impl Widget for Switch {
 			ctx.request_redraw();
 		}
 
+		let t_clamped = t.clamp(0.0, 1.0);
 		let active_bg = monet[MonetRole::Primary];
 		let inactive_bg = Color::TRANSPARENT;
-		let track_bg = inactive_bg.interpolate(&active_bg, t);
+		let track_bg = inactive_bg.interpolate(&active_bg, t_clamped);
 
 		let border_color = if ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-		let border_w = (1.0 - t) * 2.0;
+		let border_w = (1.0 - t_clamped) * 2.0;
 
 		let mut track_shape = RectShape::new(track_rect, track_bg).radius(13.0);
 		if border_w > 0.05 {
 			track_shape = track_shape.border(border_color, border_w);
 		}
-		if t > 0.02 {
-			track_shape = track_shape.noise(0.15 * t);
+		if t_clamped > 0.02 {
+			track_shape = track_shape.noise(0.15 * t_clamped);
 		}
 		canvas.draw(track_shape);
 
@@ -107,18 +107,18 @@ impl Widget for Switch {
 		let active_thumb_x = track_x + switch_w - 18.0 - 4.0;
 		let thumb_x = inactive_thumb_x.interpolate(&active_thumb_x, t);
 
-		let thumb_size = 14.0f32.interpolate(&18.0f32, t);
+		let thumb_size = 14.0f32.interpolate(&18.0f32, t_clamped);
 		let thumb_y = track_y + (switch_h - thumb_size) * 0.5;
 		let thumb_radius = thumb_size * 0.5;
 
 		let thumb_inactive_color = monet[MonetRole::Primary];
 		let thumb_active_color = monet[MonetRole::SurfaceContainerLow];
-		let thumb_color = thumb_inactive_color.interpolate(&thumb_active_color, t);
+		let thumb_color = thumb_inactive_color.interpolate(&thumb_active_color, t_clamped);
 
 		canvas.draw(
 			RectShape::new(Rect::new(thumb_x, thumb_y, thumb_size, thumb_size), thumb_color)
 				.radius(thumb_radius)
-				.noise(0.15 * (1.0 - t)),
+				.noise(0.15 * (1.0 - t_clamped)),
 		);
 
 		if !self.label.is_empty() {
@@ -149,10 +149,9 @@ impl Widget for Switch {
 		if let InputEvent::Click { .. } = event {
 			self.checked = !self.checked;
 			let target = if self.checked { 1.0 } else { 0.0 };
-			self.progress.set_target(
+			self.progress.set_target_spring(
 				target,
-				Duration::from_millis(160),
-				Easing::Emphasized,
+				Spring::INTERACTIVE,
 			);
 			if let Some(cb) = &mut self.on_changed {
 				cb();

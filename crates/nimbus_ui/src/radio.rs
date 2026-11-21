@@ -72,12 +72,13 @@ impl Widget for Radio {
 			ctx.request_redraw();
 		}
 
+		let t_clamped = t.clamp(0.0, 1.0);
 		let inactive_border = if ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t);
+		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t_clamped);
 		
 		// Outer circle
 		canvas.draw(
@@ -133,8 +134,8 @@ impl Widget for Radio {
 				self.checked = true;
 				self.progress.set_target(
 					1.0,
-					Duration::from_millis(150),
-					Easing::Emphasized,
+					Duration::from_millis(160),
+					Easing::BackOut,
 				);
 				ctx.dispatch_message(
 					MessageTarget::Siblings,
@@ -164,8 +165,8 @@ impl Widget for Radio {
 				self.checked = false;
 				self.progress.set_target(
 					0.0,
-					Duration::from_millis(150),
-					Easing::Emphasized,
+					Duration::from_millis(120),
+					Easing::EaseIn,
 				);
 				ctx.request_redraw();
 				if let Some(cb) = &mut self.on_changed {

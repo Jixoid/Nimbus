@@ -36,12 +36,60 @@ impl Interpolate for Vec2<f32> {
 }
 
 impl Interpolate for Rect<f32> {
-	#[inline]
 	fn interpolate(&self, target: &Self, t: f32) -> Self {
-		Rect::from_min_max(
-			self.min.interpolate(&target.min, t),
-			self.max.interpolate(&target.max, t),
-		)
+		if t <= 0.0 {
+			return *self;
+		}
+		if (t - 1.0).abs() < 1e-5 {
+			return *target;
+		}
+
+		// When spring overshoots past 1.0 or under 0.0, apply uniform physical scaling
+		if t < 0.0 || t > 1.0 {
+			return Rect::from_min_max(
+				self.min.interpolate(&target.min, t),
+				self.max.interpolate(&target.max, t),
+			);
+		}
+
+		let dx = (target.min.x + target.max.x) - (self.min.x + self.max.x);
+		let dy = (target.min.y + target.max.y) - (self.min.y + self.max.y);
+
+		// Fluid elastic stretch interpolation
+		let t_lead = 1.0 - (1.0 - t).powf(1.4);
+		let t_trail = t.powf(1.4);
+
+		let (min_x, max_x) = if dx > 0.5 {
+			let min_x = self.min.x + (target.min.x - self.min.x) * t_trail;
+			let max_x = self.max.x + (target.max.x - self.max.x) * t_lead;
+			(min_x, max_x)
+		} else if dx < -0.5 {
+			let min_x = self.min.x + (target.min.x - self.min.x) * t_lead;
+			let max_x = self.max.x + (target.max.x - self.max.x) * t_trail;
+			(min_x, max_x)
+		} else {
+			(
+				self.min.x + (target.min.x - self.min.x) * t,
+				self.max.x + (target.max.x - self.max.x) * t,
+			)
+		};
+
+		let (min_y, max_y) = if dy > 0.5 {
+			let min_y = self.min.y + (target.min.y - self.min.y) * t_trail;
+			let max_y = self.max.y + (target.max.y - self.max.y) * t_lead;
+			(min_y, max_y)
+		} else if dy < -0.5 {
+			let min_y = self.min.y + (target.min.y - self.min.y) * t_lead;
+			let max_y = self.max.y + (target.max.y - self.max.y) * t_trail;
+			(min_y, max_y)
+		} else {
+			(
+				self.min.y + (target.min.y - self.min.y) * t,
+				self.max.y + (target.max.y - self.max.y) * t,
+			)
+		};
+
+		Rect::from_min_max(Vec2::new(min_x, min_y), Vec2::new(max_x, max_y))
 	}
 }
 
@@ -71,6 +119,10 @@ pub enum Easing {
 	Decelerate,
 	/// Material Design 3 Standard Accelerate: (0.3, 0.0, 1.0, 1.0)
 	Accelerate,
+	/// Playful anticipation/overshoot then settle: ideal for popups, tooltips, checkmarks
+	BackOut,
+	/// Material 3 Emphasized Decelerate: (0.05, 0.7, 0.1, 1.0)
+	EmphasizedDecelerate,
 	/// Custom Cubic Bézier curve control points: (p1x, p1y, p2x, p2y)
 	CubicBezier(f32, f32, f32, f32),
 }
@@ -92,6 +144,12 @@ impl Easing {
 			Easing::Emphasized => sample_cubic_bezier(0.2, 0.0, 0.0, 1.0, t),
 			Easing::Decelerate => sample_cubic_bezier(0.0, 0.0, 0.2, 1.0, t),
 			Easing::Accelerate => sample_cubic_bezier(0.3, 0.0, 1.0, 1.0, t),
+			Easing::BackOut => {
+				let s = 1.4f32;
+				let p = t - 1.0;
+				1.0 + (s + 1.0) * p * p * p + s * p * p
+			}
+			Easing::EmphasizedDecelerate => sample_cubic_bezier(0.05, 0.7, 0.1, 1.0, t),
 			Easing::CubicBezier(p1x, p1y, p2x, p2y) => sample_cubic_bezier(*p1x, *p1y, *p2x, *p2y, t),
 		}
 	}
@@ -156,6 +214,13 @@ impl Spring {
 		damping: 32.0,
 	};
 
+	/// Highly responsive spring with subtle playful overshoot (~4-5%), ideal for tabs, switches, and sliders
+	pub const INTERACTIVE: Self = Self {
+		mass: 1.0,
+		stiffness: 280.0,
+		damping: 24.0,
+	};
+
 	/// Playful bounce with controlled overshoot. Ideal for alerts and buttons
 	pub const BOUNCY: Self = Self {
 		mass: 1.0,
@@ -167,8 +232,7 @@ impl Spring {
 		Self { mass, stiffness, damping }
 	}
 
-	/// Solves the spring position at elapsed time `t` (in seconds)
-	/// returning a normalized factor from 0.0 (start) to 1.0 (settled target)
+	/// Solves the spring position at elapsed time `t`
 	pub fn solve(&self, t_sec: f32) -> (f32, bool) {
 		if t_sec <= 0.0 {
 			return (0.0, false);

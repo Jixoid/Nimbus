@@ -70,12 +70,13 @@ impl Widget for Check {
 			ctx.request_redraw();
 		}
 
+		let t_clamped = t.clamp(0.0, 1.0);
 		let inactive_border = if ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t);
+		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t_clamped);
 		
 		canvas.draw(
 			RectShape::new(box_rect, Color::TRANSPARENT)
@@ -93,7 +94,7 @@ impl Widget for Check {
 			);
 			canvas.draw(
 				RectShape::new(inner_rect, monet[MonetRole::Primary])
-					.radius(3.0 * t)
+					.radius(3.0 * t_clamped)
 					.noise(0.15),
 			);
 		}
@@ -125,12 +126,12 @@ impl Widget for Check {
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		if let InputEvent::Click { .. } = event {
 			self.checked = !self.checked;
-			let target = if self.checked { 1.0 } else { 0.0 };
-			self.progress.set_target(
-				target,
-				Duration::from_millis(150),
-				Easing::Emphasized,
-			);
+			let (target, easing, dur) = if self.checked {
+				(1.0, Easing::BackOut, Duration::from_millis(160))
+			} else {
+				(0.0, Easing::EaseIn, Duration::from_millis(120))
+			};
+			self.progress.set_target(target, dur, easing);
 			if let Some(cb) = &mut self.on_changed {
 				cb();
 			}

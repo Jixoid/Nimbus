@@ -175,8 +175,8 @@ impl Popup {
 				self.slide_progress.snap_to(0.0);
 				self.slide_progress.set_target(
 					1.0,
-					Duration::from_millis(180),
-					Easing::Emphasized,
+					Duration::from_millis(200),
+					Easing::EmphasizedDecelerate,
 				);
 				ctx.request_redraw();
 				ctx.request_layout();
@@ -194,8 +194,8 @@ impl Popup {
 			self.slide_progress.snap_to(0.0);
 			self.slide_progress.set_target(
 				1.0,
-				Duration::from_millis(180),
-				Easing::Emphasized,
+				Duration::from_millis(200),
+				Easing::EmphasizedDecelerate,
 			);
 			ctx.request_redraw();
 			ctx.request_layout();
