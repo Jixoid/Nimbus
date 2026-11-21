@@ -85,7 +85,8 @@ impl Widget for Radio {
 			);
 			canvas.draw(
 				RectShape::new(inner_rect, monet[MonetRole::Primary])
-					.radius(inner_size * 0.5),
+					.radius(inner_size * 0.5)
+					.noise(0.15),
 			);
 		}
 

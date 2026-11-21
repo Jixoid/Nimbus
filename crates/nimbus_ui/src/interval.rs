@@ -111,7 +111,9 @@ impl Widget for Interval {
 		if mid_w > 0.0 {
 			let mid_rect = Rect::new(bounds.x() + mid_start, bounds.y() + track_padding, mid_w, track_h);
 			canvas.draw(
-				RectShape::new(mid_rect, monet[MonetRole::Secondary]).radius(4.0),
+				RectShape::new(mid_rect, monet[MonetRole::Secondary])
+					.radius(4.0)
+					.noise(0.15),
 			);
 		}
 

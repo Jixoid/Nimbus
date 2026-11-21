@@ -32,10 +32,12 @@ pub struct RectInstance {
 	shadow_offset: [f32; 2],
 	border_width: f32,
 	shadow_blur: f32,
+	noise: f32,
+	_pad: [f32; 3],
 }
 
 const _: () = {
-	assert!(std::mem::size_of::<RectInstance>() == 96);
+	assert!(std::mem::size_of::<RectInstance>() == 112);
 	assert!(std::mem::align_of::<RectInstance>() == 16);
 };
 
@@ -56,6 +58,8 @@ impl RectShape {
 				shadow_offset: [0.0; 2],
 				border_width: 0.0,
 				shadow_blur: 0.0,
+				noise: 0.0,
+				_pad: [0.0; 3],
 			},
 		}
 	}
@@ -81,6 +85,11 @@ impl RectShape {
 		self.inst.shadow_color = color.to_array();
 		self.inst.shadow_offset = offset.to_array();
 		self.inst.shadow_blur = blur;
+		self
+	}
+
+	pub fn noise(mut self, intensity: f32) -> Self {
+		self.inst.noise = intensity.clamp(0.0, 1.0);
 		self
 	}
 }

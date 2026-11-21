@@ -114,7 +114,8 @@ impl Widget for Choice {
 				let tab_radius = bounds.height() * 0.5;
 				canvas.draw(
 					RectShape::new(tab_rect, monet[MonetRole::Primary])
-						.radius(tab_radius),
+						.radius(tab_radius)
+						.noise(0.15),
 				);
 			}
 

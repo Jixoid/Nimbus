@@ -74,7 +74,9 @@ impl Widget for Check {
 		if self.checked {
 			let inner_rect = Rect::new(box_x + 6.0, box_y + 6.0, 10.0, 10.0);
 			canvas.draw(
-				RectShape::new(inner_rect, monet[MonetRole::Primary]).radius(3.0),
+				RectShape::new(inner_rect, monet[MonetRole::Primary])
+				.radius(3.0)
+				.noise(0.15),
 			);
 		}
 

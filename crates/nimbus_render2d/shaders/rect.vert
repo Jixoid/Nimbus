@@ -12,6 +12,8 @@ struct RectInstance {
     vec2 shadow_offset;
     float border_width;
     float shadow_blur;
+    float noise;
+    vec3 _pad;
 };
 
 layout(buffer_reference, scalar) readonly buffer InstanceBuffer {
@@ -32,6 +34,7 @@ layout(location = 5) out vec4 v_shadow_color;
 layout(location = 6) out vec2 v_shadow_offset;
 layout(location = 7) out float v_border_width;
 layout(location = 8) out float v_shadow_blur;
+layout(location = 9) out float v_noise;
 
 const vec2 QUAD_VERTICES[6] = vec2[6](
     vec2(0.0, 0.0),
@@ -69,4 +72,5 @@ void main() {
     v_shadow_offset = inst.shadow_offset;
     v_border_width = inst.border_width;
     v_shadow_blur = inst.shadow_blur;
+    v_noise = inst.noise;
 }

@@ -74,13 +74,16 @@ impl Widget for Switch {
 
 		if self.checked {
 			canvas.draw(
-				RectShape::new(track_rect, monet[MonetRole::Primary]).radius(13.0),
+				RectShape::new(track_rect, monet[MonetRole::Primary])
+					.radius(13.0)
+					.noise(0.15),
 			);
 
 			let thumb_x = track_x + switch_w - 18.0 - 4.0;
 			let thumb_y = track_y + (switch_h - 18.0) * 0.5;
 			canvas.draw(
-				RectShape::new(Rect::new(thumb_x, thumb_y, 18.0, 18.0), monet[MonetRole::SurfaceContainerLow]).radius(9.0),
+				RectShape::new(Rect::new(thumb_x, thumb_y, 18.0, 18.0), monet[MonetRole::SurfaceContainerLow])
+					.radius(9.0),
 			);
 		} else {
 			let border_color = if ctx.hovered {
@@ -97,7 +100,9 @@ impl Widget for Switch {
 			let thumb_x = track_x + 6.0;
 			let thumb_y = track_y + (switch_h - 14.0) * 0.5;
 			canvas.draw(
-				RectShape::new(Rect::new(thumb_x, thumb_y, 14.0, 14.0), monet[MonetRole::Primary]).radius(7.0),
+				RectShape::new(Rect::new(thumb_x, thumb_y, 14.0, 14.0), monet[MonetRole::Primary])
+					.radius(7.0)
+					.noise(0.15),
 			);
 		}
 

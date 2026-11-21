@@ -96,7 +96,8 @@ impl Widget for Slider {
 			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + 4.0, left_w, (h - 8.0).max(0.0));
 			canvas.draw(
 				RectShape::new(left_rect, monet[MonetRole::Secondary])
-					.radius4([14.0, 4.0, 4.0, 14.0]),
+					.radius4([14.0, 4.0, 4.0, 14.0])
+					.noise(0.15),
 			);
 		}
 

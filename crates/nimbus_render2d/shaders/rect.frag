@@ -9,8 +9,28 @@ layout(location = 5) in vec4 v_shadow_color;
 layout(location = 6) in vec2 v_shadow_offset;
 layout(location = 7) in float v_border_width;
 layout(location = 8) in float v_shadow_blur;
+layout(location = 9) in float v_noise;
 
 layout(location = 0) out vec4 out_color;
+
+float hash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float overlay_channel(float b, float n) {
+    return (b < 0.5) ? (2.0 * b * n) : (1.0 - 2.0 * (1.0 - b) * (1.0 - n));
+}
+
+vec3 apply_overlay_noise(vec3 base, float noise_val, float intensity) {
+    float n = mix(0.5, noise_val, intensity);
+    return vec3(
+        overlay_channel(base.r, n),
+        overlay_channel(base.g, n),
+        overlay_channel(base.b, n)
+    );
+}
 
 float rounded_rect_sdf(vec2 p, vec2 b, vec4 r) {
     float rad = (p.x > 0.0) ? ((p.y > 0.0) ? r.z : r.y) : ((p.y > 0.0) ? r.w : r.x);
@@ -33,6 +53,11 @@ void main() {
         float inner_dist = dist + v_border_width;
         float inner_coverage = clamp(0.5 - inner_dist / aa, 0.0, 1.0);
         shape_color = mix(v_border_color, v_fill_color, inner_coverage);
+    }
+
+    if (v_noise > 0.0) {
+        float h = hash(floor(v_local_pos));
+        shape_color.rgb = apply_overlay_noise(shape_color.rgb, h, v_noise);
     }
 
     vec4 final_color = vec4(shape_color.rgb, shape_color.a * fill_coverage);
