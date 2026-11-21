@@ -1,25 +1,33 @@
-## QCL
+# Nimbus
 
-A modern, Skia-based user interface (UI) engine and framework. 
-Developed under the QAOS umbrella, QCL focuses on a clean and layered architecture to simplify interface programming and embrace modern principles.
+A UI framework and engine.
+
+Developed under the QAOS umbrella, Nimbus combines a declarative UI markup language (**QDL**), a Vulkan-powered 2D rendering pipeline, dynamic Material Design 3 / Monet palette generation, and interactive physics-based spring animations.
 
 Other languages: [tr](README.tr.md)
 
+---
 
-## Architecture
+## Features
 
-The project is structured into highly decoupled modules:
+- **GPU-Accelerated 2D Renderer:** Low-level Vulkan abstraction (`nimbus_rhi_ash`) driving a custom 2D canvas with procedural GPU noise shaders and high-quality SDF/font glyph atlas rendering (`fontdue`).
+- **Declarative QDL Markup:** Clean and human-friendly UI markup language for defining layout trees, style blocks, and event bindings.
+- **Dynamic Theming (Monet):** OKLCH-based dynamic tonal palettes, elevation tokens, radius and stroke styling with full dark/light theme support.
+- **Spring Animations:** Responsive spring physics (`Spring::INTERACTIVE`, `BOUNCY`, `SMOOTH`) and modern easing functions (`EmphasizedDecelerate`, etc.).
+- **Component Library (`nimbus_ui`):**
+  - **Inputs & Controls:** Button (Filled, Tonal, Elevated, Outlined), Checkbox, Radio, Switch, Slider, Interval slider, TextInput (`Edit`).
+  - **Navigation & Selection:** Tabs, Choice chips, Popup menus (with animated submenus and custom chevron indicators).
+  - **Feedback & Display:** ProgressBar, MultiProgressBar, Tooltip / ToolTip (with directional positioning and fade/slide animations).
+  - **Layout & Containers:** HBox, VBox, Flow, Card, ScrollView.
 
-1. **QCL Core:** Management of fundamental interface components (Controls, Views, Windows) and the virtual file system (VFS).
-2. **QSTD (Standard Library):** A ready-to-use, standardized UI components package.
-3. **Platform:** Operating system-specific integrations and low-level backend connections.
-
+---
 
 ## Visuals
 
-![QCL Interface Test](/images/test.png)
+![Nimbus Interface Test](/images/test.png)
 *Interface test.*
 
+---
 
 ## License
 
@@ -27,6 +35,7 @@ This project is licensed under the GNU General Public License version 3 (GPL3).
 
 Copyright (c) 2025-2026 Kadir Aydın.
 
+---
 
 ## QAOS
 
