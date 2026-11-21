@@ -151,6 +151,22 @@ fn main() {
 			node qstd::tabs {
 				tabs: ["tab1", "tab2", "tab3"]
 			}
+
+			node qstd::popup {
+				items: [
+					"open",
+					"save",
+					"-",
+					{
+						text: "others",
+						items: [
+							"other 1"
+							"other 2"
+						],
+					},
+					
+				]
+			}
 		}
 
 	}

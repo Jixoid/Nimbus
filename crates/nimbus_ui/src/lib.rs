@@ -19,6 +19,7 @@ pub mod flex;
 pub mod flow;
 pub mod interval;
 pub mod multi_progress;
+pub mod popup;
 pub mod progress;
 pub mod radio;
 pub mod slider;
@@ -36,6 +37,7 @@ pub use flex::{HBox, VBox};
 pub use flow::Flow;
 pub use interval::Interval;
 pub use multi_progress::{MultiProgressBar, ProgressSegment};
+pub use popup::{Popup, PopupItem};
 pub use progress::ProgressBar;
 pub use radio::Radio;
 pub use scroll::{ScrollState, ScrollView};
@@ -66,4 +68,5 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::tabs", || Box::new(Tabs::default()));
 	registry.register("qstd::choice", || Box::new(Choice::default()));
 	registry.register("qstd::scroll", || Box::new(ScrollView::default()));
+	registry.register("qstd::popup", || Box::new(Popup::default()));
 }
