@@ -72,6 +72,11 @@ pub trait Widget: AsAny + 'static {
 	fn bind_event(&mut self, event_name: &str, callback: MethodCallback) -> bool {
 		self.bind_method(event_name, callback)
 	}
+
+	fn handle_message(&mut self, ctx: &mut EventCtx, name: &str, payload: &PropertyValue) -> bool {
+		let _ = (ctx, name, payload);
+		false
+	}
 }
 
 impl Widget for Box<dyn Widget> {
@@ -109,5 +114,9 @@ impl Widget for Box<dyn Widget> {
 
 	fn bind_event(&mut self, event_name: &str, callback: MethodCallback) -> bool {
 		(**self).bind_event(event_name, callback)
+	}
+
+	fn handle_message(&mut self, ctx: &mut EventCtx, name: &str, payload: &PropertyValue) -> bool {
+		(**self).handle_message(ctx, name, payload)
 	}
 }

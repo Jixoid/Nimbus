@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use nimbus_core::{
 	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+	Interpolate, LayoutCtx, MessageTarget, MethodCallback, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -136,6 +136,11 @@ impl Widget for Radio {
 					Duration::from_millis(150),
 					Easing::Emphasized,
 				);
+				ctx.dispatch_message(
+					MessageTarget::Siblings,
+					"radio_selected",
+					PropertyValue::String(self.group.clone().unwrap_or_default()),
+				);
 				if let Some(cb) = &mut self.on_changed {
 					cb();
 				}
@@ -144,6 +149,33 @@ impl Widget for Radio {
 			}
 		}
 		EventResponse::Ignored
+	}
+
+	fn handle_message(&mut self, ctx: &mut EventCtx, name: &str, payload: &PropertyValue) -> bool {
+		if name == "radio_selected" {
+			let incoming_group = payload.as_str().filter(|s| !s.is_empty());
+			let matches = match (incoming_group, &self.group) {
+				(Some(g1), Some(g2)) => g1 == g2.as_str(),
+				(None, None) => true,
+				_ => false,
+			};
+
+			if matches && self.checked {
+				self.checked = false;
+				self.progress.set_target(
+					0.0,
+					Duration::from_millis(150),
+					Easing::Emphasized,
+				);
+				ctx.request_redraw();
+				if let Some(cb) = &mut self.on_changed {
+					cb();
+				}
+				return true;
+			}
+		}
+
+		false
 	}
 
 	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {

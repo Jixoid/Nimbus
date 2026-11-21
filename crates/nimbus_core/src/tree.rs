@@ -16,7 +16,9 @@ use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::Canvas2D;
 
 use crate::draw::DrawCtx;
-use crate::event::{ButtonState, EventCtx, EventResponse, InputEvent, MouseButton};
+use crate::event::{
+	ButtonState, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
+};
 use crate::id::ObjectID;
 use crate::layout::{BoxConstraints, LayoutCtx};
 use crate::node::NodeData;
@@ -550,10 +552,16 @@ impl UiTree {
 			node_id: id,
 			redraw_requested,
 			layout_requested,
+			messages: Vec::new(),
 		};
 
 		let resp = widget.handle_event(&mut ctx, event);
 		self.widgets.insert(id, Some(widget));
+
+		if !ctx.messages.is_empty() {
+			self.process_messages(ctx.messages);
+		}
+
 		if *layout_requested {
 			self.needs_layout = true;
 		}
@@ -561,6 +569,72 @@ impl UiTree {
 			self.needs_redraw = true;
 		}
 		resp
+	}
+
+	pub fn process_messages(&mut self, initial_messages: Vec<Message>) {
+		let mut queue = std::collections::VecDeque::from(initial_messages);
+		let mut redraw = false;
+		let mut layout = false;
+
+		while let Some(msg) = queue.pop_front() {
+			let targets: Vec<ObjectID> = match msg.target {
+				MessageTarget::Siblings => {
+					if let Some(parent_id) = self.nodes.get(msg.sender).and_then(|n| n.parent) {
+						if let Some(parent_node) = self.nodes.get(parent_id) {
+							parent_node
+								.children
+								.iter()
+								.copied()
+								.filter(|&id| id != msg.sender)
+								.collect()
+						} else {
+							Vec::new()
+						}
+					} else {
+						Vec::new()
+					}
+				}
+				MessageTarget::Parent => {
+					self.nodes
+						.get(msg.sender)
+						.and_then(|n| n.parent)
+						.into_iter()
+						.collect()
+				}
+				MessageTarget::Children => {
+					self.nodes
+						.get(msg.sender)
+						.map(|n| n.children.clone())
+						.unwrap_or_default()
+				}
+				MessageTarget::Root => self.roots.clone(),
+			};
+
+			for target_id in targets {
+				if let Some(mut target_widget) = self.widgets.get_mut(target_id).and_then(|w| w.take()) {
+					let mut target_ctx = EventCtx {
+						node_id: target_id,
+						redraw_requested: &mut redraw,
+						layout_requested: &mut layout,
+						messages: Vec::new(),
+					};
+
+					let _ = target_widget.handle_message(&mut target_ctx, &msg.name, &msg.payload);
+					self.widgets.insert(target_id, Some(target_widget));
+
+					for child_msg in target_ctx.messages {
+						queue.push_back(child_msg);
+					}
+				}
+			}
+		}
+
+		if redraw {
+			self.needs_redraw = true;
+		}
+		if layout {
+			self.needs_layout = true;
+		}
 	}
 }
 
@@ -680,5 +754,69 @@ mod tests {
 		let redraw = tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Released, center);
 		assert!(redraw);
 		assert_eq!(counter.load(Ordering::SeqCst), 1);
+	}
+
+	#[test]
+	fn test_message_dispatch_siblings() {
+		use crate::property::PropertyValue;
+
+		struct MockItem {
+			active: bool,
+		}
+		impl Widget for MockItem {
+			fn layout(&mut self, _ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
+				constraints.constrain(Vec2::new(20.0, 20.0))
+			}
+			fn draw(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
+			fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
+				if let InputEvent::Click { .. } = event {
+					if !self.active {
+						self.active = true;
+						ctx.dispatch_message(
+							MessageTarget::Siblings,
+							"deactivate",
+							PropertyValue::Bool(false),
+						);
+						ctx.request_redraw();
+						return EventResponse::Handled;
+					}
+				}
+				EventResponse::Ignored
+			}
+			fn handle_message(
+				&mut self,
+				ctx: &mut EventCtx,
+				name: &str,
+				_payload: &PropertyValue,
+			) -> bool {
+				if name == "deactivate" && self.active {
+					self.active = false;
+					ctx.request_redraw();
+					return true;
+				}
+				false
+			}
+		}
+
+		let mut tree = UiTree::new();
+		let root = tree.insert_root(TestWidget::new(200.0, 100.0));
+		let i1 = tree.insert_child(root, MockItem { active: true });
+		let i2 = tree.insert_child(root, MockItem { active: false });
+
+		tree.layout_all(Vec2::new(200.0, 100.0));
+		let i2_pos = tree.bounds(i2).center();
+
+		// Click i2
+		tree.dispatch_pointer_move(i2_pos);
+		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Pressed, i2_pos);
+		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Released, i2_pos);
+
+		// Now i1 should be inactive and i2 should be active!
+		let i1_widget = tree.widgets.get(i1).unwrap().as_ref().unwrap();
+		let i2_widget = tree.widgets.get(i2).unwrap().as_ref().unwrap();
+		let i1_item = i1_widget.as_any().downcast_ref::<MockItem>().unwrap();
+		let i2_item = i2_widget.as_any().downcast_ref::<MockItem>().unwrap();
+		assert!(!i1_item.active);
+		assert!(i2_item.active);
 	}
 }

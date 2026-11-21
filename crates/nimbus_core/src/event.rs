@@ -12,6 +12,24 @@
 
 use nimbus_math::Vec2;
 use crate::id::ObjectID;
+use crate::property::PropertyValue;
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum MessageTarget {
+	Siblings,
+	Parent,
+	Children,
+	Root,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Message {
+	pub sender: ObjectID,
+	pub target: MessageTarget,
+	pub name: String,
+	pub payload: PropertyValue,
+}
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -63,6 +81,7 @@ pub struct EventCtx<'a> {
 	pub(crate) node_id: ObjectID,
 	pub(crate) redraw_requested: &'a mut bool,
 	pub(crate) layout_requested: &'a mut bool,
+	pub(crate) messages: Vec<Message>,
 }
 
 impl<'a> EventCtx<'a> {
@@ -75,6 +94,7 @@ impl<'a> EventCtx<'a> {
 			node_id,
 			redraw_requested,
 			layout_requested,
+			messages: Vec::new(),
 		}
 	}
 
@@ -88,5 +108,19 @@ impl<'a> EventCtx<'a> {
 
 	pub fn request_layout(&mut self) {
 		*self.layout_requested = true;
+	}
+
+	pub fn dispatch_message(
+		&mut self,
+		target: MessageTarget,
+		name: impl Into<String>,
+		payload: PropertyValue,
+	) {
+		self.messages.push(Message {
+			sender: self.node_id,
+			target,
+			name: name.into(),
+			payload,
+		});
 	}
 }
