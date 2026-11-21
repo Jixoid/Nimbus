@@ -10,6 +10,7 @@
 */
 
 
+use std::cell::Cell;
 use nimbus_math::Rect;
 use nimbus_theme::Theme;
 use crate::ObjectID;
@@ -22,4 +23,18 @@ pub struct DrawCtx<'a> {
 	pub hovered: bool,
 	pub pressed: bool,
 	pub focused: bool,
+	pub(crate) redraw_requested: &'a Cell<bool>,
+	pub(crate) layout_requested: &'a Cell<bool>,
+}
+
+impl<'a> DrawCtx<'a> {
+	#[inline]
+	pub fn request_redraw(&self) {
+		self.redraw_requested.set(true);
+	}
+
+	#[inline]
+	pub fn request_layout(&self) {
+		self.layout_requested.set(true);
+	}
 }

@@ -125,6 +125,10 @@ impl<'a> LayoutCtx<'a> {
 			.set_child_position(self.node_id, child_id, local_pos);
 	}
 
+	pub fn set_clip_children(&mut self, clip: bool) {
+		self.tree.set_clip_children(self.node_id, clip);
+	}
+
 	pub fn measure_text(&self, text: &str, font_size: f32) -> (f32, f32) {
 		FontManager::default_font().measure_text(text, font_size)
 	}

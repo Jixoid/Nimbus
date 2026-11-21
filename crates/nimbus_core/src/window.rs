@@ -11,7 +11,7 @@
 
 
 use nimbus_theme::Theme;
-use winit::event::{ElementState, MouseButton as WinitMouseButton, WindowEvent};
+use winit::event::{ElementState, MouseButton as WinitMouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::WindowId;
 
@@ -231,6 +231,17 @@ impl Window {
 				}
 			}
 
+			WindowEvent::MouseWheel { delta, .. } => {
+				let scroll_delta = match delta {
+					MouseScrollDelta::LineDelta(x, y) => Vec2::new(*x * 32.0, *y * 32.0),
+					MouseScrollDelta::PixelDelta(p) => Vec2::new(p.x as f32, p.y as f32),
+				};
+
+				if self.tree.dispatch_pointer_scroll(self.last_cursor, scroll_delta) {
+					redraw_needed = true;
+				}
+			}
+
 			WindowEvent::KeyboardInput { event, .. } => {
 				use winit::keyboard::Key;
 				let key_name = match &event.logical_key {
@@ -269,7 +280,7 @@ impl Window {
 			_ => {}
 		}
 
-		if redraw_needed {
+		if redraw_needed || self.tree.needs_redraw || self.tree.needs_layout {
 			self.request_redraw();
 		}
 
@@ -306,11 +317,20 @@ impl Window {
 		let width = display.width();
 		let height = display.height();
 
+		// Layout pass if tree layout was invalidated
+		if self.tree.needs_layout {
+			self.tree.layout_all(Vec2::new(width as f32, height as f32));
+			self.tree.needs_layout = false;
+		}
+
 		// Build UI frame on canvas
 		canvas.clear_batches();
-		self.tree.draw(canvas, theme);
+		let (anim_active, anim_layout_needed) = self.tree.draw(canvas, theme);
+		if anim_layout_needed {
+			self.tree.needs_layout = true;
+		}
 
-		// Vulkan dynamic render pass
+		// Dynamic render pass
 		let cmd = &mut self.cmd_buffers[frame];
 		cmd.begin();
 
@@ -348,5 +368,11 @@ impl Window {
 
 		display.present_with_semaphore(image_index, &render_finished);
 		sync.end_frame();
+
+		// If any animation is actively running or layout/redraw was requested, queue next frame
+		if anim_active || self.tree.needs_redraw || self.tree.needs_layout {
+			self.tree.needs_redraw = false;
+			self.request_redraw();
+		}
 	}
 }

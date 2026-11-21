@@ -10,10 +10,17 @@
 */
 
 
-use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, PropertyCtx, PropertyValue, Widget};
-use nimbus_math::{Color, Vec2};
+use std::cell::Cell;
+
+use nimbus_core::{
+	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, PropertyCtx,
+	PropertyValue, Widget,
+};
+use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
 use nimbus_theme::MonetRole;
+
+use crate::scroll::ScrollState;
 
 
 // VBox
@@ -25,6 +32,9 @@ pub struct VBox {
 	pub border_width: f32,
 	pub border_color: Option<Color>,
 	pub shadow_blur: f32,
+	pub scrollable: bool,
+	pub scroll: ScrollState,
+	last_bounds: Cell<Rect<f32>>,
 }
 
 impl Default for VBox {
@@ -37,6 +47,9 @@ impl Default for VBox {
 			border_width: 0.0,
 			border_color: None,
 			shadow_blur: 0.0,
+			scrollable: false,
+			scroll: ScrollState::new(),
+			last_bounds: Cell::new(Rect::ZERO),
 		}
 	}
 }
@@ -55,22 +68,41 @@ impl Widget for VBox {
 			f32::INFINITY,
 		);
 
+		let mut child_sizes = Vec::with_capacity(children.len());
 		for (i, child) in children.iter().enumerate() {
 			if i > 0 {
 				current_y += self.spacing;
 			}
 
 			let size = ctx.layout_child(*child, child_constraints);
-			ctx.set_child_position(*child, Vec2::new(self.padding, current_y));
-
 			current_y += size.y;
 			max_width = max_width.max(size.x);
+			child_sizes.push(size);
 		}
 
 		current_y += self.padding;
 		let total_width = max_width + self.padding * 2.0;
+		let final_size = constraints.constrain(Vec2::new(total_width, current_y));
 
-		constraints.constrain(Vec2::new(total_width, current_y))
+		let scroll_offset = if self.scrollable {
+			ctx.set_clip_children(true);
+			self.scroll.update(current_y, final_size.y);
+			self.scroll.sync();
+			self.scroll.offset
+		} else {
+			0.0
+		};
+
+		let mut pos_y = self.padding - scroll_offset;
+		for (i, child) in children.iter().enumerate() {
+			if i > 0 {
+				pos_y += self.spacing;
+			}
+			ctx.set_child_position(*child, Vec2::new(self.padding, pos_y));
+			pos_y += child_sizes[i].y;
+		}
+
+		final_size
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
@@ -98,10 +130,33 @@ impl Widget for VBox {
 		}
 
 		canvas.draw(shape);
+
+		self.last_bounds.set(ctx.bounds);
+		if self.scrollable {
+			self.scroll.draw(canvas, ctx.bounds, true, ctx.theme);
+			if self.scroll.is_animating() {
+				ctx.request_layout();
+				ctx.request_redraw();
+			}
+		}
+	}
+
+	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
+		if self.scrollable {
+			self.scroll.handle_event(ctx, event, self.last_bounds.get(), true)
+		} else {
+			EventResponse::Ignored
+		}
 	}
 
 	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
 		match key {
+			"scrollable" => {
+				if let Some(b) = value.as_bool() {
+					self.scrollable = b;
+					return true;
+				}
+			}
 			"spacing" => {
 				if let Some(s) = value.as_f32() {
 					self.spacing = s;
@@ -167,6 +222,9 @@ pub struct HBox {
 	pub border_width: f32,
 	pub border_color: Option<Color>,
 	pub shadow_blur: f32,
+	pub scrollable: bool,
+	pub scroll: ScrollState,
+	last_bounds: Cell<Rect<f32>>,
 }
 
 impl Default for HBox {
@@ -179,6 +237,9 @@ impl Default for HBox {
 			border_width: 0.0,
 			border_color: None,
 			shadow_blur: 0.0,
+			scrollable: false,
+			scroll: ScrollState::new(),
+			last_bounds: Cell::new(Rect::ZERO),
 		}
 	}
 }
@@ -197,22 +258,41 @@ impl Widget for HBox {
 			(constraints.max_height - self.padding * 2.0).max(0.0),
 		);
 
+		let mut child_sizes = Vec::with_capacity(children.len());
 		for (i, child) in children.iter().enumerate() {
 			if i > 0 {
 				current_x += self.spacing;
 			}
 
 			let size = ctx.layout_child(*child, child_constraints);
-			ctx.set_child_position(*child, Vec2::new(current_x, self.padding));
-
 			current_x += size.x;
 			max_height = max_height.max(size.y);
+			child_sizes.push(size);
 		}
 
 		current_x += self.padding;
 		let total_height = max_height + self.padding * 2.0;
+		let final_size = constraints.constrain(Vec2::new(current_x, total_height));
 
-		constraints.constrain(Vec2::new(current_x, total_height))
+		let scroll_offset = if self.scrollable {
+			ctx.set_clip_children(true);
+			self.scroll.update(current_x, final_size.x);
+			self.scroll.sync();
+			self.scroll.offset
+		} else {
+			0.0
+		};
+
+		let mut pos_x = self.padding - scroll_offset;
+		for (i, child) in children.iter().enumerate() {
+			if i > 0 {
+				pos_x += self.spacing;
+			}
+			ctx.set_child_position(*child, Vec2::new(pos_x, self.padding));
+			pos_x += child_sizes[i].x;
+		}
+
+		final_size
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
@@ -240,10 +320,33 @@ impl Widget for HBox {
 		}
 
 		canvas.draw(shape);
+
+		self.last_bounds.set(ctx.bounds);
+		if self.scrollable {
+			self.scroll.draw(canvas, ctx.bounds, false, ctx.theme);
+			if self.scroll.is_animating() {
+				ctx.request_layout();
+				ctx.request_redraw();
+			}
+		}
+	}
+
+	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
+		if self.scrollable {
+			self.scroll.handle_event(ctx, event, self.last_bounds.get(), false)
+		} else {
+			EventResponse::Ignored
+		}
 	}
 
 	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
 		match key {
+			"scrollable" => {
+				if let Some(b) = value.as_bool() {
+					self.scrollable = b;
+					return true;
+				}
+			}
 			"spacing" => {
 				if let Some(s) = value.as_f32() {
 					self.spacing = s;

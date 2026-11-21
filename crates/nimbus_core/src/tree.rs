@@ -30,6 +30,8 @@ pub struct UiTree {
 	pub hovered_node: Option<ObjectID>,
 	pub pressed_node: Option<ObjectID>,
 	pub focused_node: Option<ObjectID>,
+	pub needs_layout: bool,
+	pub needs_redraw: bool,
 }
 
 impl UiTree {
@@ -41,6 +43,8 @@ impl UiTree {
 			hovered_node: None,
 			pressed_node: None,
 			focused_node: None,
+			needs_layout: true,
+			needs_redraw: true,
 		}
 	}
 
@@ -241,13 +245,23 @@ impl UiTree {
 
 	// Draw Pass
 
-	pub fn draw(&self, canvas: &mut Canvas2D, theme: &Theme) {
+	pub fn draw(&self, canvas: &mut Canvas2D, theme: &Theme) -> (bool, bool) {
+		let redraw_requested = std::cell::Cell::new(false);
+		let layout_requested = std::cell::Cell::new(false);
 		for &root_id in &self.roots {
-			self.draw_node(root_id, canvas, theme);
+			self.draw_node(root_id, canvas, theme, &redraw_requested, &layout_requested);
 		}
+		(redraw_requested.get(), layout_requested.get())
 	}
 
-	fn draw_node(&self, id: ObjectID, canvas: &mut Canvas2D, theme: &Theme) {
+	fn draw_node(
+		&self,
+		id: ObjectID,
+		canvas: &mut Canvas2D,
+		theme: &Theme,
+		redraw_requested: &std::cell::Cell<bool>,
+		layout_requested: &std::cell::Cell<bool>,
+	) {
 		let node = match self.nodes.get(id) {
 			Some(n) if n.visible => n,
 			_ => return,
@@ -261,6 +275,8 @@ impl UiTree {
 				hovered: node.hovered,
 				pressed: node.pressed,
 				focused: node.focused,
+				redraw_requested,
+				layout_requested,
 			};
 			widget.draw(&ctx, canvas);
 		}
@@ -270,7 +286,7 @@ impl UiTree {
 		}
 
 		for &child_id in &node.children {
-			self.draw_node(child_id, canvas, theme);
+			self.draw_node(child_id, canvas, theme, redraw_requested, layout_requested);
 		}
 
 		if node.clip_children {
@@ -293,6 +309,10 @@ impl UiTree {
 	fn hit_test_node(&self, id: ObjectID, pos: Vec2<f32>) -> Option<ObjectID> {
 		let node = self.nodes.get(id)?;
 		if !node.visible || !node.enabled {
+			return None;
+		}
+
+		if node.clip_children && !node.bounds.contains_point(pos) {
 			return None;
 		}
 
@@ -353,7 +373,25 @@ impl UiTree {
 			);
 		}
 
-		redraw_requested
+		if let Some(pressed) = self.pressed_node {
+			if Some(pressed) != self.hovered_node {
+				self.send_event(
+					pressed,
+					&InputEvent::PointerMoved { position: pos },
+					&mut redraw_requested,
+					&mut layout_requested,
+				);
+			}
+		}
+
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+
+		redraw_requested || layout_requested
 	}
 
 	pub fn dispatch_pointer_button(
@@ -430,7 +468,14 @@ impl UiTree {
 			}
 		}
 
-		redraw_requested
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+
+		redraw_requested || layout_requested
 	}
 
 	pub fn dispatch_key(&mut self, event: &InputEvent) -> bool {
@@ -446,7 +491,47 @@ impl UiTree {
 			);
 		}
 
-		redraw_requested
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+
+		redraw_requested || layout_requested
+	}
+
+	pub fn dispatch_pointer_scroll(&mut self, pos: Vec2<f32>, delta: Vec2<f32>) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+
+		let hit = self.hit_test(pos);
+		let mut curr = hit;
+
+		while let Some(target) = curr {
+			let resp = self.send_event(
+				target,
+				&InputEvent::PointerScroll { delta },
+				&mut redraw_requested,
+				&mut layout_requested,
+			);
+
+			if resp == EventResponse::Handled {
+				redraw_requested = true;
+				break;
+			}
+
+			curr = self.nodes.get(target).and_then(|n| n.parent);
+		}
+
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+
+		redraw_requested || layout_requested
 	}
 
 	fn send_event(
@@ -469,6 +554,12 @@ impl UiTree {
 
 		let resp = widget.handle_event(&mut ctx, event);
 		self.widgets.insert(id, Some(widget));
+		if *layout_requested {
+			self.needs_layout = true;
+		}
+		if *redraw_requested {
+			self.needs_redraw = true;
+		}
 		resp
 	}
 }

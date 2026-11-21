@@ -10,11 +10,12 @@
 */
 
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::time::Duration;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx,
-	MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
+	Animated, BoxConstraints, ButtonState, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
+	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -28,6 +29,7 @@ pub struct Choice {
 	pub font_size: f32,
 	pub on_changed: Option<MethodCallback>,
 
+	indicator: RefCell<Animated<Rect<f32>>>,
 	hovered_tab: Option<usize>,
 	last_bounds: Cell<Rect<f32>>,
 }
@@ -40,6 +42,7 @@ impl Default for Choice {
 			font: None,
 			font_size: 14.0,
 			on_changed: None,
+			indicator: RefCell::new(Animated::new(Rect::ZERO)),
 			hovered_tab: None,
 			last_bounds: Cell::new(Rect::ZERO),
 		}
@@ -47,6 +50,26 @@ impl Default for Choice {
 }
 
 impl Choice {
+	fn tab_rect(&self, bounds: Rect<f32>, index: usize) -> Option<Rect<f32>> {
+		let fface = FontManager::default_font();
+		let mut x_off = bounds.x() - 10.0;
+
+		for (i, tab) in self.tabs.iter().enumerate() {
+			x_off += 16.0;
+			let (tab_w, _) = fface.measure_text(tab, self.font_size);
+			if i == index {
+				return Some(Rect::new(
+					x_off - 6.0,
+					bounds.y(),
+					tab_w + 12.0,
+					bounds.height(),
+				));
+			}
+			x_off += tab_w;
+		}
+		None
+	}
+
 	fn tab_at_x(&self, bounds: Rect<f32>, x: f32) -> Option<usize> {
 		let fface = FontManager::default_font();
 		let mut x_off = bounds.x() - 10.0;
@@ -91,6 +114,29 @@ impl Widget for Choice {
 				.radius(track_radius),
 		);
 
+		// Animate indicator pill sliding/morphing
+		let cur_pill = self.indicator.borrow().value();
+		if self.indicator.borrow().is_animating() {
+			ctx.request_redraw();
+		}
+
+		if cur_pill != Rect::ZERO {
+			let pill_radius = bounds.height() * 0.5;
+			canvas.draw(
+				RectShape::new(cur_pill, monet[MonetRole::Primary])
+					.radius(pill_radius)
+					.noise(0.15),
+			);
+		} else if let Some(target_rect) = self.tab_rect(bounds, self.tab_id as usize) {
+			self.indicator.borrow_mut().snap_to(target_rect);
+			let pill_radius = bounds.height() * 0.5;
+			canvas.draw(
+				RectShape::new(target_rect, monet[MonetRole::Primary])
+					.radius(pill_radius)
+					.noise(0.15),
+			);
+		}
+
 		let fface = FontManager::default_font();
 		let font = match self.font {
 			Some(id) => Font::with_id(id, fface, self.font_size),
@@ -103,21 +149,6 @@ impl Widget for Choice {
 			x_off += 16.0;
 			let (tab_w, tab_h) = canvas.measure_text(tab, self.font_size);
 			let is_selected = self.tab_id == i as i32;
-
-			if is_selected {
-				let tab_rect = Rect::new(
-					x_off - 6.0,
-					bounds.y(),
-					tab_w + 12.0,
-					bounds.height(),
-				);
-				let tab_radius = bounds.height() * 0.5;
-				canvas.draw(
-					RectShape::new(tab_rect, monet[MonetRole::Primary])
-						.radius(tab_radius)
-						.noise(0.15),
-				);
-			}
 
 			let text_color = if is_selected {
 				monet[MonetRole::OnPrimary]
@@ -149,6 +180,18 @@ impl Widget for Choice {
 				if let Some(tab_idx) = self.tab_at_x(bounds, position.x) {
 					if self.tab_id != tab_idx as i32 {
 						self.tab_id = tab_idx as i32;
+						if let Some(target_rect) = self.tab_rect(bounds, tab_idx) {
+							let mut ind = self.indicator.borrow_mut();
+							if *ind.target() == Rect::ZERO {
+								ind.snap_to(target_rect);
+							} else {
+								ind.set_target(
+									target_rect,
+									Duration::from_millis(180),
+									Easing::Emphasized,
+								);
+							}
+						}
 						if let Some(cb) = &mut self.on_changed {
 							cb();
 						}
@@ -177,17 +220,29 @@ impl Widget for Choice {
 		match name {
 			"tabs" => {
 				if let Some(arr) = value.as_array() {
-					self.tabs = arr
-						.iter()
-						.filter_map(|v| v.as_str().map(|s| s.to_string()))
-						.collect();
+					let mut list = Vec::new();
+					for item in arr {
+						if let Some(s) = item.as_str() {
+							list.push(s.to_string());
+						}
+					}
+					self.tabs = list;
 					return true;
 				}
 			}
 
 			"tab_id" => {
 				if let Some(n) = value.as_f32() {
-					self.tab_id = n as i32;
+					let new_id = n as i32;
+					if self.tab_id != new_id {
+						self.tab_id = new_id;
+						let bounds = self.last_bounds.get();
+						if bounds != Rect::ZERO {
+							if let Some(target_rect) = self.tab_rect(bounds, new_id as usize) {
+								self.indicator.borrow_mut().snap_to(target_rect);
+							}
+						}
+					}
 					return true;
 				}
 			}

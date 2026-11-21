@@ -61,6 +61,7 @@ fn main() {
 			paddings: 16
 			color: "monet(SurfaceContainer)"
 			corner_radius: 16
+			scrollable: true
 
 			node qstd::text {
 				style: "tool_header"
@@ -146,6 +147,9 @@ fn main() {
 
 			node qstd::choice {
 				tabs: ["cho1", "cho2", "cho3"]
+			}
+			node qstd::tabs {
+				tabs: ["tab1", "tab2", "tab3"]
 			}
 		}
 

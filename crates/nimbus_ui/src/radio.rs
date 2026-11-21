@@ -11,8 +11,12 @@
 
 
 use std::any;
+use std::time::Duration;
 
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
+	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
 use nimbus_theme::MonetRole;
@@ -26,6 +30,7 @@ pub struct Radio {
 	pub font_size: f32,
 	pub color: Option<Color>,
 	pub on_changed: Option<MethodCallback>,
+	pub progress: Animated<f32>,
 }
 
 impl Default for Radio {
@@ -38,6 +43,7 @@ impl Default for Radio {
 			font_size: 15.0,
 			color: None,
 			on_changed: None,
+			progress: Animated::new(0.0),
 		}
 	}
 }
@@ -61,12 +67,18 @@ impl Widget for Radio {
 		let circle_y = ctx.bounds.y() + (ctx.bounds.height() - circle_size) * 0.5;
 		let outer_rect = Rect::new(circle_x, circle_y, circle_size, circle_size);
 
-		let border_color = if ctx.hovered {
+		let t = self.progress.value();
+		if self.progress.is_animating() {
+			ctx.request_redraw();
+		}
+
+		let inactive_border = if ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-
+		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t);
+		
 		// Outer circle
 		canvas.draw(
 			RectShape::new(outer_rect, Color::TRANSPARENT)
@@ -74,9 +86,9 @@ impl Widget for Radio {
 				.border(border_color, 2.0),
 		);
 
-		// Inner circle if checked
-		if self.checked {
-			let inner_size = 10.0f32;
+		// Inner circle animated scale
+		if t > 0.01 {
+			let inner_size = 10.0f32 * t;
 			let inner_rect = Rect::new(
 				circle_x + (circle_size - inner_size) * 0.5,
 				circle_y + (circle_size - inner_size) * 0.5,
@@ -119,6 +131,11 @@ impl Widget for Radio {
 		if let InputEvent::Click { .. } = event {
 			if !self.checked {
 				self.checked = true;
+				self.progress.set_target(
+					1.0,
+					Duration::from_millis(150),
+					Easing::Emphasized,
+				);
 				if let Some(cb) = &mut self.on_changed {
 					cb();
 				}
@@ -134,6 +151,7 @@ impl Widget for Radio {
 			"checked" => {
 				if let Some(b) = value.as_bool() {
 					self.checked = b;
+					self.progress.snap_to(if b { 1.0 } else { 0.0 });
 					return true;
 				}
 			}

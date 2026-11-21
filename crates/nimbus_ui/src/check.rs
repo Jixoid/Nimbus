@@ -11,8 +11,12 @@
 
 
 use std::any;
+use std::time::Duration;
 
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
+	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
 use nimbus_theme::MonetRole;
@@ -25,6 +29,7 @@ pub struct Check {
 	pub font_size: f32,
 	pub color: Option<Color>,
 	pub on_changed: Option<MethodCallback>,
+	pub progress: Animated<f32>,
 }
 
 impl Default for Check {
@@ -36,6 +41,7 @@ impl Default for Check {
 			font_size: 15.0,
 			color: None,
 			on_changed: None,
+			progress: Animated::new(0.0),
 		}
 	}
 }
@@ -59,24 +65,36 @@ impl Widget for Check {
 		let box_y = ctx.bounds.y() + (ctx.bounds.height() - box_size) * 0.5;
 		let box_rect = Rect::new(box_x, box_y, box_size, box_size);
 
-		let border_color = if ctx.hovered {
+		let t = self.progress.value();
+		if self.progress.is_animating() {
+			ctx.request_redraw();
+		}
+
+		let inactive_border = if ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-
+		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t);
+		
 		canvas.draw(
 			RectShape::new(box_rect, Color::TRANSPARENT)
 				.radius(8.0)
 				.border(border_color, 2.0),
 		);
 
-		if self.checked {
-			let inner_rect = Rect::new(box_x + 6.0, box_y + 6.0, 10.0, 10.0);
+		if t > 0.01 {
+			let inner_size = 10.0f32 * t;
+			let inner_rect = Rect::new(
+				box_x + (box_size - inner_size) * 0.5,
+				box_y + (box_size - inner_size) * 0.5,
+				inner_size,
+				inner_size,
+			);
 			canvas.draw(
 				RectShape::new(inner_rect, monet[MonetRole::Primary])
-				.radius(3.0)
-				.noise(0.15),
+					.radius(3.0 * t)
+					.noise(0.15),
 			);
 		}
 
@@ -107,6 +125,12 @@ impl Widget for Check {
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		if let InputEvent::Click { .. } = event {
 			self.checked = !self.checked;
+			let target = if self.checked { 1.0 } else { 0.0 };
+			self.progress.set_target(
+				target,
+				Duration::from_millis(150),
+				Easing::Emphasized,
+			);
 			if let Some(cb) = &mut self.on_changed {
 				cb();
 			}
@@ -121,6 +145,7 @@ impl Widget for Check {
 			"checked" => {
 				if let Some(b) = value.as_bool() {
 					self.checked = b;
+					self.progress.snap_to(if b { 1.0 } else { 0.0 });
 					return true;
 				}
 			}

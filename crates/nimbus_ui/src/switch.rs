@@ -11,8 +11,12 @@
 
 
 use std::any;
+use std::time::Duration;
 
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
+	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
 use nimbus_theme::MonetRole;
@@ -25,6 +29,7 @@ pub struct Switch {
 	pub font_size: f32,
 	pub color: Option<Color>,
 	pub on_changed: Option<MethodCallback>,
+	pub progress: Animated<f32>,
 }
 
 impl Default for Switch {
@@ -36,6 +41,7 @@ impl Default for Switch {
 			font_size: 15.0,
 			color: None,
 			on_changed: None,
+			progress: Animated::new(0.0),
 		}
 	}
 }
@@ -72,39 +78,48 @@ impl Widget for Switch {
 		let track_y = ctx.bounds.y() + (ctx.bounds.height() - switch_h) * 0.5;
 		let track_rect = Rect::new(track_x, track_y, switch_w, switch_h);
 
-		if self.checked {
-			canvas.draw(
-				RectShape::new(track_rect, monet[MonetRole::Primary])
-					.radius(13.0)
-					.noise(0.15),
-			);
-
-			let thumb_x = track_x + switch_w - 18.0 - 4.0;
-			let thumb_y = track_y + (switch_h - 18.0) * 0.5;
-			canvas.draw(
-				RectShape::new(Rect::new(thumb_x, thumb_y, 18.0, 18.0), monet[MonetRole::SurfaceContainerLow])
-					.radius(9.0),
-			);
-		} else {
-			let border_color = if ctx.hovered {
-				monet[MonetRole::Primary]
-			} else {
-				monet[MonetRole::PrimaryOutline]
-			};
-			canvas.draw(
-				RectShape::new(track_rect, Color::TRANSPARENT)
-					.radius(13.0)
-					.border(border_color, 2.0),
-			);
-
-			let thumb_x = track_x + 6.0;
-			let thumb_y = track_y + (switch_h - 14.0) * 0.5;
-			canvas.draw(
-				RectShape::new(Rect::new(thumb_x, thumb_y, 14.0, 14.0), monet[MonetRole::Primary])
-					.radius(7.0)
-					.noise(0.15),
-			);
+		let t = self.progress.value();
+		if self.progress.is_animating() {
+			ctx.request_redraw();
 		}
+
+		let active_bg = monet[MonetRole::Primary];
+		let inactive_bg = Color::TRANSPARENT;
+		let track_bg = inactive_bg.interpolate(&active_bg, t);
+
+		let border_color = if ctx.hovered {
+			monet[MonetRole::Primary]
+		} else {
+			monet[MonetRole::PrimaryOutline]
+		};
+		let border_w = (1.0 - t) * 2.0;
+
+		let mut track_shape = RectShape::new(track_rect, track_bg).radius(13.0);
+		if border_w > 0.05 {
+			track_shape = track_shape.border(border_color, border_w);
+		}
+		if t > 0.02 {
+			track_shape = track_shape.noise(0.15 * t);
+		}
+		canvas.draw(track_shape);
+
+		let inactive_thumb_x = track_x + 6.0;
+		let active_thumb_x = track_x + switch_w - 18.0 - 4.0;
+		let thumb_x = inactive_thumb_x.interpolate(&active_thumb_x, t);
+
+		let thumb_size = 14.0f32.interpolate(&18.0f32, t);
+		let thumb_y = track_y + (switch_h - thumb_size) * 0.5;
+		let thumb_radius = thumb_size * 0.5;
+
+		let thumb_inactive_color = monet[MonetRole::Primary];
+		let thumb_active_color = monet[MonetRole::SurfaceContainerLow];
+		let thumb_color = thumb_inactive_color.interpolate(&thumb_active_color, t);
+
+		canvas.draw(
+			RectShape::new(Rect::new(thumb_x, thumb_y, thumb_size, thumb_size), thumb_color)
+				.radius(thumb_radius)
+				.noise(0.15 * (1.0 - t)),
+		);
 
 		if !self.label.is_empty() {
 			let (_, text_h) = canvas.measure_text(&self.label, self.font_size);
@@ -133,6 +148,12 @@ impl Widget for Switch {
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		if let InputEvent::Click { .. } = event {
 			self.checked = !self.checked;
+			let target = if self.checked { 1.0 } else { 0.0 };
+			self.progress.set_target(
+				target,
+				Duration::from_millis(160),
+				Easing::Emphasized,
+			);
 			if let Some(cb) = &mut self.on_changed {
 				cb();
 			}
@@ -147,6 +168,7 @@ impl Widget for Switch {
 			"checked" => {
 				if let Some(b) = value.as_bool() {
 					self.checked = b;
+					self.progress.snap_to(if b { 1.0 } else { 0.0 });
 					return true;
 				}
 			}

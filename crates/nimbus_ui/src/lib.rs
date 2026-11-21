@@ -22,6 +22,7 @@ pub mod multi_progress;
 pub mod progress;
 pub mod radio;
 pub mod slider;
+pub mod scroll;
 pub mod text;
 pub mod switch;
 pub mod tabs;
@@ -37,6 +38,7 @@ pub use interval::Interval;
 pub use multi_progress::{MultiProgressBar, ProgressSegment};
 pub use progress::ProgressBar;
 pub use radio::Radio;
+pub use scroll::{ScrollState, ScrollView};
 pub use slider::Slider;
 pub use text::Text;
 pub use switch::Switch;
@@ -63,4 +65,5 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::multiprogress", || Box::new(MultiProgressBar::default()));
 	registry.register("qstd::tabs", || Box::new(Tabs::default()));
 	registry.register("qstd::choice", || Box::new(Choice::default()));
+	registry.register("qstd::scroll", || Box::new(ScrollView::default()));
 }

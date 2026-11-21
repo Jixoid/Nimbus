@@ -10,6 +10,7 @@
 */
 
 
+pub mod anim;
 pub mod app;
 pub mod draw;
 pub mod event;
@@ -23,6 +24,7 @@ pub mod tree;
 pub mod widget;
 pub mod window;
 
+pub use anim::{Animated, Easing, Interpolate, Spring};
 pub use app::Application;
 pub use draw::DrawCtx;
 pub use event::{ButtonState, EventCtx, EventResponse, InputEvent, MouseButton};

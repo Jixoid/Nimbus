@@ -234,7 +234,7 @@ impl SubMonetSurface {
     if is_dark {
       Self {
         main: Color::from_oklch(0.06, c_neutral, hue),
-        on_main: Color::from_oklch(0.90, c_neutral, hue),
+        on_main: Color::from_oklch(0.90, c_neutral * 0.5, hue),
         variant: Color::from_oklch(0.30, c_variant, hue),
         on_variant: Color::from_oklch(0.80, c_variant, hue),
         dim: Color::from_oklch(0.06, c_neutral, hue),

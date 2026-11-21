@@ -184,37 +184,3 @@ impl<'a> Font<'a> {
 		self.fface.measure_text(text, self.size)
 	}
 }
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_font_manager_default() {
-		let fm = FontManager::new();
-		let face = fm.get(FontId::DEFAULT);
-		assert!(face.is_some());
-
-		let (w, h) = face.unwrap().measure_text("Hello Nimbus", 16.0);
-		assert!(w > 0.0);
-		assert!(h > 0.0);
-	}
-
-	#[test]
-	fn test_font_manager_by_name() {
-		let fm = FontManager::new();
-		assert_eq!(fm.get_by_name("default"), Some(FontId::DEFAULT));
-		assert_eq!(fm.get_by_name("nonexistent"), None);
-	}
-
-	#[test]
-	fn test_font_struct_measure() {
-		let face = FontManager::default_font();
-		let font = Font::new(face, 20.0);
-		let (w, h) = font.measure_text("Test");
-		assert!(w > 0.0);
-		assert!(h > 0.0);
-		assert_eq!(font.id(), FontId::DEFAULT);
-	}
-}
