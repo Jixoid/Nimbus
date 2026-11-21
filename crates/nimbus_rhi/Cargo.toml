@@ -1,0 +1,10 @@
+[package]
+name = "nimbus_rhi"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+bitflags = "2.13.2"
+raw-window-handle = "0.6"
+nimbus_math = { path = "../nimbus_math" }

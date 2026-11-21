@@ -1,0 +1,9 @@
+[package]
+name = "nimbus_theme"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mundy = "0.2.3"
+nimbus_math = { path = "../nimbus_math" }

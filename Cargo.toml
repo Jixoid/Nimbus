@@ -1,0 +1,24 @@
+[package]
+name = "nimbus"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[workspace.package]
+license = "GPL-3.0-only"
+
+[workspace]
+members = [
+  "crates/*"
+]
+
+[dependencies]
+nimbus_core = { path = "crates/nimbus_core" }
+nimbus_ui = { path = "crates/nimbus_ui" }
+nimbus_except = { path = "crates/nimbus_except" }
+nimbus_math = { path = "crates/nimbus_math" }
+nimbus_platform = { path = "crates/nimbus_platform" }
+nimbus_render2d = { path = "crates/nimbus_render2d" }
+nimbus_rhi_ash = { path = "crates/nimbus_rhi_ash" }
+nimbus_qdl = { path = "crates/nimbus_qdl" }
+nimbus_theme = { path = "crates/nimbus_theme" }

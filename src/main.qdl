@@ -1,0 +1,135 @@
+styles {
+  tool_header {
+    font_size: 16
+  }
+}
+
+root qstd::hbox {
+  spacing: 10
+  paddings: 16
+  color: "monet(SurfaceContainerLow)"
+
+  node qstd::vbox {
+    spacing: 10
+    paddings: 16
+    color: "monet(SurfaceContainer)"
+    corner_radius: 16
+    scrollable: true
+
+    node qstd::text {
+      style: "tool_header"
+      text: "Nimbus Application"
+      color: "monet(PrimaryFixed)"
+      font_size: 25
+    }
+
+    node qstd::radio {
+      text: "Radio 1"
+      checked: false
+    }
+    node qstd::radio {
+      text: "Radio 2"
+      checked: true
+    }
+      
+    node qstd::check {
+      text: "Check 1"
+      checked: false
+    }
+    node qstd::check {
+      text: "Check 2"
+      checked: true
+    }
+    
+    node qstd::switch {
+      text: "Switch 1"
+      checked: false
+    }
+    node qstd::switch {
+      text: "Switch 2"
+      checked: true
+    }
+    
+    node qstd::button {
+      text: "filled"
+      variant: "filled"
+    }
+    node qstd::button {
+      text: "tonal"
+      variant: "tonal"
+    }
+    node qstd::button {
+      text: "elevated"
+      variant: "elevated"
+    }
+    node qstd::button {
+      text: "outlined"
+      variant: "outlined"
+    }
+  }
+
+  node qstd::vbox {
+    spacing: 10
+    paddings: 16
+    color: "monet(SurfaceContainer)"
+    corner_radius: 16
+    scrollable: true
+
+    node qstd::edit {
+      text: "Edit 1"
+      title: "edit 1"
+    }
+    node qstd::edit {
+      text: "Edit 2"
+    }
+
+    node qstd::slider {
+      value: 45
+      min: 0
+      max: 100
+    }
+    node qstd::interval {
+      pos1: 25
+      pos2: 75
+      min: 0
+      max: 100
+    }
+
+    node qstd::progressbar {
+      value: 30
+      max: 100
+    }
+    node qstd::multiprogressbar {
+      values: [40, 30, 20]
+    }
+
+    node qstd::choice {
+      tabs: ["cho1", "cho2", "cho3"]
+    }
+    node qstd::tabs {
+      tabs: ["tab1", "tab2", "tab3"]
+    }
+
+    node qstd::popup {
+      items: [
+        "option 1",
+        "-",
+        {
+          text: "others",
+          items: [
+            "other 1"
+            "other 2"
+            "other 3"
+            "other 4"
+          ],
+        },
+        
+      ]
+    }
+
+    node qstd::tooltip {
+      text: "a tooltip window"
+      open: true
+    }
+  }
+}

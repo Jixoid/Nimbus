@@ -1,0 +1,8 @@
+[package]
+name = "nimbus_except"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+owo-colors = "4.4.0"
