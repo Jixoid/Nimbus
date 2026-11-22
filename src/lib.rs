@@ -17,3 +17,5 @@ pub use nimbus_math as math;
 pub use nimbus_platform as platform;
 pub use nimbus_render2d as render2d;
 pub use nimbus_rhi_ash as rhi_ash;
+pub use nimbus_qdl as qdl;
+pub use nimbus_theme as theme;
