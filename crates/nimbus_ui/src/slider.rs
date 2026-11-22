@@ -143,7 +143,7 @@ impl Widget for Slider {
 					self.is_dragging = true;
 					self.value = self.calculate_value_from_pos(position.x);
 					if let Some(cb) = &mut self.on_changed {
-						cb();
+						cb.call1(self.value);
 					}
 					ctx.request_redraw();
 					EventResponse::Handled
@@ -162,7 +162,7 @@ impl Widget for Slider {
 				if self.is_dragging {
 					self.value = self.calculate_value_from_pos(position.x);
 					if let Some(cb) = &mut self.on_changed {
-						cb();
+						cb.call1(self.value);
 					}
 					ctx.request_redraw();
 					EventResponse::Handled
@@ -173,7 +173,7 @@ impl Widget for Slider {
 			InputEvent::Click { position } => {
 				self.value = self.calculate_value_from_pos(position.x);
 				if let Some(cb) = &mut self.on_changed {
-					cb();
+					cb.call1(self.value);
 				}
 				ctx.request_redraw();
 				EventResponse::Handled

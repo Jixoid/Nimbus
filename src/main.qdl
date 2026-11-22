@@ -95,14 +95,6 @@ root qstd::hbox {
       max: 100
     }
 
-    node qstd::progressbar {
-      value: 30
-      max: 100
-    }
-    node qstd::multiprogressbar {
-      values: [40, 30, 20]
-    }
-
     node qstd::choice {
       tabs: ["cho1", "cho2", "cho3"]
     }
@@ -130,6 +122,37 @@ root qstd::hbox {
     node qstd::tooltip {
       text: "a tooltip window"
       open: true
+    }
+  }
+
+  node qstd::vbox {
+    spacing: 10
+    paddings: 16
+    color: "monet(SurfaceContainer)"
+    corner_radius: 16
+    scrollable: true
+
+    node qstd::progressbar {
+      value: 30
+      max: 100
+    }
+    node qstd::multiprogressbar {
+      values: [40, 30, 20]
+    }
+
+    node qstd::collapsible {
+      title: "Collapsible Section"
+      expanded: false
+      color: "monet(SurfaceContainerHigh)"
+      header_color: "monet(SurfaceContainerHighest)"
+
+      node qstd::text {
+        text: "Hidden details inside collapsible"
+      }
+      node qstd::button {
+        text: "Inside Action"
+        variant: "tonal"
+      }
     }
   }
 }

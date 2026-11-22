@@ -176,7 +176,7 @@ impl Widget for Interval {
 					}
 
 					if let Some(cb) = &mut self.on_changed {
-						cb();
+						cb.call2(self.pos1, self.pos2);
 					}
 					ctx.request_redraw();
 					EventResponse::Handled
@@ -200,7 +200,7 @@ impl Widget for Interval {
 						self.pos2 = val.max(self.pos1);
 					}
 					if let Some(cb) = &mut self.on_changed {
-						cb();
+						cb.call2(self.pos1, self.pos2);
 					}
 					ctx.request_redraw();
 					EventResponse::Handled
@@ -220,7 +220,7 @@ impl Widget for Interval {
 				}
 
 				if let Some(cb) = &mut self.on_changed {
-					cb();
+					cb.call2(self.pos1, self.pos2);
 				}
 				ctx.request_redraw();
 				EventResponse::Handled

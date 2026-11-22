@@ -14,6 +14,7 @@ pub mod button;
 pub mod card;
 pub mod check;
 pub mod choice;
+pub mod collapsible;
 pub mod edit;
 pub mod flex;
 pub mod flow;
@@ -35,6 +36,7 @@ pub use button::{Button, ButtonVariant};
 pub use card::Card;
 pub use check::Check;
 pub use choice::Choice;
+pub use collapsible::Collapsible;
 pub use edit::Edit;
 pub use flex::{HBox, VBox};
 pub use flow::Flow;
@@ -75,6 +77,7 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::scroll", || Box::new(ScrollView::default()));
 	registry.register("qstd::spacer", || Box::new(Spacer::default()));
 	registry.register("qstd::stack", || Box::new(Stack::default()));
+	registry.register("qstd::collapsible", || Box::new(Collapsible::default()));
 	registry.register("qstd::popup", || Box::new(Popup::default()));
 	registry.register("qstd::tooltip", || Box::new(Tooltip::default()));
 }

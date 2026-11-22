@@ -13,6 +13,7 @@
 use nimbus_math::Vec2;
 use crate::id::ObjectID;
 use crate::property::PropertyValue;
+use crate::task::{IntoTask, TaskQueue};
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -82,6 +83,7 @@ pub struct EventCtx<'a> {
 	pub(crate) redraw_requested: &'a mut bool,
 	pub(crate) layout_requested: &'a mut bool,
 	pub(crate) messages: Vec<Message>,
+	pub(crate) task_queue: TaskQueue,
 }
 
 impl<'a> EventCtx<'a> {
@@ -95,6 +97,7 @@ impl<'a> EventCtx<'a> {
 			redraw_requested,
 			layout_requested,
 			messages: Vec::new(),
+			task_queue: TaskQueue::new(),
 		}
 	}
 
@@ -108,6 +111,14 @@ impl<'a> EventCtx<'a> {
 
 	pub fn request_layout(&mut self) {
 		*self.layout_requested = true;
+	}
+
+	pub fn task_queue(&self) -> TaskQueue {
+		self.task_queue.clone()
+	}
+
+	pub fn push_task<M, F: IntoTask<M>>(&self, task: F) {
+		self.task_queue.push(task);
 	}
 
 	pub fn dispatch_message(

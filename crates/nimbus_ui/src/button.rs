@@ -33,7 +33,7 @@ pub struct Button {
 	pub font: Option<FontId>,
 	pub font_size: f32,
 	pub padding: Vec2<f32>,
-	pub on_click: Option<Box<dyn FnMut()>>,
+	pub on_click: Option<MethodCallback>,
 }
 
 impl Default for Button {
@@ -181,7 +181,7 @@ impl Widget for Button {
 		if let InputEvent::Click { .. } = event
 			&& let Some(cb) = &mut self.on_click
 		{
-			cb();
+			cb.call1(self.label.clone());
 			ctx.request_redraw();
 			return EventResponse::Handled;
 		}

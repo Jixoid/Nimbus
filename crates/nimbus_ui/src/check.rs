@@ -133,7 +133,7 @@ impl Widget for Check {
 			};
 			self.progress.set_target(target, dur, easing);
 			if let Some(cb) = &mut self.on_changed {
-				cb();
+				cb.call1(self.checked);
 			}
 			ctx.request_redraw();
 			return EventResponse::Handled;

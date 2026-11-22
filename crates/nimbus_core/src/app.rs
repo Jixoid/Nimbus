@@ -23,12 +23,14 @@ use nimbus_rhi::manager::allocator::Allocator;
 use nimbus_rhi_ash::{AshVulkanBackend, CommandManager, Device};
 
 use crate::id::WindowHandle;
+use crate::task::{IntoTask, Task, TaskQueue};
 use crate::window::Window;
 
 
 pub struct Application {
 	pub theme: Theme,
 	pub windows: SlotMap<WindowHandle, Window>,
+	pub task_queue: TaskQueue,
 }
 
 impl Application {
@@ -36,7 +38,20 @@ impl Application {
 		Self {
 			theme,
 			windows: SlotMap::with_key(),
+			task_queue: TaskQueue::new(),
 		}
+	}
+
+	pub fn task_queue(&self) -> TaskQueue {
+		self.task_queue.clone()
+	}
+
+	pub fn push_task<M, F: IntoTask<M>>(&self, task: F) {
+		self.task_queue.push(task);
+	}
+
+	pub fn window_task_queue(&self, handle: WindowHandle) -> Option<TaskQueue> {
+		self.windows.get(handle).map(|w| w.task_queue())
 	}
 
 
@@ -74,6 +89,7 @@ impl Application {
 		let mut runner = AppRunner {
 			theme: self.theme,
 			windows: self.windows,
+			task_queue: self.task_queue,
 			winit_map: HashMap::new(),
 			device: None,
 			allocator: None,
@@ -92,6 +108,7 @@ impl Application {
 struct AppRunner {
 	theme: Theme,
 	windows: SlotMap<WindowHandle, Window>,
+	task_queue: TaskQueue,
 	winit_map: HashMap<WindowId, WindowHandle>,
 	device: Option<Device>,
 	allocator: Option<Allocator<AshVulkanBackend>>,
@@ -176,6 +193,60 @@ impl ApplicationHandler for AppRunner {
 			self.winit_map.remove(&window_id);
 			self.windows.remove(handle);
 
+			if self.windows.is_empty() {
+				nimbus_disp!("All windows closed. Exiting Nimbus Application.");
+				event_loop.exit();
+			}
+		}
+	}
+
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		for _ in 0..64 {
+			let tasks = self.task_queue.drain_all();
+			if tasks.is_empty() {
+				break;
+			}
+			for task in tasks {
+				match task {
+					Task::Plain(f) => f(),
+					Task::Tree(f) => {
+						if let Some(window) = self.windows.values_mut().next() {
+							f(&mut window.tree);
+							window.tree.needs_redraw = true;
+						}
+					}
+					Task::Window(f) => {
+						if let Some(window) = self.windows.values_mut().next() {
+							f(window);
+							window.tree.needs_redraw = true;
+						}
+					}
+				}
+			}
+		}
+
+		let mut closed_windows = Vec::new();
+		for (handle, window) in self.windows.iter_mut() {
+			if !window.tree.task_queue.is_empty() {
+				window.process_tasks();
+			}
+			if window.should_close {
+				closed_windows.push((handle, window.winit_id));
+			} else if window.tree.needs_redraw || window.tree.needs_layout {
+				window.request_redraw();
+			}
+		}
+
+		if !closed_windows.is_empty() {
+			if let Some(device) = &self.device {
+				device.wait_idle();
+			}
+			for (handle, winit_id) in closed_windows {
+				if let Some(wid) = winit_id {
+					self.winit_map.remove(&wid);
+				}
+				self.windows.remove(handle);
+			}
 			if self.windows.is_empty() {
 				nimbus_disp!("All windows closed. Exiting Nimbus Application.");
 				event_loop.exit();

@@ -652,9 +652,10 @@ impl Widget for Popup {
 								self.navigate_to(idx, ctx);
 								return EventResponse::Handled;
 							} else {
+								let item_text = item.text.clone();
 								self.selected_index = Some(idx);
 								if let Some(cb) = &mut self.on_selected {
-									cb();
+									cb.call2(idx, item_text);
 								}
 								ctx.request_redraw();
 								return EventResponse::Handled;

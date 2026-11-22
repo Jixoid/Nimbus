@@ -20,6 +20,7 @@ pub mod method;
 pub mod node;
 pub mod property;
 pub mod registry;
+pub mod task;
 pub mod tree;
 pub mod widget;
 pub mod window;
@@ -32,11 +33,14 @@ pub use event::{
 };
 pub use id::{ObjectID, WindowHandle};
 pub use layout::{BoxConstraints, LayoutCtx};
-pub use method::{ActionCallback, EventRegistry, MethodCallback, MethodTable};
+pub use method::{
+	ActionCallback, FromMethodArg, IntoMethod, MethodCallback, MethodTable,
+};
 pub use node::{Anchor, NodeData};
 pub use property::{parse_color, PropertyCtx, PropertyError, PropertyValue};
 pub use registry::{create_widget, register_global_widget, WidgetFactory, WidgetRegistry};
 pub use nimbus_render2d::Canvas2D;
+pub use task::{IntoTask, Task, TaskQueue, TaskSender};
 pub use tree::UiTree;
 pub use widget::{AsAny, Widget};
 pub use window::Window;

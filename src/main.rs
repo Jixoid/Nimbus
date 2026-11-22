@@ -10,7 +10,7 @@
 */
 
 
-use nimbus_core::{Application, EventRegistry, WidgetRegistry, Window};
+use nimbus_core::{Application, MethodTable, WidgetRegistry, Window};
 use nimbus_math::Color;
 use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens, Theme};
 use nimbus_except::*;
@@ -44,7 +44,7 @@ fn main() {
 	let main_handle = app.create_window(Window::new("Nimbus Application", 860, 560));
 	let main_window = app.window_mut(main_handle).unwrap();
 
-	let mut events = EventRegistry::new();
+	let mut events = MethodTable::new();
 	events.register("ToolAction", || {
 		nimbus_disp!("QDL Event Callback!");
 	});

@@ -371,7 +371,7 @@ impl Widget for Edit {
 							self.cursor_pos = prev;
 						}
 						if let Some(cb) = &mut self.on_changed {
-							cb();
+							cb.call1(self.text.clone());
 						}
 						ctx.request_redraw();
 						EventResponse::Handled
@@ -382,14 +382,14 @@ impl Widget for Edit {
 							self.text.drain(self.cursor_pos..next);
 						}
 						if let Some(cb) = &mut self.on_changed {
-							cb();
+							cb.call1(self.text.clone());
 						}
 						ctx.request_redraw();
 						EventResponse::Handled
 					}
 					"Enter" => {
 						if let Some(cb) = &mut self.on_submit {
-							cb();
+							cb.call1(self.text.clone());
 						}
 						EventResponse::Handled
 					}
@@ -402,7 +402,7 @@ impl Widget for Edit {
 								self.text.insert_str(self.cursor_pos, &filtered);
 								self.cursor_pos += filtered.len();
 								if let Some(cb) = &mut self.on_changed {
-									cb();
+									cb.call1(self.text.clone());
 								}
 								ctx.request_redraw();
 								return EventResponse::Handled;

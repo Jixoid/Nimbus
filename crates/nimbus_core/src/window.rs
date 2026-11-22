@@ -24,6 +24,7 @@ use nimbus_rhi_ash::{AshVulkanBackend, Command, CommandManager, Device, Synchron
 
 use crate::event::{ButtonState, InputEvent, MouseButton};
 use crate::id::WindowHandle;
+use crate::task::{IntoTask, Task, TaskQueue};
 use crate::tree::UiTree;
 
 
@@ -84,6 +85,43 @@ impl Window {
 
 	pub fn tree_mut(&mut self) -> &mut UiTree {
 		&mut self.tree
+	}
+
+	pub fn task_queue(&self) -> TaskQueue {
+		self.tree.task_queue()
+	}
+
+	pub fn push_task<M, F: IntoTask<M>>(&self, task: F) {
+		self.tree.push_task(task);
+	}
+
+	pub fn process_tasks(&mut self) -> bool {
+		let mut executed = false;
+		for _ in 0..64 {
+			let tasks = self.tree.task_queue.drain_all();
+			if tasks.is_empty() {
+				break;
+			}
+			for task in tasks {
+				match task {
+					Task::Plain(f) => {
+						f();
+						executed = true;
+					}
+					Task::Tree(f) => {
+						f(&mut self.tree);
+						self.tree.needs_redraw = true;
+						executed = true;
+					}
+					Task::Window(f) => {
+						f(self);
+						self.tree.needs_redraw = true;
+						executed = true;
+					}
+				}
+			}
+		}
+		executed
 	}
 
 
@@ -280,6 +318,10 @@ impl Window {
 			_ => {}
 		}
 
+		if self.process_tasks() {
+			redraw_needed = true;
+		}
+
 		if redraw_needed || self.tree.needs_redraw || self.tree.needs_layout {
 			self.request_redraw();
 		}
@@ -294,6 +336,8 @@ impl Window {
 		cmd_manager: &CommandManager,
 		theme: &Theme,
 	) {
+		self.process_tasks();
+
 		let (display, canvas, sync) =
 			match (&mut self.display, &mut self.canvas, &mut self.synchronizer) {
 				(Some(d), Some(c), Some(s)) => (d, c, s),

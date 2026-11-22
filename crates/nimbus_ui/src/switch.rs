@@ -154,7 +154,7 @@ impl Widget for Switch {
 				Spring::INTERACTIVE,
 			);
 			if let Some(cb) = &mut self.on_changed {
-				cb();
+				cb.call1(self.checked);
 			}
 			ctx.request_redraw();
 			return EventResponse::Handled;

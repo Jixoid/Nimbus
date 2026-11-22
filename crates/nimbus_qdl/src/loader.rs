@@ -23,6 +23,13 @@ use crate::ast::{QdlDocument, QdlNode};
 use crate::parser::parse;
 
 
+#[derive(Default)]
+struct NodeAttributes {
+	anchor: Option<Anchor>,
+	visible: Option<bool>,
+	enabled: Option<bool>,
+}
+
 pub struct QdlScene {
 	pub root_id: ObjectID,
 	pub named_nodes: HashMap<String, ObjectID>,
@@ -69,11 +76,9 @@ pub fn load_into_tree_with_registry(
 		.ok_or_else(|| "No root node found in QDL document".to_string())?;
 
 	let mut named_nodes = HashMap::new();
-	let (root_widget, root_anchor) = instantiate_node(root_node, &doc, theme, methods, registry)?;
+	let (root_widget, root_attrs) = instantiate_node(root_node, &doc, theme, methods, registry)?;
 	let root_id = tree.insert_root_boxed(root_widget);
-	if root_anchor.is_some() {
-		tree.set_anchor(root_id, root_anchor);
-	}
+	apply_node_attributes(tree, root_id, root_attrs);
 
 	if let Some(name) = &root_node.name {
 		named_nodes.insert(name.clone(), root_id);
@@ -98,6 +103,18 @@ pub fn load_into_tree_with_registry(
 	})
 }
 
+fn apply_node_attributes(tree: &mut UiTree, id: ObjectID, attrs: NodeAttributes) {
+	if let Some(anchor) = attrs.anchor {
+		tree.set_anchor(id, Some(anchor));
+	}
+	if let Some(visible) = attrs.visible {
+		tree.set_visible(id, visible);
+	}
+	if let Some(enabled) = attrs.enabled {
+		tree.set_enabled(id, enabled);
+	}
+}
+
 #[allow(clippy::too_many_arguments)]
 fn load_child_recursive(
 	node: &QdlNode,
@@ -109,11 +126,9 @@ fn load_child_recursive(
 	registry: &WidgetRegistry,
 	named_nodes: &mut HashMap<String, ObjectID>,
 ) -> Result<ObjectID, String> {
-	let (widget, anchor) = instantiate_node(node, doc, theme, methods, registry)?;
+	let (widget, attrs) = instantiate_node(node, doc, theme, methods, registry)?;
 	let id = tree.insert_child_boxed(parent_id, widget);
-	if anchor.is_some() {
-		tree.set_anchor(id, anchor);
-	}
+	apply_node_attributes(tree, id, attrs);
 
 	if let Some(name) = &node.name {
 		named_nodes.insert(name.clone(), id);
@@ -132,7 +147,7 @@ fn instantiate_node(
 	theme: &Theme,
 	methods: &MethodTable,
 	registry: &WidgetRegistry,
-) -> Result<(Box<dyn Widget>, Option<Anchor>), String> {
+) -> Result<(Box<dyn Widget>, NodeAttributes), String> {
 	let mut widget = registry.create(&node.kind).ok_or_else(|| {
 		format!(
 			"Unknown widget kind '{}' in QDL. Did you register it in WidgetRegistry?",
@@ -141,28 +156,28 @@ fn instantiate_node(
 	})?;
 
 	let ctx = PropertyCtx { theme };
-	let mut anchor = None;
+	let mut attrs = NodeAttributes::default();
 
 	// Styles
 	for style_name in &node.styles {
 		if let Some(style_props) = doc.styles.get(style_name) {
 			for (key, val) in style_props {
-				apply_property(&mut widget, &mut anchor, key, val, &ctx, methods);
+				apply_property(&mut widget, &mut attrs, key, val, &ctx, methods);
 			}
 		}
 	}
 
 	// Properties & Methods
 	for (key, val) in &node.props {
-		apply_property(&mut widget, &mut anchor, key, val, &ctx, methods);
+		apply_property(&mut widget, &mut attrs, key, val, &ctx, methods);
 	}
 
-	Ok((widget, anchor))
+	Ok((widget, attrs))
 }
 
 fn apply_property(
 	widget: &mut Box<dyn Widget>,
-	anchor: &mut Option<Anchor>,
+	attrs: &mut NodeAttributes,
 	key: &str,
 	val: &PropertyValue,
 	ctx: &PropertyCtx,
@@ -170,10 +185,36 @@ fn apply_property(
 ) {
 	if key == "anchor" {
 		if let Some(parsed) = val.as_str().and_then(Anchor::parse) {
-			*anchor = Some(parsed);
+			attrs.anchor = Some(parsed);
 		} else {
 			nimbus_warn!(
 				"Invalid value {:?} for property 'anchor' on widget '{}' (expected e.g. 'left-top', 'right-top', 'center', 'fill')",
+				val,
+				widget.name(),
+			);
+		}
+		return;
+	}
+
+	if key == "visible" {
+		if let Some(b) = val.as_bool() {
+			attrs.visible = Some(b);
+		} else {
+			nimbus_warn!(
+				"Invalid value {:?} for property 'visible' on widget '{}' (expected bool)",
+				val,
+				widget.name(),
+			);
+		}
+		return;
+	}
+
+	if key == "enabled" {
+		if let Some(b) = val.as_bool() {
+			attrs.enabled = Some(b);
+		} else {
+			nimbus_warn!(
+				"Invalid value {:?} for property 'enabled' on widget '{}' (expected bool)",
 				val,
 				widget.name(),
 			);
@@ -213,5 +254,112 @@ fn apply_property(
 				);
 			}
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use nimbus_core::{BoxConstraints, Canvas2D, DrawCtx, LayoutCtx};
+	use nimbus_math::{Color, Vec2};
+	use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens};
+
+	struct DummyBox {
+		spacing: f32,
+		height: f32,
+	}
+
+	impl Widget for DummyBox {
+		fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
+			let children = ctx.children();
+			let mut y = 0.0f32;
+			let mut max_w = 0.0f32;
+			for (i, child) in children.iter().enumerate() {
+				if i > 0 {
+					y += self.spacing;
+				}
+				let sz = ctx.layout_child(*child, BoxConstraints::loose(constraints.max_size()));
+				ctx.set_child_position(*child, Vec2::new(0.0, y));
+				y += sz.y;
+				max_w = max_w.max(sz.x);
+			}
+			if children.is_empty() {
+				constraints.constrain(Vec2::new(100.0, self.height))
+			} else {
+				constraints.constrain(Vec2::new(max_w, y))
+			}
+		}
+
+		fn draw(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
+
+		fn set_property(
+			&mut self,
+			key: &str,
+			value: &PropertyValue,
+			_ctx: &PropertyCtx,
+		) -> Result<(), PropertyError> {
+			match key {
+				"spacing" => self.spacing = value.expect_f32()?,
+				"height" => self.height = value.expect_f32()?,
+				_ => return Err(PropertyError::NotFound),
+			}
+			Ok(())
+		}
+	}
+
+	#[test]
+	fn test_qdl_visible_and_enabled_attributes() {
+		let mut registry = WidgetRegistry::new();
+		registry.register("dummy::box", || Box::new(DummyBox { spacing: 10.0, height: 30.0 }));
+
+		let theme = Theme {
+			elevation: ElevationTokens::default(),
+			radius: RadiusTokens::default(),
+			state: StateTokens::default(),
+			stroke: StrokeTokens::default(),
+			monet: Monet::new(
+				Color::from_oklch(0.675, 0.138, 65.0),
+				Color::from_oklch(0.563, 0.038, 65.0),
+				Color::from_oklch(0.517, 0.052, 300.0),
+				true,
+			),
+		};
+
+		let qdl = r#"
+			root dummy::box {
+				spacing: 10
+				node dummy::box "first" {
+					height: 20
+				}
+				node dummy::box "hidden" {
+					height: 50
+					visible: false
+					enabled: false
+				}
+				node dummy::box "last" {
+					height: 30
+				}
+			}
+		"#;
+
+		let mut tree = UiTree::new();
+		let methods = MethodTable::new();
+		let scene = load_into_tree_with_registry(qdl, &mut tree, &theme, &methods, &registry).unwrap();
+
+		let first = scene.find("first").unwrap();
+		let hidden = scene.find("hidden").unwrap();
+		let last = scene.find("last").unwrap();
+
+		assert!(tree.is_visible(first));
+		assert!(!tree.is_visible(hidden));
+		assert!(!tree.is_enabled(hidden));
+		assert!(tree.is_visible(last));
+
+		tree.layout_node(scene.root_id, BoxConstraints::loose(Vec2::new(400.0, 400.0)));
+		// Only first (20) + spacing (10) + last (30) = 60, hidden contributes 0 height and no extra spacing
+		assert_eq!(tree.bounds(scene.root_id).height(), 60.0);
+		assert_eq!(tree.bounds(hidden).size(), Vec2::ZERO);
+		assert_eq!(tree.bounds(last).min.y, 30.0);
 	}
 }

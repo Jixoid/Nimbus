@@ -22,6 +22,7 @@ use crate::event::{
 use crate::id::ObjectID;
 use crate::layout::{BoxConstraints, LayoutCtx};
 use crate::node::NodeData;
+use crate::task::{IntoTask, Task, TaskQueue};
 use crate::widget::Widget;
 
 
@@ -34,6 +35,7 @@ pub struct UiTree {
 	pub focused_node: Option<ObjectID>,
 	pub needs_layout: bool,
 	pub needs_redraw: bool,
+	pub task_queue: TaskQueue,
 }
 
 impl UiTree {
@@ -47,6 +49,7 @@ impl UiTree {
 			focused_node: None,
 			needs_layout: true,
 			needs_redraw: true,
+			task_queue: TaskQueue::new(),
 		}
 	}
 
@@ -154,6 +157,122 @@ impl UiTree {
 		}
 	}
 
+	pub fn is_visible(&self, id: ObjectID) -> bool {
+		self.nodes.get(id).map(|n| n.visible).unwrap_or(false)
+	}
+
+	pub fn set_visible(&mut self, id: ObjectID, visible: bool) {
+		let changed = if let Some(node) = self.nodes.get_mut(id) {
+			if node.visible != visible {
+				node.visible = visible;
+				true
+			} else {
+				false
+			}
+		} else {
+			false
+		};
+
+		if changed {
+			if !visible {
+				self.clear_interaction_in_subtree(id);
+			}
+			self.needs_layout = true;
+			self.needs_redraw = true;
+		}
+	}
+
+	pub fn is_enabled(&self, id: ObjectID) -> bool {
+		self.nodes.get(id).map(|n| n.enabled).unwrap_or(false)
+	}
+
+	pub fn set_enabled(&mut self, id: ObjectID, enabled: bool) {
+		let changed = if let Some(node) = self.nodes.get_mut(id) {
+			if node.enabled != enabled {
+				node.enabled = enabled;
+				true
+			} else {
+				false
+			}
+		} else {
+			false
+		};
+
+		if changed {
+			if !enabled {
+				self.clear_interaction_in_subtree(id);
+			}
+			self.needs_redraw = true;
+		}
+	}
+
+	fn clear_interaction_in_subtree(&mut self, id: ObjectID) {
+		let children = if let Some(node) = self.nodes.get_mut(id) {
+			node.hovered = false;
+			node.pressed = false;
+			node.focused = false;
+			node.children.clone()
+		} else {
+			return;
+		};
+
+		if self.hovered_node == Some(id) {
+			self.hovered_node = None;
+		}
+		if self.pressed_node == Some(id) {
+			self.pressed_node = None;
+		}
+		if self.focused_node == Some(id) {
+			self.focused_node = None;
+		}
+
+		for child in children {
+			self.clear_interaction_in_subtree(child);
+		}
+	}
+
+	pub fn task_queue(&self) -> TaskQueue {
+		self.task_queue.clone()
+	}
+
+	pub fn push_task<M, F: IntoTask<M>>(&self, task: F) {
+		self.task_queue.push(task);
+	}
+
+	pub fn process_tasks(&mut self) -> bool {
+		let mut executed = false;
+		let mut deferred_window_tasks = Vec::new();
+
+		for _ in 0..64 {
+			let tasks = self.task_queue.drain_all();
+			if tasks.is_empty() {
+				break;
+			}
+			for task in tasks {
+				match task {
+					Task::Plain(f) => {
+						f();
+						executed = true;
+					}
+					Task::Tree(f) => {
+						f(self);
+						self.needs_redraw = true;
+						executed = true;
+					}
+					other @ Task::Window(_) => {
+						deferred_window_tasks.push(other);
+					}
+				}
+			}
+		}
+
+		if !deferred_window_tasks.is_empty() {
+			self.task_queue.push_front_all(deferred_window_tasks);
+		}
+
+		executed
+	}
+
 
 	pub fn get_widget<W: Widget>(&self, id: ObjectID) -> Option<&W> {
 		self
@@ -183,6 +302,22 @@ impl UiTree {
 	}
 
 	pub fn layout_node(&mut self, id: ObjectID, constraints: BoxConstraints) -> Vec2<f32> {
+		if !self.is_visible(id) {
+			if let Some(node) = self.nodes.get_mut(id) {
+				node.bounds = Rect::new(node.bounds.x(), node.bounds.y(), 0.0, 0.0);
+			}
+			return Vec2::ZERO;
+		}
+
+		let all_children = self.children(id).to_vec();
+		for child_id in all_children {
+			if !self.is_visible(child_id)
+				&& let Some(child_node) = self.nodes.get_mut(child_id)
+			{
+				child_node.bounds = Rect::new(child_node.bounds.x(), child_node.bounds.y(), 0.0, 0.0);
+			}
+		}
+
 		let mut widget = match self.widgets.get_mut(id).and_then(|w| w.take()) {
 			Some(w) => w,
 			None => return Vec2::ZERO,
@@ -396,6 +531,10 @@ impl UiTree {
 			}
 		}
 
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+
 		if layout_requested {
 			self.needs_layout = true;
 		}
@@ -480,6 +619,10 @@ impl UiTree {
 			}
 		}
 
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+
 		if layout_requested {
 			self.needs_layout = true;
 		}
@@ -501,6 +644,10 @@ impl UiTree {
 				&mut redraw_requested,
 				&mut layout_requested,
 			);
+		}
+
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
 		}
 
 		if layout_requested {
@@ -536,6 +683,10 @@ impl UiTree {
 			curr = self.nodes.get(target).and_then(|n| n.parent);
 		}
 
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+
 		if layout_requested {
 			self.needs_layout = true;
 		}
@@ -563,6 +714,7 @@ impl UiTree {
 			redraw_requested,
 			layout_requested,
 			messages: Vec::new(),
+			task_queue: self.task_queue.clone(),
 		};
 
 		let resp = widget.handle_event(&mut ctx, event);
@@ -570,6 +722,10 @@ impl UiTree {
 
 		if !ctx.messages.is_empty() {
 			self.process_messages(ctx.messages);
+		}
+
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			*redraw_requested = true;
 		}
 
 		if *layout_requested {
@@ -627,6 +783,7 @@ impl UiTree {
 						redraw_requested: &mut redraw,
 						layout_requested: &mut layout,
 						messages: Vec::new(),
+						task_queue: self.task_queue.clone(),
 					};
 
 					let _ = target_widget.handle_message(&mut target_ctx, &msg.name, &msg.payload);
@@ -828,5 +985,68 @@ mod tests {
 		let i2_item = i2_widget.as_any().downcast_ref::<MockItem>().unwrap();
 		assert!(!i1_item.active);
 		assert!(i2_item.active);
+	}
+
+	#[test]
+	fn test_visible_excludes_hidden_children_from_layout() {
+		let mut tree = UiTree::new();
+		let root = tree.insert_root(TestWidget::new(200.0, 200.0));
+		let c1 = tree.insert_child(root, TestWidget::new(80.0, 30.0));
+		let c2 = tree.insert_child(root, TestWidget::new(80.0, 40.0));
+
+		tree.layout_all(Vec2::new(200.0, 200.0));
+		assert_eq!(tree.bounds(c1).size(), Vec2::new(80.0, 30.0));
+		assert_eq!(tree.bounds(c2).min.y, 30.0);
+		assert_eq!(tree.bounds(c2).size(), Vec2::new(80.0, 40.0));
+
+		tree.needs_layout = false;
+		tree.needs_redraw = false;
+		tree.set_visible(c1, false);
+		assert!(tree.needs_layout);
+		assert!(tree.needs_redraw);
+
+		tree.layout_all(Vec2::new(200.0, 200.0));
+		assert_eq!(tree.bounds(c1).size(), Vec2::ZERO);
+		assert_eq!(tree.bounds(c2).min.y, 0.0);
+		assert_eq!(tree.bounds(c2).size(), Vec2::new(80.0, 40.0));
+
+		tree.needs_layout = false;
+		tree.needs_redraw = false;
+		tree.set_visible(c1, true);
+		assert!(tree.needs_layout);
+		assert!(tree.needs_redraw);
+
+		tree.layout_all(Vec2::new(200.0, 200.0));
+		assert_eq!(tree.bounds(c1).size(), Vec2::new(80.0, 30.0));
+		assert_eq!(tree.bounds(c2).min.y, 30.0);
+	}
+
+	#[test]
+	fn test_task_queue_cross_thread_and_plain_tasks() {
+		let mut tree = UiTree::new();
+		let root = tree.insert_root(TestWidget::new(100.0, 100.0));
+		let child = tree.insert_child(root, TestWidget::new(50.0, 25.0));
+
+		let ran = Arc::new(AtomicUsize::new(0));
+		let ran_clone = ran.clone();
+
+		let sender = tree.task_queue();
+		sender.push(move || {
+			ran_clone.fetch_add(1, Ordering::SeqCst);
+		});
+
+		let sender_thread = tree.task_queue();
+		let handle = std::thread::spawn(move || {
+			sender_thread.push(move |tree: &mut UiTree| {
+				tree.set_visible(child, false);
+			});
+		});
+		handle.join().unwrap();
+
+		assert!(tree.process_tasks());
+		assert_eq!(ran.load(Ordering::SeqCst), 1);
+		assert!(!tree.is_visible(child));
+		assert!(tree.needs_layout);
+		assert!(tree.needs_redraw);
 	}
 }

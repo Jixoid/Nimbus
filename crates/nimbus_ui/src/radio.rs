@@ -143,7 +143,7 @@ impl Widget for Radio {
 					PropertyValue::String(self.group.clone().unwrap_or_default()),
 				);
 				if let Some(cb) = &mut self.on_changed {
-					cb();
+					cb.call1(self.checked);
 				}
 				ctx.request_redraw();
 				return EventResponse::Handled;
@@ -170,7 +170,7 @@ impl Widget for Radio {
 				);
 				ctx.request_redraw();
 				if let Some(cb) = &mut self.on_changed {
-					cb();
+					cb.call1(self.checked);
 				}
 				return true;
 			}

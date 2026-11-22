@@ -113,7 +113,21 @@ pub struct LayoutCtx<'a> {
 
 impl<'a> LayoutCtx<'a> {
 	pub fn children(&self) -> Vec<ObjectID> {
+		self
+			.tree
+			.children(self.node_id)
+			.iter()
+			.copied()
+			.filter(|&id| self.tree.is_visible(id))
+			.collect()
+	}
+
+	pub fn all_children(&self) -> Vec<ObjectID> {
 		self.tree.children(self.node_id).to_vec()
+	}
+
+	pub fn is_child_visible(&self, child_id: ObjectID) -> bool {
+		self.tree.is_visible(child_id)
 	}
 
 	pub fn layout_child(&mut self, child_id: ObjectID, constraints: BoxConstraints) -> Vec2<f32> {

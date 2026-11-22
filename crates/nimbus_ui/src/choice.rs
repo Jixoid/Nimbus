@@ -210,7 +210,8 @@ impl Widget for Choice {
 							}
 						}
 						if let Some(cb) = &mut self.on_changed {
-							cb();
+							let tab_text = self.tabs.get(tab_idx).cloned().unwrap_or_default();
+							cb.call2(self.tab_id, tab_text);
 						}
 						ctx.request_redraw();
 						return EventResponse::Handled;
