@@ -33,7 +33,8 @@ pub struct RectInstance {
 	border_width: f32,
 	shadow_blur: f32,
 	noise: f32,
-	_pad: [f32; 3],
+	pub(crate) texture_id: u32,
+	_pad: [f32; 2],
 }
 
 const _: () = {
@@ -59,7 +60,8 @@ impl RectShape {
 				border_width: 0.0,
 				shadow_blur: 0.0,
 				noise: 0.0,
-				_pad: [0.0; 3],
+				texture_id: u32::MAX,
+				_pad: [0.0; 2],
 			},
 		}
 	}
@@ -90,6 +92,11 @@ impl RectShape {
 
 	pub fn noise(mut self, intensity: f32) -> Self {
 		self.inst.noise = intensity.clamp(0.0, 1.0);
+		self
+	}
+
+	pub fn texture(mut self, texture_id: u32) -> Self {
+		self.inst.texture_id = texture_id;
 		self
 	}
 }

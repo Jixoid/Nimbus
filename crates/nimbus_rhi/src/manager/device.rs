@@ -167,6 +167,12 @@ impl<B: RhiBackend> Device<B> {
 			.write_texture_descriptor(view.raw(), sampler.raw())
 	}
 
+	pub fn update_texture_descriptor(&self, id: u32, view: &ImageView2<B>, sampler: &Sampler2<B>) {
+		self
+			.inner
+			.update_texture_descriptor(id, view.raw(), sampler.raw());
+	}
+
 	pub fn create_image_view(
 		&self,
 		image: &Image2<B>,

@@ -105,6 +105,7 @@ pub trait RhiDevice<B: RhiBackend>: Send + Sync {
 	fn init_descriptor_heap(&self, allocator: &B::Allocator) -> RhiResult<()>;
 	fn fini_descriptor_heap(&self);
 	fn write_texture_descriptor(&self, view: &B::ImageView2, sampler: &B::Sampler) -> u32;
+	fn update_texture_descriptor(&self, id: u32, view: &B::ImageView2, sampler: &B::Sampler);
 	fn descriptor_heap(&self) -> Option<B::Buffer>;
 	fn sampler_heap(&self) -> Option<B::Buffer>;
 

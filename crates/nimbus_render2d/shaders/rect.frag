@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : enable
 
 layout(location = 0) in vec2 v_local_pos;
 layout(location = 1) in vec2 v_rect_half_size;
@@ -10,8 +11,11 @@ layout(location = 6) in vec2 v_shadow_offset;
 layout(location = 7) in float v_border_width;
 layout(location = 8) in float v_shadow_blur;
 layout(location = 9) in float v_noise;
+layout(location = 10) flat in uint v_texture_id;
 
 layout(location = 0) out vec4 out_color;
+
+layout(set = 0, binding = 0) uniform sampler2D u_textures[];
 
 float hash(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -47,12 +51,19 @@ void main() {
     // Main shape coverage
     float fill_coverage = clamp(0.5 - dist / aa, 0.0, 1.0);
 
+    vec4 base_fill = v_fill_color;
+    if (v_texture_id != 0xFFFFFFFFu) {
+        vec2 rect_size = max(v_rect_half_size * 2.0, vec2(1.0));
+        vec2 tex_uv = clamp((v_local_pos / rect_size) + vec2(0.5), vec2(0.0), vec2(1.0));
+        base_fill *= texture(u_textures[nonuniformEXT(v_texture_id)], tex_uv);
+    }
+
     // Border handling
-    vec4 shape_color = v_fill_color;
+    vec4 shape_color = base_fill;
     if (v_border_width > 0.0 && v_border_color.a > 0.0) {
         float inner_dist = dist + v_border_width;
         float inner_coverage = clamp(0.5 - inner_dist / aa, 0.0, 1.0);
-        shape_color = mix(v_border_color, v_fill_color, inner_coverage);
+        shape_color = mix(v_border_color, base_fill, inner_coverage);
     }
 
     if (v_noise > 0.0) {

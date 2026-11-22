@@ -31,6 +31,7 @@ pub mod text;
 pub mod switch;
 pub mod tabs;
 pub mod tooltip;
+pub mod viewport;
 
 pub use button::{Button, ButtonBuilder, ButtonVariant};
 pub use card::{Card, CardBuilder};
@@ -53,6 +54,7 @@ pub use text::{Text, TextBuilder};
 pub use switch::{Switch, SwitchBuilder};
 pub use tabs::{Tabs, TabsBuilder};
 pub use tooltip::{ToolTip, ToolTipBuilder, Tooltip, TooltipBuilder, TooltipPosition};
+pub use viewport::{Viewport, ViewportBuilder};
 
 use nimbus_core::WidgetRegistry;
 
@@ -80,4 +82,5 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::collapsible", || Box::new(Collapsible::default()));
 	registry.register("qstd::popup", || Box::new(Popup::default()));
 	registry.register("qstd::tooltip", || Box::new(Tooltip::default()));
+	registry.register("qstd::viewport", || Box::new(Viewport::default()));
 }

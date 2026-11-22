@@ -761,7 +761,17 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			let mut lock = heap.next_id.lock().unwrap();
 			let id = *lock;
 			*lock += 1;
+			drop(lock);
 
+			self.update_texture_descriptor(id, view, sampler);
+			id
+		} else {
+			0
+		}
+	}
+
+	fn update_texture_descriptor(&self, id: u32, view: &AshImageView2, sampler: &AshSampler) {
+		if let Some(heap) = &self.inner.bindless_heap {
 			let image_info = [vk::DescriptorImageInfo::default()
 				.sampler(sampler.handle())
 				.image_view(view.handle())
@@ -777,10 +787,6 @@ impl RhiDevice<AshVulkanBackend> for AshDevice {
 			unsafe {
 				self.inner.device().update_descriptor_sets(&write, &[]);
 			}
-
-			id
-		} else {
-			0
 		}
 	}
 
