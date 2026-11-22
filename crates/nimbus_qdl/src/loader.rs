@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use nimbus_core::{
-	MethodTable, ObjectID, PropertyCtx, PropertyValue, UiTree, Widget, WidgetRegistry,
+	MethodTable, ObjectID, PropertyCtx, PropertyError, PropertyValue, UiTree, Widget, WidgetRegistry,
 };
 use nimbus_except::{nimbus_log, nimbus_warn};
 use nimbus_theme::Theme;
@@ -37,7 +37,7 @@ pub fn load_into_tree(
 	qdl_source: &str,
 	tree: &mut UiTree,
 	theme: &Theme,
-	methods: &mut MethodTable,
+	methods: &MethodTable,
 ) -> Result<QdlScene, String> {
 	let registry_guard = WidgetRegistry::global()
 		.read()
@@ -50,15 +50,15 @@ pub fn load_into_tree_simple(
 	tree: &mut UiTree,
 	theme: &Theme,
 ) -> Result<QdlScene, String> {
-	let mut empty_methods = MethodTable::new();
-	load_into_tree(qdl_source, tree, theme, &mut empty_methods)
+	let empty_methods = MethodTable::new();
+	load_into_tree(qdl_source, tree, theme, &empty_methods)
 }
 
 pub fn load_into_tree_with_registry(
 	qdl_source: &str,
 	tree: &mut UiTree,
 	theme: &Theme,
-	methods: &mut MethodTable,
+	methods: &MethodTable,
 	registry: &WidgetRegistry,
 ) -> Result<QdlScene, String> {
 	let doc = parse(qdl_source)?;
@@ -101,7 +101,7 @@ fn load_child_recursive(
 	tree: &mut UiTree,
 	doc: &QdlDocument,
 	theme: &Theme,
-	methods: &mut MethodTable,
+	methods: &MethodTable,
 	registry: &WidgetRegistry,
 	named_nodes: &mut HashMap<String, ObjectID>,
 ) -> Result<ObjectID, String> {
@@ -123,7 +123,7 @@ fn instantiate_node(
 	node: &QdlNode,
 	doc: &QdlDocument,
 	theme: &Theme,
-	methods: &mut MethodTable,
+	methods: &MethodTable,
 	registry: &WidgetRegistry,
 ) -> Result<Box<dyn Widget>, String> {
 	let mut widget = registry.create(&node.kind).ok_or_else(|| {
@@ -157,11 +157,11 @@ fn apply_property(
 	key: &str,
 	val: &PropertyValue,
 	ctx: &PropertyCtx,
-	methods: &mut MethodTable,
+	methods: &MethodTable,
 ) {
 	if widget.is_method(key) {
 		if let Some(method_name) = val.as_str() {
-			if let Some(method_ptr) = methods.take(method_name) {
+			if let Some(method_ptr) = methods.get(method_name) {
 				widget.bind_method(key, method_ptr);
 			} else {
 				nimbus_warn!(
@@ -172,11 +172,24 @@ fn apply_property(
 			}
 		}
 	} else {
-		if !widget.set_property(key, val, ctx) {
-			nimbus_log!(
-				"Property '{}' not found by widget",
-				key,
-			);
+		match widget.set_property(key, val, ctx) {
+			Ok(()) => {}
+			Err(PropertyError::NotFound) => {
+				nimbus_log!(
+					"Property '{}' not found on widget '{}'",
+					key,
+					widget.name(),
+				);
+			}
+			Err(PropertyError::InvalidValue { expected }) => {
+				nimbus_warn!(
+					"Invalid value {:?} for property '{}' on widget '{}' (expected {})",
+					val,
+					key,
+					widget.name(),
+					expected,
+				);
+			}
 		}
 	}
 }

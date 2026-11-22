@@ -417,40 +417,18 @@ impl Widget for Edit {
 		}
 	}
 
-	fn set_property(&mut self, name: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, name: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match name {
 			"text" => {
-				if let Some(s) = value.as_str() {
-					self.text = s.to_string();
-					self.ensure_cursor_boundary();
-					return true;
-				}
+				self.text = value.expect_str()?.to_string();
+				self.ensure_cursor_boundary();
 			}
-
-			"title" => {
-				if let Some(s) = value.as_str() {
-					self.title = s.to_string();
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			"border_radius" => {
-				if let Some(n) = value.as_f32() {
-					self.border_radius = n;
-					return true;
-				}
-			}
-
-			_ => {}
+			"title" => self.title = value.expect_str()?.to_string(),
+			"font_size" => self.font_size = value.expect_f32()?,
+			"border_radius" => self.border_radius = value.expect_f32()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

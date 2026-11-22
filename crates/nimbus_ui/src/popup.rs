@@ -670,48 +670,21 @@ impl Widget for Popup {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"title" => {
-				if let Some(s) = value.as_str() {
-					self.title = Some(s.to_string());
-					return true;
-				}
-			}
-
-			"min_width" => {
-				if let Some(n) = value.as_f32() {
-					self.min_width = n;
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			"open" => {
-				if let Some(b) = value.as_bool() {
-					self.set_open(b);
-					return true;
-				}
-			}
-
+			"title" => self.title = Some(value.expect_str()?.to_string()),
+			"min_width" => self.min_width = value.expect_f32()?,
+			"font_size" => self.font_size = value.expect_f32()?,
+			"open" => self.set_open(value.expect_bool()?),
 			"items" => {
-				if let Some(arr) = value.as_array() {
-					self.items = arr.iter().filter_map(parse_popup_item).collect();
-					self.nav_stack.clear();
-					self.prev_stack.clear();
-					return true;
-				}
+				let arr = value.expect_array()?;
+				self.items = arr.iter().filter_map(parse_popup_item).collect();
+				self.nav_stack.clear();
+				self.prev_stack.clear();
 			}
-
-			_ => {}
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

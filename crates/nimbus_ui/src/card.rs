@@ -89,12 +89,11 @@ impl Widget for Card {
 		canvas.draw(shape);
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"paddings" => {
 				if let Some(p) = value.as_f32() {
 					self.padding = p;
-					return true;
 				} else if let Some(obj) = value.as_object() {
 					let top = obj
 						.get("top")
@@ -102,47 +101,17 @@ impl Widget for Card {
 						.and_then(|v| v.as_f32())
 						.unwrap_or(8.0);
 					self.padding = top;
-					return true;
+				} else {
+					return Err(nimbus_core::PropertyError::InvalidValue { expected: "number or object" });
 				}
 			}
-			
-			"corner_radius" => {
-				if let Some(r) = value.as_f32() {
-					self.corner_radius = Some(r);
-					return true;
-				}
-			}
-
-			"color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.background = Some(c);
-					return true;
-				}
-			}
-
-			"border_color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.border_color = Some(c);
-					return true;
-				}
-			}
-
-			"border_width" => {
-				if let Some(w) = value.as_f32() {
-					self.border_width = w;
-					return true;
-				}
-			}
-
-			"shadow_blur" => {
-				if let Some(b) = value.as_f32() {
-					self.shadow_blur = b;
-					return true;
-				}
-			}
-			
-			_ => {}
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
+			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
+			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"border_width" => self.border_width = value.expect_f32()?,
+			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

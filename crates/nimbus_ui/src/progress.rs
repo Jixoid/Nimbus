@@ -178,93 +178,35 @@ impl Widget for ProgressBar {
 		key: &str,
 		value: &PropertyValue,
 		ctx: &PropertyCtx,
-	) -> bool {
+	) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"value" => {
-				if let Some(p) = value.as_f32() {
-					self.value = p;
-					self.update_animation();
-					return true;
-				}
+				self.value = value.expect_f32()?;
+				self.update_animation();
 			}
-
 			"progress" => {
-				if let Some(p) = value.as_f32() {
-					self.value = p;
-					self.max = Some(1.0);
-					self.min = 0.0;
-					self.update_animation();
-					return true;
-				}
+				self.value = value.expect_f32()?;
+				self.max = Some(1.0);
+				self.min = 0.0;
+				self.update_animation();
 			}
-
 			"min" => {
-				if let Some(m) = value.as_f32() {
-					self.min = m;
-					self.update_animation();
-					return true;
-				}
+				self.min = value.expect_f32()?;
+				self.update_animation();
 			}
-
 			"max" => {
-				if let Some(m) = value.as_f32() {
-					self.max = Some(m);
-					self.update_animation();
-					return true;
-				}
+				self.max = Some(value.expect_f32()?);
+				self.update_animation();
 			}
-
-			"height" => {
-				if let Some(h) = value.as_f32() {
-					self.height = h;
-					return true;
-				}
-			}
-
-			"corner_radius" | "radius" => {
-				if let Some(r) = value.as_f32() {
-					self.corner_radius = Some(r);
-					return true;
-				}
-			}
-
-			"color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.color = Some(c);
-					return true;
-				}
-			}
-
-			"track_color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.track_color = Some(c);
-					return true;
-				}
-			}
-
-			"text" => {
-				if let Some(s) = value.as_str() {
-					self.text = Some(s.to_string());
-					return true;
-				}
-			}
-
-			"show_percentage" => {
-				if let Some(b) = value.as_bool() {
-					self.show_percentage = b;
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			_ => {}
+			"height" => self.height = value.expect_f32()?,
+			"corner_radius" | "radius" => self.corner_radius = Some(value.expect_f32()?),
+			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"track_color" => self.track_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"text" => self.text = Some(value.expect_str()?.to_string()),
+			"show_percentage" => self.show_percentage = value.expect_bool()?,
+			"font_size" => self.font_size = value.expect_f32()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

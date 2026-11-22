@@ -342,3 +342,250 @@ impl<T: Number> From<Color<T>> for (T, T, T, T) {
 		(c.r, c.g, c.b, c.a)
 	}
 }
+
+
+impl Color<f32> {
+	pub fn parse(s: &str) -> Option<Self> {
+		parse_color(s)
+	}
+
+	pub fn parse_color(s: &str) -> Option<Self> {
+		parse_color(s)
+	}
+}
+
+impl core::str::FromStr for Color<f32> {
+	type Err = ();
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		parse_color(s).ok_or(())
+	}
+}
+
+
+/// Parses a CSS/Nimbus color string into a `Color<f32>`
+pub fn parse_color(s: &str) -> Option<Color<f32>> {
+	let s = s.trim();
+	if s.is_empty() {
+		return None;
+	}
+
+	// "color(...)" or named colors
+	if let Some(inner) = strip_fn_call(s, "color") {
+		return parse_named_color(inner.trim());
+	}
+	if let Some(named) = parse_named_color(s) {
+		return Some(named);
+	}
+
+	// "rgba(...)" or "rgb(...)"
+	if let Some(inner) = strip_fn_call(s, "rgba").or_else(|| strip_fn_call(s, "rgb")) {
+		let (parts, count) = split_components(inner.trim())?;
+		if count == 3 || count == 4 {
+			let r = parse_rgb_channel(parts[0])?;
+			let g = parse_rgb_channel(parts[1])?;
+			let b = parse_rgb_channel(parts[2])?;
+			let a = if count == 4 {
+				parse_alpha(parts[3])?
+			} else {
+				1.0
+			};
+
+			return Some(Color::new(
+				r.clamp(0.0, 1.0),
+				g.clamp(0.0, 1.0),
+				b.clamp(0.0, 1.0),
+				a.clamp(0.0, 1.0),
+			));
+		}
+		return None;
+	}
+
+	// "oklch(l,c,h)" or "oklch(l,c,h,a)"
+	if let Some(inner) = strip_fn_call(s, "oklch") {
+		let (parts, count) = split_components(inner.trim())?;
+		if count == 3 || count == 4 {
+			let l_str = parts[0];
+			let l = if let Some(pct) = l_str.strip_suffix('%') {
+				pct.trim().parse::<f32>().ok()? / 100.0
+			} else {
+				let val = l_str.parse::<f32>().ok()?;
+				if val > 1.0 {
+					val / 100.0
+				} else {
+					val
+				}
+			};
+
+			let c_str = parts[1];
+			let c = if let Some(pct) = c_str.strip_suffix('%') {
+				pct.trim().parse::<f32>().ok()? / 100.0 * 0.4
+			} else {
+				c_str.parse::<f32>().ok()?
+			};
+
+			let h_str = parts[2];
+			let h = if let Some(deg) = strip_suffix_ignore_ascii_case(h_str, "deg") {
+				deg.trim().parse::<f32>().ok()?
+			} else if let Some(rad) = strip_suffix_ignore_ascii_case(h_str, "rad") {
+				rad.trim().parse::<f32>().ok()?.to_degrees()
+			} else if let Some(turn) = strip_suffix_ignore_ascii_case(h_str, "turn") {
+				turn.trim().parse::<f32>().ok()? * 360.0
+			} else {
+				h_str.parse::<f32>().ok()?
+			};
+
+			let a = if count == 4 {
+				parse_alpha(parts[3])?
+			} else {
+				1.0
+			};
+
+			let mut color = Color::from_oklch(l.clamp(0.0, 1.0), c.max(0.0), h);
+			color.a = a.clamp(0.0, 1.0);
+			return Some(color);
+		}
+		return None;
+	}
+
+	// Hex: #RGB, #RGBA, #RRGGBB, #RRGGBBAA
+	if let Some(hex) = s.strip_prefix('#') {
+		return parse_hex_color(hex);
+	}
+
+	None
+}
+
+fn strip_fn_call<'a>(s: &'a str, name: &str) -> Option<&'a str> {
+	let rest = s.strip_suffix(')')?;
+	if rest.len() < name.len() + 1 || !rest.is_char_boundary(name.len()) {
+		return None;
+	}
+	let (head, tail) = rest.split_at(name.len());
+	if head.eq_ignore_ascii_case(name) {
+		tail.strip_prefix('(')
+	} else {
+		None
+	}
+}
+
+fn strip_suffix_ignore_ascii_case<'a>(s: &'a str, suffix: &str) -> Option<&'a str> {
+	if s.len() < suffix.len() {
+		return None;
+	}
+	let split_idx = s.len() - suffix.len();
+	if !s.is_char_boundary(split_idx) {
+		return None;
+	}
+	let (head, tail) = s.split_at(split_idx);
+	if tail.eq_ignore_ascii_case(suffix) {
+		Some(head)
+	} else {
+		None
+	}
+}
+
+fn split_components(s: &str) -> Option<([&str; 4], usize)> {
+	let mut parts = [""; 4];
+	let mut count = 0;
+
+	if s.contains(',') {
+		for part in s.split(',') {
+			let trimmed = part.trim();
+			if trimmed.is_empty() || count >= 4 {
+				return None;
+			}
+			parts[count] = trimmed;
+			count += 1;
+		}
+	} else {
+		for part in s.split(|c: char| c.is_whitespace() || c == '/') {
+			let trimmed = part.trim();
+			if trimmed.is_empty() {
+				continue;
+			}
+			if count >= 4 {
+				return None;
+			}
+			parts[count] = trimmed;
+			count += 1;
+		}
+	}
+
+	Some((parts, count))
+}
+
+fn parse_rgb_channel(s: &str) -> Option<f32> {
+	let s = s.trim();
+	if let Some(pct) = s.strip_suffix('%') {
+		pct.trim().parse::<f32>().ok().map(|v| v / 100.0)
+	} else {
+		s.parse::<f32>().ok().map(|v| v / 255.0)
+	}
+}
+
+fn parse_alpha(s: &str) -> Option<f32> {
+	let s = s.trim();
+	if let Some(pct) = s.strip_suffix('%') {
+		pct.trim().parse::<f32>().ok().map(|v| v / 100.0)
+	} else {
+		s.parse::<f32>().ok()
+	}
+}
+
+fn parse_named_color(name: &str) -> Option<Color<f32>> {
+	let name = name.trim();
+	if name.eq_ignore_ascii_case("transparent") {
+		Some(Color::TRANSPARENT)
+	} else if name.eq_ignore_ascii_case("black") {
+		Some(Color::BLACK)
+	} else if name.eq_ignore_ascii_case("white") {
+		Some(Color::WHITE)
+	} else if name.eq_ignore_ascii_case("red") {
+		Some(Color::RED)
+	} else if name.eq_ignore_ascii_case("green") {
+		Some(Color::GREEN)
+	} else if name.eq_ignore_ascii_case("blue") {
+		Some(Color::BLUE)
+	} else if name.eq_ignore_ascii_case("yellow") {
+		Some(Color::YELLOW)
+	} else if name.eq_ignore_ascii_case("cyan") {
+		Some(Color::CYAN)
+	} else if name.eq_ignore_ascii_case("magenta") {
+		Some(Color::MAGENTA)
+	} else {
+		None
+	}
+}
+
+fn parse_hex_color(hex: &str) -> Option<Color<f32>> {
+	match hex.len() {
+		3 => {
+			let r = u8::from_str_radix(&hex[0..1], 16).ok()? as f32 / 15.0;
+			let g = u8::from_str_radix(&hex[1..2], 16).ok()? as f32 / 15.0;
+			let b = u8::from_str_radix(&hex[2..3], 16).ok()? as f32 / 15.0;
+			Some(Color::new(r, g, b, 1.0))
+		}
+		4 => {
+			let r = u8::from_str_radix(&hex[0..1], 16).ok()? as f32 / 15.0;
+			let g = u8::from_str_radix(&hex[1..2], 16).ok()? as f32 / 15.0;
+			let b = u8::from_str_radix(&hex[2..3], 16).ok()? as f32 / 15.0;
+			let a = u8::from_str_radix(&hex[3..4], 16).ok()? as f32 / 15.0;
+			Some(Color::new(r, g, b, a))
+		}
+		6 => {
+			let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
+			let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
+			let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+			Some(Color::new(r, g, b, 1.0))
+		}
+		8 => {
+			let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
+			let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
+			let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+			let a = u8::from_str_radix(&hex[6..8], 16).ok()? as f32 / 255.0;
+			Some(Color::new(r, g, b, a))
+		}
+		_ => None,
+	}
+}

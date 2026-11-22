@@ -12,9 +12,16 @@
 
 use std::collections::HashMap;
 use nimbus_except::nimbus_log;
+pub use nimbus_math::parse_color;
 use nimbus_math::{Color, Vec2};
 use nimbus_theme::{Monet, MonetRole, Theme};
 
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PropertyError {
+	NotFound,
+	InvalidValue { expected: &'static str },
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PropertyValue {
@@ -195,22 +202,43 @@ impl PropertyValue {
 					color.a *= alpha;
 				}
 				return Some(color);
-			} else if let Some(hex) = s_trim.strip_prefix('#') {
-				if hex.len() == 6 {
-					let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255) as f32 / 255.0;
-					let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255) as f32 / 255.0;
-					let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255) as f32 / 255.0;
-					return Some(Color::new(r, g, b, 1.0));
-				} else if hex.len() == 8 {
-					let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255) as f32 / 255.0;
-					let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255) as f32 / 255.0;
-					let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255) as f32 / 255.0;
-					let a = u8::from_str_radix(&hex[6..8], 16).unwrap_or(255) as f32 / 255.0;
-					return Some(Color::new(r, g, b, a));
-				}
+			} else if let Some(color) = nimbus_math::parse_color(s_trim) {
+				return Some(color);
 			}
 		}
 		None
+	}
+
+	pub fn expect_str(&self) -> Result<&str, PropertyError> {
+		self.as_str().ok_or(PropertyError::InvalidValue { expected: "string" })
+	}
+
+	pub fn expect_f32(&self) -> Result<f32, PropertyError> {
+		self.as_f32().ok_or(PropertyError::InvalidValue { expected: "number" })
+	}
+
+	pub fn expect_f64(&self) -> Result<f64, PropertyError> {
+		self.as_f64().ok_or(PropertyError::InvalidValue { expected: "number" })
+	}
+
+	pub fn expect_bool(&self) -> Result<bool, PropertyError> {
+		self.as_bool().ok_or(PropertyError::InvalidValue { expected: "bool" })
+	}
+
+	pub fn expect_vec2(&self) -> Result<Vec2<f32>, PropertyError> {
+		self.as_vec2().ok_or(PropertyError::InvalidValue { expected: "vec2" })
+	}
+
+	pub fn expect_array(&self) -> Result<&[PropertyValue], PropertyError> {
+		self.as_array().ok_or(PropertyError::InvalidValue { expected: "array" })
+	}
+
+	pub fn expect_object(&self) -> Result<&HashMap<String, PropertyValue>, PropertyError> {
+		self.as_object().ok_or(PropertyError::InvalidValue { expected: "object" })
+	}
+
+	pub fn expect_color(&self, monet: &Monet) -> Result<Color<f32>, PropertyError> {
+		self.resolve_color(monet).ok_or(PropertyError::InvalidValue { expected: "color" })
 	}
 }
 

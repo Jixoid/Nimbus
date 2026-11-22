@@ -188,48 +188,31 @@ impl Widget for Button {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"text" => {
-				if let Some(s) = value.as_str() {
-					self.label = s.to_string();
-					return true;
-				}
-			}
-
+			"text" => self.label = value.expect_str()?.to_string(),
 			"variant" => {
-				if let Some(s) = value.as_str() {
-					self.variant = match s {
-						"filled" => ButtonVariant::Filled,
-						"tonal" => ButtonVariant::Tonal,
-						"elevated" => ButtonVariant::Elevated,
-						"outlined" => ButtonVariant::Outlined,
-						_ => ButtonVariant::Filled,
-					};
-					return true;
-				}
+				self.variant = match value.expect_str()? {
+					"filled" => ButtonVariant::Filled,
+					"tonal" => ButtonVariant::Tonal,
+					"elevated" => ButtonVariant::Elevated,
+					"outlined" => ButtonVariant::Outlined,
+					_ => return Err(nimbus_core::PropertyError::InvalidValue { expected: "filled | tonal | elevated | outlined" }),
+				};
 			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
+			"font_size" => self.font_size = value.expect_f32()?,
 			"paddings" => {
 				if let Some(n) = value.as_f32() {
 					self.padding = Vec2::new(n, n);
-					return true;
 				} else if let Some(v) = value.as_vec2() {
 					self.padding = v;
-					return true;
+				} else {
+					return Err(nimbus_core::PropertyError::InvalidValue { expected: "number or vec2" });
 				}
 			}
-
-			_ => {}
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

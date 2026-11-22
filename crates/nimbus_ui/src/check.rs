@@ -141,40 +141,19 @@ impl Widget for Check {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"checked" => {
-				if let Some(b) = value.as_bool() {
-					self.checked = b;
-					self.progress.snap_to(if b { 1.0 } else { 0.0 });
-					return true;
-				}
+				let b = value.expect_bool()?;
+				self.checked = b;
+				self.progress.snap_to(if b { 1.0 } else { 0.0 });
 			}
-
-			"text" => {
-				if let Some(s) = value.as_str() {
-					self.label = s.to_string();
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			"color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.color = Some(c);
-					return true;
-				}
-			}
-
-			_ => {}
+			"text" => self.label = value.expect_str()?.to_string(),
+			"font_size" => self.font_size = value.expect_f32()?,
+			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

@@ -392,22 +392,12 @@ impl Widget for ScrollView {
 		resp
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"scrollable_x" => {
-				if let Some(b) = value.as_bool() {
-					self.scrollable_x = b;
-					return true;
-				}
-			}
-			"scrollable_y" => {
-				if let Some(b) = value.as_bool() {
-					self.scrollable_y = b;
-					return true;
-				}
-			}
-			_ => {}
+			"scrollable_x" => self.scrollable_x = value.expect_bool()?,
+			"scrollable_y" => self.scrollable_y = value.expect_bool()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

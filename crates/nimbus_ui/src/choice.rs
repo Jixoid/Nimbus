@@ -233,51 +233,38 @@ impl Widget for Choice {
 		}
 	}
 
-	fn set_property(&mut self, name: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, name: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match name {
 			"tabs" => {
-				if let Some(arr) = value.as_array() {
-					let mut list = Vec::new();
-					for item in arr {
-						if let Some(s) = item.as_str() {
-							list.push(s.to_string());
-						}
+				let arr = value.expect_array()?;
+				let mut list = Vec::new();
+				for item in arr {
+					if let Some(s) = item.as_str() {
+						list.push(s.to_string());
 					}
-					self.tabs = list;
+				}
+				self.tabs = list;
+				let bounds = self.last_bounds.get();
+				let h = if bounds != Rect::ZERO { bounds.height() } else { 28.0 };
+				if let Some(target_local) = self.local_tab_rect(h, self.tab_id as usize) {
+					self.indicator.borrow_mut().snap_to(target_local);
+				}
+			}
+			"tab_id" => {
+				let new_id = value.expect_f32()? as i32;
+				if self.tab_id != new_id {
+					self.tab_id = new_id;
 					let bounds = self.last_bounds.get();
 					let h = if bounds != Rect::ZERO { bounds.height() } else { 28.0 };
-					if let Some(target_local) = self.local_tab_rect(h, self.tab_id as usize) {
+					if let Some(target_local) = self.local_tab_rect(h, new_id as usize) {
 						self.indicator.borrow_mut().snap_to(target_local);
 					}
-					return true;
 				}
 			}
-
-			"tab_id" => {
-				if let Some(n) = value.as_f32() {
-					let new_id = n as i32;
-					if self.tab_id != new_id {
-						self.tab_id = new_id;
-						let bounds = self.last_bounds.get();
-						let h = if bounds != Rect::ZERO { bounds.height() } else { 28.0 };
-						if let Some(target_local) = self.local_tab_rect(h, new_id as usize) {
-							self.indicator.borrow_mut().snap_to(target_local);
-						}
-					}
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			_ => {}
+			"font_size" => self.font_size = value.expect_f32()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

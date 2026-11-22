@@ -182,39 +182,15 @@ impl Widget for Slider {
 		}
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"value" => {
-				if let Some(v) = value.as_f32() {
-					self.value = v.clamp(self.min, self.max);
-					return true;
-				}
-			}
-
-			"min" => {
-				if let Some(v) = value.as_f32() {
-					self.min = v;
-					return true;
-				}
-			}
-
-			"max" => {
-				if let Some(v) = value.as_f32() {
-					self.max = v;
-					return true;
-				}
-			}
-
-			"step" => {
-				if let Some(v) = value.as_f32() {
-					self.step = Some(v);
-					return true;
-				}
-			}
-
-			_ => {}
+			"value" => self.value = value.expect_f32()?.clamp(self.min, self.max),
+			"min" => self.min = value.expect_f32()?,
+			"max" => self.max = value.expect_f32()?,
+			"step" => self.step = Some(value.expect_f32()?),
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 
 	fn is_method(&self, name: &str) -> bool {

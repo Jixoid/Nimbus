@@ -18,7 +18,7 @@ use crate::draw::DrawCtx;
 use crate::event::{EventCtx, EventResponse, InputEvent};
 use crate::layout::{BoxConstraints, LayoutCtx};
 use crate::method::MethodCallback;
-use crate::property::{PropertyCtx, PropertyValue};
+use crate::property::{PropertyCtx, PropertyError, PropertyValue};
 
 
 pub trait AsAny: 'static {
@@ -50,9 +50,9 @@ pub trait Widget: AsAny + 'static {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), PropertyError> {
 		let _ = (key, value, ctx);
-		false
+		Err(PropertyError::NotFound)
 	}
 
 	fn is_method(&self, name: &str) -> bool {
@@ -63,14 +63,6 @@ pub trait Widget: AsAny + 'static {
 	fn bind_method(&mut self, method_name: &str, callback: MethodCallback) -> bool {
 		let _ = (method_name, callback);
 		false
-	}
-
-	fn is_event(&self, name: &str) -> bool {
-		self.is_method(name)
-	}
-
-	fn bind_event(&mut self, event_name: &str, callback: MethodCallback) -> bool {
-		self.bind_method(event_name, callback)
 	}
 
 	fn handle_message(&mut self, ctx: &mut EventCtx, name: &str, payload: &PropertyValue) -> bool {
@@ -96,7 +88,7 @@ impl Widget for Box<dyn Widget> {
 		(**self).handle_event(ctx, event)
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), PropertyError> {
 		(**self).set_property(key, value, ctx)
 	}
 
@@ -106,14 +98,6 @@ impl Widget for Box<dyn Widget> {
 
 	fn bind_method(&mut self, method_name: &str, callback: MethodCallback) -> bool {
 		(**self).bind_method(method_name, callback)
-	}
-
-	fn is_event(&self, name: &str) -> bool {
-		(**self).is_event(name)
-	}
-
-	fn bind_event(&mut self, event_name: &str, callback: MethodCallback) -> bool {
-		(**self).bind_event(event_name, callback)
 	}
 
 	fn handle_message(&mut self, ctx: &mut EventCtx, name: &str, payload: &PropertyValue) -> bool {

@@ -86,39 +86,18 @@ impl Widget for Flow {
 		key: &str,
 		value: &nimbus_core::PropertyValue,
 		_ctx: &nimbus_core::PropertyCtx,
-	) -> bool {
+	) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"spacing" => {
-				if let Some(s) = value.as_f32() {
-					self.spacing_x = s;
-					self.spacing_y = s;
-					return true;
-				}
+				let s = value.expect_f32()?;
+				self.spacing_x = s;
+				self.spacing_y = s;
 			}
-			
-			"horiz_spacing" => {
-				if let Some(s) = value.as_f32() {
-					self.spacing_x = s;
-					return true;
-				}
-			}
-			
-			"vert_spacing" => {
-				if let Some(s) = value.as_f32() {
-					self.spacing_y = s;
-					return true;
-				}
-			}
-
-			"paddings" => {
-				if let Some(p) = value.as_f32() {
-					self.padding = p;
-					return true;
-				}
-			}
-			
-			_ => {}
+			"horiz_spacing" => self.spacing_x = value.expect_f32()?,
+			"vert_spacing" => self.spacing_y = value.expect_f32()?,
+			"paddings" => self.padding = value.expect_f32()?,
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

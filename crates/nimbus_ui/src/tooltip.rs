@@ -344,69 +344,29 @@ impl Widget for Tooltip {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"text" => {
-				if let Some(s) = value.as_str() {
-					self.text = s.to_string();
-					return true;
-				}
-			}
-
+			"text" => self.text = value.expect_str()?.to_string(),
 			"position" => {
-				if let Some(s) = value.as_str() {
-					if let Some(pos) = TooltipPosition::from_str(s) {
-						self.position = pos;
-						return true;
-					}
-				}
+				let s = value.expect_str()?;
+				self.position = TooltipPosition::from_str(s).ok_or(
+					nimbus_core::PropertyError::InvalidValue {
+						expected: "top | bottom | left | right",
+					},
+				)?;
 			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			"corner_radius" => {
-				if let Some(n) = value.as_f32() {
-					self.corner_radius = n;
-					return true;
-				}
-			}
-
-			"show_arrow" => {
-				if let Some(b) = value.as_bool() {
-					self.show_arrow = b;
-					return true;
-				}
-			}
-
+			"font_size" => self.font_size = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = value.expect_f32()?,
+			"show_arrow" => self.show_arrow = value.expect_bool()?,
 			"open" => {
-				if let Some(b) = value.as_bool() {
-					self.open = Some(b);
-					self.progress.snap_to(if b { 1.0 } else { 0.0 });
-					return true;
-				}
+				let b = value.expect_bool()?;
+				self.open = Some(b);
+				self.progress.snap_to(if b { 1.0 } else { 0.0 });
 			}
-
-			"background" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.background = Some(c);
-					return true;
-				}
-			}
-
-			"color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.color = Some(c);
-					return true;
-				}
-			}
-
-			_ => {}
+			"background" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

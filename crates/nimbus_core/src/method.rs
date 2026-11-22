@@ -10,7 +10,9 @@
 */
 
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 
 pub type MethodCallback = Box<dyn FnMut() + 'static>;
@@ -18,7 +20,7 @@ pub type ActionCallback = MethodCallback;
 
 #[derive(Default)]
 pub struct MethodTable {
-	methods: HashMap<String, MethodCallback>,
+	methods: HashMap<String, Rc<RefCell<dyn FnMut() + 'static>>>,
 }
 
 impl MethodTable {
@@ -32,12 +34,26 @@ impl MethodTable {
 	where
 		F: FnMut() + 'static,
 	{
-		self.methods.insert(name.into(), Box::new(callback));
+		self.methods.insert(name.into(), Rc::new(RefCell::new(callback)));
 		self
 	}
 
+	pub fn get(&self, name: &str) -> Option<MethodCallback> {
+		let shared = self.methods.get(name)?.clone();
+		Some(Box::new(move || {
+			if let Ok(mut cb) = shared.try_borrow_mut() {
+				cb();
+			}
+		}))
+	}
+
 	pub fn take(&mut self, name: &str) -> Option<MethodCallback> {
-		self.methods.remove(name)
+		let shared = self.methods.remove(name)?;
+		Some(Box::new(move || {
+			if let Ok(mut cb) = shared.try_borrow_mut() {
+				cb();
+			}
+		}))
 	}
 
 	pub fn contains(&self, name: &str) -> bool {

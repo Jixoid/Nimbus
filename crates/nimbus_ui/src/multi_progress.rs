@@ -134,72 +134,50 @@ impl Widget for MultiProgressBar {
 		}
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> bool {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"values" => {
-				if let Some(arr) = value.as_array() {
-					let mut segs = Vec::new();
-					let mut i = 0;
-					while i < arr.len() {
-						match &arr[i] {
-							PropertyValue::Number(n) => {
-								let val = *n as f32;
-								// Check if subsequent item is a color
-								if i + 1 < arr.len() {
-									if let Some(c) = arr[i + 1].resolve_color(&ctx.theme.monet) {
-										segs.push(ProgressSegment::new(val, Some(c)));
-										i += 2;
-										continue;
-									}
-								}
-								segs.push(ProgressSegment::new(val, None));
-								i += 1;
+				let arr = value.expect_array()?;
+				let mut segs = Vec::new();
+				let mut i = 0;
+				while i < arr.len() {
+					match &arr[i] {
+						PropertyValue::Number(n) => {
+							let val = *n as f32;
+							if i + 1 < arr.len()
+								&& let Some(c) = arr[i + 1].resolve_color(&ctx.theme.monet)
+							{
+								segs.push(ProgressSegment::new(val, Some(c)));
+								i += 2;
+								continue;
 							}
-							PropertyValue::Object(obj) => {
-								let val = obj
-									.get("value")
-									.or_else(|| obj.get("val"))
-									.and_then(|v| v.as_f32())
-									.unwrap_or(0.0);
-								let color = obj
-									.get("color")
-									.and_then(|c| c.resolve_color(&ctx.theme.monet));
-								segs.push(ProgressSegment::new(val, color));
-								i += 1;
-							}
-							_ => {
-								i += 1;
-							}
+							segs.push(ProgressSegment::new(val, None));
+							i += 1;
+						}
+						PropertyValue::Object(obj) => {
+							let val = obj
+								.get("value")
+								.or_else(|| obj.get("val"))
+								.and_then(|v| v.as_f32())
+								.unwrap_or(0.0);
+							let color = obj
+								.get("color")
+								.and_then(|c| c.resolve_color(&ctx.theme.monet));
+							segs.push(ProgressSegment::new(val, color));
+							i += 1;
+						}
+						_ => {
+							i += 1;
 						}
 					}
-					self.segments = segs;
-					return true;
 				}
+				self.segments = segs;
 			}
-			
-			"max" => {
-				if let Some(m) = value.as_f32() {
-					self.max = Some(m);
-					return true;
-				}
-			}
-
-			"height" => {
-				if let Some(h) = value.as_f32() {
-					self.height = h;
-					return true;
-				}
-			}
-
-			"corner_radius" => {
-				if let Some(r) = value.as_f32() {
-					self.corner_radius = Some(r);
-					return true;
-				}
-			}
-			
-			_ => {}
+			"max" => self.max = Some(value.expect_f32()?),
+			"height" => self.height = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }

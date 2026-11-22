@@ -66,31 +66,13 @@ impl Widget for Text {
 		key: &str,
 		value: &nimbus_core::PropertyValue,
 		ctx: &nimbus_core::PropertyCtx,
-	) -> bool {
+	) -> Result<(), nimbus_core::PropertyError> {
 		match key {
-			"text" => {
-				if let Some(s) = value.as_str() {
-					self.text = s.to_string();
-					return true;
-				}
-			}
-
-			"font_size" => {
-				if let Some(n) = value.as_f32() {
-					self.font_size = n;
-					return true;
-				}
-			}
-
-			"color" => {
-				if let Some(c) = value.resolve_color(&ctx.theme.monet) {
-					self.color = Some(c);
-					return true;
-				}
-			}
-
-			_ => {}
+			"text" => self.text = value.expect_str()?.to_string(),
+			"font_size" => self.font_size = value.expect_f32()?,
+			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
-		false
+		Ok(())
 	}
 }
