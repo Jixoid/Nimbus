@@ -13,7 +13,10 @@
 use std::cell::Cell;
 
 use nimbus_core::event::{ButtonState, MouseButton};
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod, LayoutCtx,
+	MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
 use nimbus_theme::MonetRole;
@@ -204,5 +207,67 @@ impl Widget for Slider {
 		} else {
 			false
 		}
+	}
+}
+
+impl Slider {
+	pub fn builder() -> SliderBuilder {
+		SliderBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct SliderBuilder {
+	inner: Slider,
+}
+
+impl SliderBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Slider::default(),
+		}
+	}
+
+	pub fn value(mut self, value: f32) -> Self {
+		self.inner.value = value;
+		self
+	}
+
+	pub fn min(mut self, min: f32) -> Self {
+		self.inner.min = min;
+		self
+	}
+
+	pub fn max(mut self, max: f32) -> Self {
+		self.inner.max = max;
+		self
+	}
+
+	pub fn range(mut self, min: f32, max: f32) -> Self {
+		self.inner.min = min;
+		self.inner.max = max;
+		self
+	}
+
+	pub fn step(mut self, step: f32) -> Self {
+		self.inner.step = Some(step);
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(mut self) -> Slider {
+		self.inner.value = self.inner.value.clamp(self.inner.min, self.inner.max);
+		self.inner
+	}
+}
+
+impl From<SliderBuilder> for Slider {
+	fn from(builder: SliderBuilder) -> Self {
+		builder.build()
 	}
 }

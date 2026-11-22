@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use nimbus_core::{
 	Anchor, Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	LayoutCtx, MethodCallback, PropertyCtx, PropertyError, PropertyValue, Widget,
+	IntoMethod, LayoutCtx, MethodCallback, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -390,6 +390,131 @@ impl Widget for Collapsible {
 		} else {
 			false
 		}
+	}
+}
+
+impl Collapsible {
+	pub fn builder() -> CollapsibleBuilder {
+		CollapsibleBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct CollapsibleBuilder {
+	inner: Collapsible,
+}
+
+impl CollapsibleBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Collapsible::default(),
+		}
+	}
+
+	pub fn title(mut self, title: impl Into<String>) -> Self {
+		self.inner.title = title.into();
+		self
+	}
+
+	pub fn text(mut self, title: impl Into<String>) -> Self {
+		self.inner.title = title.into();
+		self
+	}
+
+	pub fn expanded(mut self, expanded: bool) -> Self {
+		self.inner.set_open(expanded, false);
+		self
+	}
+
+	pub fn open(mut self, open: bool) -> Self {
+		self.inner.set_open(open, false);
+		self
+	}
+
+	pub fn spacing(mut self, spacing: f32) -> Self {
+		self.inner.spacing = spacing;
+		self
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn header_height(mut self, height: f32) -> Self {
+		self.inner.header_height = height.max(20.0);
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn header_background(mut self, color: Color) -> Self {
+		self.inner.header_background = Some(color);
+		self
+	}
+
+	pub fn header_color(mut self, color: Color) -> Self {
+		self.inner.header_background = Some(color);
+		self
+	}
+
+	pub fn text_color(mut self, color: Color) -> Self {
+		self.inner.color = Some(color);
+		self
+	}
+
+	pub fn border_width(mut self, width: f32) -> Self {
+		self.inner.border_width = width;
+		self
+	}
+
+	pub fn border_color(mut self, color: Color) -> Self {
+		self.inner.border_color = Some(color);
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Collapsible {
+		self.inner
+	}
+}
+
+impl From<CollapsibleBuilder> for Collapsible {
+	fn from(builder: CollapsibleBuilder) -> Self {
+		builder.build()
 	}
 }
 

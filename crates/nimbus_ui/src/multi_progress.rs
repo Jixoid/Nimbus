@@ -181,3 +181,69 @@ impl Widget for MultiProgressBar {
 		Ok(())
 	}
 }
+
+impl MultiProgressBar {
+	pub fn builder() -> MultiProgressBarBuilder {
+		MultiProgressBarBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct MultiProgressBarBuilder {
+	inner: MultiProgressBar,
+}
+
+impl MultiProgressBarBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: MultiProgressBar::default(),
+		}
+	}
+
+	pub fn segments(mut self, segments: Vec<ProgressSegment>) -> Self {
+		self.inner.segments = segments;
+		self
+	}
+
+	pub fn segment(mut self, value: f32, color: Option<Color>) -> Self {
+		self.inner.segments.push(ProgressSegment::new(value, color));
+		self
+	}
+
+	pub fn values<I>(mut self, values: I) -> Self
+	where
+		I: IntoIterator<Item = f32>,
+	{
+		self.inner.segments = values
+			.into_iter()
+			.map(|v| ProgressSegment::new(v, None))
+			.collect();
+		self
+	}
+
+	pub fn max(mut self, max: f32) -> Self {
+		self.inner.max = Some(max);
+		self
+	}
+
+	pub fn height(mut self, height: f32) -> Self {
+		self.inner.height = height;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn build(self) -> MultiProgressBar {
+		self.inner
+	}
+}
+
+impl From<MultiProgressBarBuilder> for MultiProgressBar {
+	fn from(builder: MultiProgressBarBuilder) -> Self {
+		builder.build()
+	}
+}

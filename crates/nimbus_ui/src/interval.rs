@@ -13,7 +13,10 @@
 use std::cell::Cell;
 
 use nimbus_core::event::{ButtonState, MouseButton};
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod, LayoutCtx,
+	MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
 use nimbus_theme::MonetRole;
@@ -252,5 +255,73 @@ impl Widget for Interval {
 		} else {
 			false
 		}
+	}
+}
+
+impl Interval {
+	pub fn builder() -> IntervalBuilder {
+		IntervalBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct IntervalBuilder {
+	inner: Interval,
+}
+
+impl IntervalBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Interval::default(),
+		}
+	}
+
+	pub fn pos1(mut self, pos1: f32) -> Self {
+		self.inner.pos1 = pos1;
+		self
+	}
+
+	pub fn pos2(mut self, pos2: f32) -> Self {
+		self.inner.pos2 = pos2;
+		self
+	}
+
+	pub fn min(mut self, min: f32) -> Self {
+		self.inner.min = min;
+		self
+	}
+
+	pub fn max(mut self, max: f32) -> Self {
+		self.inner.max = max;
+		self
+	}
+
+	pub fn range(mut self, min: f32, max: f32) -> Self {
+		self.inner.min = min;
+		self.inner.max = max;
+		self
+	}
+
+	pub fn step(mut self, step: f32) -> Self {
+		self.inner.step = Some(step);
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(mut self) -> Interval {
+		self.inner.pos1 = self.inner.pos1.clamp(self.inner.min, self.inner.max);
+		self.inner.pos2 = self.inner.pos2.clamp(self.inner.pos1, self.inner.max);
+		self.inner
+	}
+}
+
+impl From<IntervalBuilder> for Interval {
+	fn from(builder: IntervalBuilder) -> Self {
+		builder.build()
 	}
 }

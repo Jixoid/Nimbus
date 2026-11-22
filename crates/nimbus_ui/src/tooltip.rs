@@ -370,3 +370,81 @@ impl Widget for Tooltip {
 		Ok(())
 	}
 }
+
+impl Tooltip {
+	pub fn builder() -> TooltipBuilder {
+		TooltipBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct TooltipBuilder {
+	inner: Tooltip,
+}
+
+pub type ToolTipBuilder = TooltipBuilder;
+
+impl TooltipBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Tooltip::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.text = text.into();
+		self
+	}
+
+	pub fn position(mut self, position: TooltipPosition) -> Self {
+		self.inner.position = position;
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = radius;
+		self
+	}
+
+	pub fn show_arrow(mut self, show: bool) -> Self {
+		self.inner.show_arrow = show;
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.color = Some(color);
+		self
+	}
+
+	pub fn open(mut self, open: bool) -> Self {
+		self.inner.open = Some(open);
+		self.inner.progress.snap_to(if open { 1.0 } else { 0.0 });
+		self
+	}
+
+	pub fn build(self) -> Tooltip {
+		self.inner
+	}
+}
+
+impl From<TooltipBuilder> for Tooltip {
+	fn from(builder: TooltipBuilder) -> Self {
+		builder.build()
+	}
+}

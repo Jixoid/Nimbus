@@ -76,3 +76,53 @@ impl Widget for Text {
 		Ok(())
 	}
 }
+
+impl Text {
+	pub fn builder() -> TextBuilder {
+		TextBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct TextBuilder {
+	inner: Text,
+}
+
+impl TextBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Text::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.text = text.into();
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.color = Some(color);
+		self
+	}
+
+	pub fn build(self) -> Text {
+		self.inner
+	}
+}
+
+impl From<TextBuilder> for Text {
+	fn from(builder: TextBuilder) -> Self {
+		builder.build()
+	}
+}

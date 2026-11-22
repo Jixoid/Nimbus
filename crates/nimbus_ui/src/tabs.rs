@@ -14,7 +14,7 @@ use std::cell::{Cell, RefCell};
 
 use nimbus_core::{
 	Animated, BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent,
-	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Spring, Widget,
+	IntoMethod, LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Spring, Widget,
 };
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -281,6 +281,73 @@ impl Widget for Tabs {
 		} else {
 			false
 		}
+	}
+}
+
+impl Tabs {
+	pub fn builder() -> TabsBuilder {
+		TabsBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct TabsBuilder {
+	inner: Tabs,
+}
+
+impl TabsBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Tabs::default(),
+		}
+	}
+
+	pub fn tabs<I, S>(mut self, tabs: I) -> Self
+	where
+		I: IntoIterator<Item = S>,
+		S: Into<String>,
+	{
+		self.inner.tabs = tabs.into_iter().map(Into::into).collect();
+		self
+	}
+
+	pub fn tab(mut self, tab: impl Into<String>) -> Self {
+		self.inner.tabs.push(tab.into());
+		self
+	}
+
+	pub fn tab_id(mut self, tab_id: i32) -> Self {
+		self.inner.tab_id = tab_id;
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Tabs {
+		if let Some(target_local) = self.inner.local_tab_rect(32.0, self.inner.tab_id as usize) {
+			self.inner.indicator.borrow_mut().snap_to(target_local);
+		}
+		self.inner
+	}
+}
+
+impl From<TabsBuilder> for Tabs {
+	fn from(builder: TabsBuilder) -> Self {
+		builder.build()
 	}
 }
 

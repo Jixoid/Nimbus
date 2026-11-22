@@ -12,7 +12,10 @@
 
 use std::any;
 
-use nimbus_core::{BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget};
+use nimbus_core::{
+	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod, LayoutCtx,
+	MethodCallback, PropertyCtx, PropertyValue, Widget,
+};
 use nimbus_math::{Color, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
 use nimbus_theme::MonetRole;
@@ -226,5 +229,75 @@ impl Widget for Button {
 		} else {
 			false
 		}
+	}
+}
+
+impl Button {
+	pub fn builder() -> ButtonBuilder {
+		ButtonBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct ButtonBuilder {
+	inner: Button,
+}
+
+impl ButtonBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Button::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.label = text.into();
+		self
+	}
+
+	pub fn label(mut self, label: impl Into<String>) -> Self {
+		self.inner.label = label.into();
+		self
+	}
+
+	pub fn variant(mut self, variant: ButtonVariant) -> Self {
+		self.inner.variant = variant;
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn padding(mut self, padding: Vec2<f32>) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = Vec2::new(padding, padding);
+		self
+	}
+
+	pub fn on_click<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_click = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Button {
+		self.inner
+	}
+}
+
+impl From<ButtonBuilder> for Button {
+	fn from(builder: ButtonBuilder) -> Self {
+		builder.build()
 	}
 }

@@ -14,7 +14,7 @@ use std::any;
 
 use nimbus_core::{
 	Animated, BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent,
-	Interpolate, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Spring, Widget,
+	Interpolate, IntoMethod, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Spring, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -188,5 +188,71 @@ impl Widget for Switch {
 		} else {
 			false
 		}
+	}
+}
+
+impl Switch {
+	pub fn builder() -> SwitchBuilder {
+		SwitchBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct SwitchBuilder {
+	inner: Switch,
+}
+
+impl SwitchBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Switch::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.label = text.into();
+		self
+	}
+
+	pub fn label(mut self, label: impl Into<String>) -> Self {
+		self.inner.label = label.into();
+		self
+	}
+
+	pub fn checked(mut self, checked: bool) -> Self {
+		self.inner.checked = checked;
+		self.inner.progress.snap_to(if checked { 1.0 } else { 0.0 });
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.color = Some(color);
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Switch {
+		self.inner
+	}
+}
+
+impl From<SwitchBuilder> for Switch {
+	fn from(builder: SwitchBuilder) -> Self {
+		builder.build()
 	}
 }

@@ -101,3 +101,69 @@ impl Widget for Flow {
 		Ok(())
 	}
 }
+
+impl Flow {
+	pub fn builder() -> FlowBuilder {
+		FlowBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct FlowBuilder {
+	inner: Flow,
+}
+
+impl FlowBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Flow::default(),
+		}
+	}
+
+	pub fn spacing(mut self, spacing: f32) -> Self {
+		self.inner.spacing_x = spacing;
+		self.inner.spacing_y = spacing;
+		self
+	}
+
+	pub fn spacing_x(mut self, spacing_x: f32) -> Self {
+		self.inner.spacing_x = spacing_x;
+		self
+	}
+
+	pub fn horiz_spacing(mut self, spacing_x: f32) -> Self {
+		self.inner.spacing_x = spacing_x;
+		self
+	}
+
+	pub fn spacing_y(mut self, spacing_y: f32) -> Self {
+		self.inner.spacing_y = spacing_y;
+		self
+	}
+
+	pub fn vert_spacing(mut self, spacing_y: f32) -> Self {
+		self.inner.spacing_y = spacing_y;
+		self
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn build(self) -> Flow {
+		self.inner
+	}
+}
+
+impl From<FlowBuilder> for Flow {
+	fn from(builder: FlowBuilder) -> Self {
+		builder.build()
+	}
+}

@@ -55,3 +55,50 @@ impl Widget for Spacer {
 		Ok(())
 	}
 }
+
+impl Spacer {
+	pub fn builder() -> SpacerBuilder {
+		SpacerBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct SpacerBuilder {
+	inner: Spacer,
+}
+
+impl SpacerBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Spacer::default(),
+		}
+	}
+
+	pub fn width(mut self, width: f32) -> Self {
+		self.inner.width = width.max(0.0);
+		self
+	}
+
+	pub fn height(mut self, height: f32) -> Self {
+		self.inner.height = height.max(0.0);
+		self
+	}
+
+	pub fn size(mut self, size: f32) -> Self {
+		let s = size.max(0.0);
+		self.inner.width = s;
+		self.inner.height = s;
+		self
+	}
+
+	pub fn build(self) -> Spacer {
+		self.inner
+	}
+}
+
+impl From<SpacerBuilder> for Spacer {
+	fn from(builder: SpacerBuilder) -> Self {
+		builder.build()
+	}
+}

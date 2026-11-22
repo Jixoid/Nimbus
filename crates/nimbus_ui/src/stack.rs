@@ -144,3 +144,73 @@ impl Widget for Stack {
 		Ok(())
 	}
 }
+
+impl Stack {
+	pub fn builder() -> StackBuilder {
+		StackBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct StackBuilder {
+	inner: Stack,
+}
+
+impl StackBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Stack::default(),
+		}
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn border_width(mut self, width: f32) -> Self {
+		self.inner.border_width = width;
+		self
+	}
+
+	pub fn border_color(mut self, color: Color) -> Self {
+		self.inner.border_color = Some(color);
+		self
+	}
+
+	pub fn shadow_blur(mut self, blur: f32) -> Self {
+		self.inner.shadow_blur = blur;
+		self
+	}
+
+	pub fn build(self) -> Stack {
+		self.inner
+	}
+}
+
+impl From<StackBuilder> for Stack {
+	fn from(builder: StackBuilder) -> Self {
+		builder.build()
+	}
+}

@@ -140,3 +140,73 @@ impl Widget for Card {
 		Ok(())
 	}
 }
+
+impl Card {
+	pub fn builder() -> CardBuilder {
+		CardBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct CardBuilder {
+	inner: Card,
+}
+
+impl CardBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Card::default(),
+		}
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn border_width(mut self, width: f32) -> Self {
+		self.inner.border_width = width;
+		self
+	}
+
+	pub fn border_color(mut self, color: Color) -> Self {
+		self.inner.border_color = Some(color);
+		self
+	}
+
+	pub fn shadow_blur(mut self, blur: f32) -> Self {
+		self.inner.shadow_blur = blur;
+		self
+	}
+
+	pub fn build(self) -> Card {
+		self.inner
+	}
+}
+
+impl From<CardBuilder> for Card {
+	fn from(builder: CardBuilder) -> Self {
+		builder.build()
+	}
+}

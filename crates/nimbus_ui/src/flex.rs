@@ -227,6 +227,86 @@ impl Widget for VBox {
 	}
 }
 
+impl VBox {
+	pub fn builder() -> VBoxBuilder {
+		VBoxBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct VBoxBuilder {
+	inner: VBox,
+}
+
+impl VBoxBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: VBox::default(),
+		}
+	}
+
+	pub fn spacing(mut self, spacing: f32) -> Self {
+		self.inner.spacing = spacing;
+		self
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn border_width(mut self, width: f32) -> Self {
+		self.inner.border_width = width;
+		self
+	}
+
+	pub fn border_color(mut self, color: Color) -> Self {
+		self.inner.border_color = Some(color);
+		self
+	}
+
+	pub fn shadow_blur(mut self, blur: f32) -> Self {
+		self.inner.shadow_blur = blur;
+		self
+	}
+
+	pub fn scrollable(mut self, scrollable: bool) -> Self {
+		self.inner.scrollable = scrollable;
+		self
+	}
+
+	pub fn build(self) -> VBox {
+		self.inner
+	}
+}
+
+impl From<VBoxBuilder> for VBox {
+	fn from(builder: VBoxBuilder) -> Self {
+		builder.build()
+	}
+}
+
 
 // HBox
 pub struct HBox {
@@ -429,5 +509,85 @@ impl Widget for HBox {
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
+	}
+}
+
+impl HBox {
+	pub fn builder() -> HBoxBuilder {
+		HBoxBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct HBoxBuilder {
+	inner: HBox,
+}
+
+impl HBoxBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: HBox::default(),
+		}
+	}
+
+	pub fn spacing(mut self, spacing: f32) -> Self {
+		self.inner.spacing = spacing;
+		self
+	}
+
+	pub fn padding(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn paddings(mut self, padding: f32) -> Self {
+		self.inner.padding = padding;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn background(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.background = Some(color);
+		self
+	}
+
+	pub fn border_width(mut self, width: f32) -> Self {
+		self.inner.border_width = width;
+		self
+	}
+
+	pub fn border_color(mut self, color: Color) -> Self {
+		self.inner.border_color = Some(color);
+		self
+	}
+
+	pub fn shadow_blur(mut self, blur: f32) -> Self {
+		self.inner.shadow_blur = blur;
+		self
+	}
+
+	pub fn scrollable(mut self, scrollable: bool) -> Self {
+		self.inner.scrollable = scrollable;
+		self
+	}
+
+	pub fn build(self) -> HBox {
+		self.inner
+	}
+}
+
+impl From<HBoxBuilder> for HBox {
+	fn from(builder: HBoxBuilder) -> Self {
+		builder.build()
 	}
 }

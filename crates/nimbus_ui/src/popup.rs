@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use nimbus_core::{
 	Animated, BoxConstraints, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
+	IntoMethod, LayoutCtx, MethodCallback, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -699,6 +699,132 @@ impl Widget for Popup {
 		} else {
 			false
 		}
+	}
+}
+
+impl PopupItem {
+	pub fn builder() -> PopupItemBuilder {
+		PopupItemBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct PopupItemBuilder {
+	inner: PopupItem,
+}
+
+impl PopupItemBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: PopupItem::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.text = text.into();
+		self
+	}
+
+	pub fn shortcut(mut self, shortcut: impl Into<String>) -> Self {
+		self.inner.shortcut = Some(shortcut.into());
+		self
+	}
+
+	pub fn disabled(mut self, disabled: bool) -> Self {
+		self.inner.disabled = disabled;
+		self
+	}
+
+	pub fn items(mut self, items: Vec<PopupItem>) -> Self {
+		self.inner.items = items;
+		self
+	}
+
+	pub fn item(mut self, item: impl Into<PopupItem>) -> Self {
+		self.inner.items.push(item.into());
+		self
+	}
+
+	pub fn build(self) -> PopupItem {
+		self.inner
+	}
+}
+
+impl From<PopupItemBuilder> for PopupItem {
+	fn from(builder: PopupItemBuilder) -> Self {
+		builder.build()
+	}
+}
+
+impl Popup {
+	pub fn builder() -> PopupBuilder {
+		PopupBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct PopupBuilder {
+	inner: Popup,
+}
+
+impl PopupBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Popup::default(),
+		}
+	}
+
+	pub fn title(mut self, title: impl Into<String>) -> Self {
+		self.inner.title = Some(title.into());
+		self
+	}
+
+	pub fn items(mut self, items: Vec<PopupItem>) -> Self {
+		self.inner.items = items;
+		self
+	}
+
+	pub fn item(mut self, item: impl Into<PopupItem>) -> Self {
+		self.inner.items.push(item.into());
+		self
+	}
+
+	pub fn open(mut self, open: bool) -> Self {
+		self.inner.open = open;
+		self.inner.progress.snap_to(if open { 1.0 } else { 0.0 });
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn min_width(mut self, width: f32) -> Self {
+		self.inner.min_width = width;
+		self
+	}
+
+	pub fn on_selected<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_selected = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Popup {
+		self.inner
+	}
+}
+
+impl From<PopupBuilder> for Popup {
+	fn from(builder: PopupBuilder) -> Self {
+		builder.build()
 	}
 }
 

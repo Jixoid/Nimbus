@@ -401,3 +401,43 @@ impl Widget for ScrollView {
 		Ok(())
 	}
 }
+
+impl ScrollView {
+	pub fn builder() -> ScrollViewBuilder {
+		ScrollViewBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct ScrollViewBuilder {
+	inner: ScrollView,
+}
+
+impl ScrollViewBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: ScrollView::default(),
+		}
+	}
+
+	pub fn scrollable_x(mut self, scrollable: bool) -> Self {
+		self.inner.scrollable_x = scrollable;
+		self
+	}
+
+	pub fn scrollable_y(mut self, scrollable: bool) -> Self {
+		self.inner.scrollable_y = scrollable;
+		self
+	}
+
+	pub fn build(self) -> ScrollView {
+		self.inner
+	}
+}
+
+impl From<ScrollViewBuilder> for ScrollView {
+	fn from(builder: ScrollViewBuilder) -> Self {
+		builder.build()
+	}
+}

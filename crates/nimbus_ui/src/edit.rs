@@ -13,8 +13,8 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx,
-	MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
+	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
@@ -447,5 +447,71 @@ impl Widget for Edit {
 			}
 			_ => false,
 		}
+	}
+}
+
+impl Edit {
+	pub fn builder() -> EditBuilder {
+		EditBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct EditBuilder {
+	inner: Edit,
+}
+
+impl EditBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: Edit::default(),
+		}
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.text = text.into();
+		self.inner.ensure_cursor_boundary();
+		self
+	}
+
+	pub fn title(mut self, title: impl Into<String>) -> Self {
+		self.inner.title = title.into();
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn border_radius(mut self, radius: f32) -> Self {
+		self.inner.border_radius = radius;
+		self
+	}
+
+	pub fn on_changed<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_changed = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn on_submit<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_submit = Some(MethodCallback::new(callback));
+		self
+	}
+
+	pub fn build(self) -> Edit {
+		self.inner
+	}
+}
+
+impl From<EditBuilder> for Edit {
+	fn from(builder: EditBuilder) -> Self {
+		builder.build()
 	}
 }

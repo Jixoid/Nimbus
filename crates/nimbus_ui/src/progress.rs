@@ -210,3 +210,97 @@ impl Widget for ProgressBar {
 		Ok(())
 	}
 }
+
+impl ProgressBar {
+	pub fn builder() -> ProgressBarBuilder {
+		ProgressBarBuilder::new()
+	}
+}
+
+
+#[derive(Default)]
+pub struct ProgressBarBuilder {
+	inner: ProgressBar,
+}
+
+impl ProgressBarBuilder {
+	pub fn new() -> Self {
+		Self {
+			inner: ProgressBar::default(),
+		}
+	}
+
+	pub fn value(mut self, value: f32) -> Self {
+		self.inner.value = value;
+		self
+	}
+
+	pub fn progress(mut self, progress: f32) -> Self {
+		self.inner.value = progress;
+		self.inner.min = 0.0;
+		self.inner.max = Some(1.0);
+		self
+	}
+
+	pub fn min(mut self, min: f32) -> Self {
+		self.inner.min = min;
+		self
+	}
+
+	pub fn max(mut self, max: f32) -> Self {
+		self.inner.max = Some(max);
+		self
+	}
+
+	pub fn height(mut self, height: f32) -> Self {
+		self.inner.height = height;
+		self
+	}
+
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
+		self
+	}
+
+	pub fn color(mut self, color: Color) -> Self {
+		self.inner.color = Some(color);
+		self
+	}
+
+	pub fn track_color(mut self, color: Color) -> Self {
+		self.inner.track_color = Some(color);
+		self
+	}
+
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.inner.text = Some(text.into());
+		self
+	}
+
+	pub fn font(mut self, font: FontId) -> Self {
+		self.inner.font = Some(font);
+		self
+	}
+
+	pub fn font_size(mut self, size: f32) -> Self {
+		self.inner.font_size = size;
+		self
+	}
+
+	pub fn show_percentage(mut self, show: bool) -> Self {
+		self.inner.show_percentage = show;
+		self
+	}
+
+	pub fn build(self) -> ProgressBar {
+		let ratio = self.inner.ratio();
+		self.inner.anim_progress.borrow_mut().snap_to(ratio);
+		self.inner
+	}
+}
+
+impl From<ProgressBarBuilder> for ProgressBar {
+	fn from(builder: ProgressBarBuilder) -> Self {
+		builder.build()
+	}
+}
