@@ -33,7 +33,7 @@ pub use event::{
 pub use id::{ObjectID, WindowHandle};
 pub use layout::{BoxConstraints, LayoutCtx};
 pub use method::{ActionCallback, EventRegistry, MethodCallback, MethodTable};
-pub use node::NodeData;
+pub use node::{Anchor, NodeData};
 pub use property::{parse_color, PropertyCtx, PropertyError, PropertyValue};
 pub use registry::{create_widget, register_global_widget, WidgetFactory, WidgetRegistry};
 pub use nimbus_render2d::Canvas2D;

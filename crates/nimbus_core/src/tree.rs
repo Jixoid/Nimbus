@@ -245,6 +245,16 @@ impl UiTree {
 		}
 	}
 
+	pub fn anchor(&self, id: ObjectID) -> Option<crate::node::Anchor> {
+		self.nodes.get(id).and_then(|n| n.anchor)
+	}
+
+	pub fn set_anchor(&mut self, id: ObjectID, anchor: Option<crate::node::Anchor>) {
+		if let Some(node) = self.nodes.get_mut(id) {
+			node.anchor = anchor;
+		}
+	}
+
 	// Draw Pass
 
 	pub fn draw(&self, canvas: &mut Canvas2D, theme: &Theme) -> (bool, bool) {

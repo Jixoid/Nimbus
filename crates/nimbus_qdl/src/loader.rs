@@ -13,7 +13,8 @@
 use std::collections::HashMap;
 
 use nimbus_core::{
-	MethodTable, ObjectID, PropertyCtx, PropertyError, PropertyValue, UiTree, Widget, WidgetRegistry,
+	Anchor, MethodTable, ObjectID, PropertyCtx, PropertyError, PropertyValue, UiTree, Widget,
+	WidgetRegistry,
 };
 use nimbus_except::{nimbus_log, nimbus_warn};
 use nimbus_theme::Theme;
@@ -68,8 +69,11 @@ pub fn load_into_tree_with_registry(
 		.ok_or_else(|| "No root node found in QDL document".to_string())?;
 
 	let mut named_nodes = HashMap::new();
-	let root_widget = instantiate_node(root_node, &doc, theme, methods, registry)?;
+	let (root_widget, root_anchor) = instantiate_node(root_node, &doc, theme, methods, registry)?;
 	let root_id = tree.insert_root_boxed(root_widget);
+	if root_anchor.is_some() {
+		tree.set_anchor(root_id, root_anchor);
+	}
 
 	if let Some(name) = &root_node.name {
 		named_nodes.insert(name.clone(), root_id);
@@ -105,8 +109,11 @@ fn load_child_recursive(
 	registry: &WidgetRegistry,
 	named_nodes: &mut HashMap<String, ObjectID>,
 ) -> Result<ObjectID, String> {
-	let widget = instantiate_node(node, doc, theme, methods, registry)?;
+	let (widget, anchor) = instantiate_node(node, doc, theme, methods, registry)?;
 	let id = tree.insert_child_boxed(parent_id, widget);
+	if anchor.is_some() {
+		tree.set_anchor(id, anchor);
+	}
 
 	if let Some(name) = &node.name {
 		named_nodes.insert(name.clone(), id);
@@ -125,7 +132,7 @@ fn instantiate_node(
 	theme: &Theme,
 	methods: &MethodTable,
 	registry: &WidgetRegistry,
-) -> Result<Box<dyn Widget>, String> {
+) -> Result<(Box<dyn Widget>, Option<Anchor>), String> {
 	let mut widget = registry.create(&node.kind).ok_or_else(|| {
 		format!(
 			"Unknown widget kind '{}' in QDL. Did you register it in WidgetRegistry?",
@@ -134,31 +141,46 @@ fn instantiate_node(
 	})?;
 
 	let ctx = PropertyCtx { theme };
+	let mut anchor = None;
 
 	// Styles
 	for style_name in &node.styles {
 		if let Some(style_props) = doc.styles.get(style_name) {
 			for (key, val) in style_props {
-				apply_property(&mut widget, key, val, &ctx, methods);
+				apply_property(&mut widget, &mut anchor, key, val, &ctx, methods);
 			}
 		}
 	}
 
-	// Methods
+	// Properties & Methods
 	for (key, val) in &node.props {
-		apply_property(&mut widget, key, val, &ctx, methods);
+		apply_property(&mut widget, &mut anchor, key, val, &ctx, methods);
 	}
 
-	Ok(widget)
+	Ok((widget, anchor))
 }
 
 fn apply_property(
 	widget: &mut Box<dyn Widget>,
+	anchor: &mut Option<Anchor>,
 	key: &str,
 	val: &PropertyValue,
 	ctx: &PropertyCtx,
 	methods: &MethodTable,
 ) {
+	if key == "anchor" {
+		if let Some(parsed) = val.as_str().and_then(Anchor::parse) {
+			*anchor = Some(parsed);
+		} else {
+			nimbus_warn!(
+				"Invalid value {:?} for property 'anchor' on widget '{}' (expected e.g. 'left-top', 'right-top', 'center', 'fill')",
+				val,
+				widget.name(),
+			);
+		}
+		return;
+	}
+
 	if widget.is_method(key) {
 		if let Some(method_name) = val.as_str() {
 			if let Some(method_ptr) = methods.get(method_name) {

@@ -27,6 +27,9 @@ Other languages: [tr](README.tr.md)
 ![Nimbus Interface Test](/images/test.png)
 *Interface test.*
 
+![Nimbus Interface Test](/images/mstudio.png)
+*Interface test.*
+
 ---
 
 ## License

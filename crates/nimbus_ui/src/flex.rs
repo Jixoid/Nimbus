@@ -13,7 +13,7 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, PropertyCtx,
+	Anchor, BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, PropertyCtx,
 	PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -58,31 +58,76 @@ impl Default for VBox {
 impl Widget for VBox {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
 		let children = ctx.children();
-		let mut current_y = self.padding;
+		let pad = self.padding * 2.0;
+		let avail_w = if constraints.max_width.is_finite() {
+			(constraints.max_width - pad).max(0.0)
+		} else {
+			f32::INFINITY
+		};
+		let avail_h = if constraints.max_height.is_finite() {
+			(constraints.max_height - pad).max(0.0)
+		} else {
+			f32::INFINITY
+		};
+		let tight_w = constraints.min_width >= constraints.max_width && avail_w.is_finite();
+		let can_expand_y = avail_h.is_finite() && !self.scrollable;
+		let total_spacing = if children.len() > 1 {
+			self.spacing * (children.len() - 1) as f32
+		} else {
+			0.0
+		};
+
+		let mut fixed_height = 0.0f32;
 		let mut max_width = 0.0f32;
+		let mut expand_count = 0usize;
+		let mut items = Vec::with_capacity(children.len());
 
-		let child_constraints = BoxConstraints::new(
-			0.0,
-			(constraints.max_width - self.padding * 2.0).max(0.0),
-			0.0,
-			f32::INFINITY,
-		);
+		// Measure non-expanding children first
+		for child in children {
+			let anchor = ctx.child_anchor(child);
+			let is_expand_y = can_expand_y && matches!(anchor, Some(Anchor::Fill));
+			let is_fill_x = matches!(anchor, Some(Anchor::Fill | Anchor::TopFill | Anchor::BottomFill));
 
-		let mut child_sizes = Vec::with_capacity(children.len());
-		for (i, child) in children.iter().enumerate() {
-			if i > 0 {
-				current_y += self.spacing;
+			if is_expand_y {
+				expand_count += 1;
+				items.push((child, anchor, true, is_fill_x, Vec2::ZERO));
+			} else {
+				let child_constraints = if is_fill_x && tight_w {
+					BoxConstraints::new(avail_w, avail_w, 0.0, f32::INFINITY)
+				} else {
+					BoxConstraints::new(0.0, avail_w, 0.0, f32::INFINITY)
+				};
+				let size = ctx.layout_child(child, child_constraints);
+				fixed_height += size.y;
+				max_width = max_width.max(size.x);
+				items.push((child, anchor, false, is_fill_x, size));
 			}
-
-			let size = ctx.layout_child(*child, child_constraints);
-			current_y += size.y;
-			max_width = max_width.max(size.x);
-			child_sizes.push(size);
 		}
 
-		current_y += self.padding;
-		let total_width = max_width + self.padding * 2.0;
+		// Distribute remaining vertical space to `anchor: "fill"` children
+		let mut total_children_h = fixed_height;
+		if expand_count > 0 {
+			let remaining_h = (avail_h - fixed_height - total_spacing).max(0.0);
+			let share_h = remaining_h / expand_count as f32;
+			let expand_constraints = if tight_w {
+				BoxConstraints::new(avail_w, avail_w, share_h, share_h)
+			} else {
+				BoxConstraints::new(0.0, avail_w, share_h, share_h)
+			};
+
+			for (child, _, is_expand_y, _, size) in &mut items {
+				if *is_expand_y {
+					*size = ctx.layout_child(*child, expand_constraints);
+					total_children_h += size.y;
+					max_width = max_width.max(size.x);
+				}
+			}
+		}
+
+		let current_y = total_children_h + total_spacing + pad;
+		let total_width = max_width + pad;
 		let final_size = constraints.constrain(Vec2::new(total_width, current_y));
+		let inner_w = (final_size.x - pad).max(0.0);
 
 		let scroll_offset = if self.scrollable {
 			ctx.set_clip_children(true);
@@ -94,12 +139,29 @@ impl Widget for VBox {
 		};
 
 		let mut pos_y = self.padding - scroll_offset;
-		for (i, child) in children.iter().enumerate() {
+		for (i, (child, anchor, is_expand_y, is_fill_x, mut size)) in items.into_iter().enumerate() {
 			if i > 0 {
 				pos_y += self.spacing;
 			}
-			ctx.set_child_position(*child, Vec2::new(self.padding, pos_y));
-			pos_y += child_sizes[i].y;
+			if is_fill_x && (size.x - inner_w).abs() > 0.5 {
+				let c = if is_expand_y {
+					BoxConstraints::new(inner_w, inner_w, size.y, size.y)
+				} else {
+					BoxConstraints::new(inner_w, inner_w, 0.0, f32::INFINITY)
+				};
+				size = ctx.layout_child(child, c);
+			}
+			let pos_x = match anchor {
+				Some(Anchor::Center | Anchor::TopCenter | Anchor::BottomCenter) => {
+					self.padding + (inner_w - size.x).max(0.0) * 0.5
+				}
+				Some(Anchor::CenterRight | Anchor::TopRight | Anchor::BottomRight | Anchor::RightFill) => {
+					self.padding + (inner_w - size.x).max(0.0)
+				}
+				_ => self.padding,
+			};
+			ctx.set_child_position(child, Vec2::new(pos_x, pos_y));
+			pos_y += size.y;
 		}
 
 		final_size
@@ -201,31 +263,76 @@ impl Default for HBox {
 impl Widget for HBox {
 	fn layout(&mut self, ctx: &mut LayoutCtx, constraints: BoxConstraints) -> Vec2<f32> {
 		let children = ctx.children();
-		let mut current_x = self.padding;
+		let pad = self.padding * 2.0;
+		let avail_w = if constraints.max_width.is_finite() {
+			(constraints.max_width - pad).max(0.0)
+		} else {
+			f32::INFINITY
+		};
+		let avail_h = if constraints.max_height.is_finite() {
+			(constraints.max_height - pad).max(0.0)
+		} else {
+			f32::INFINITY
+		};
+		let tight_h = constraints.min_height >= constraints.max_height && avail_h.is_finite();
+		let can_expand_x = avail_w.is_finite() && !self.scrollable;
+		let total_spacing = if children.len() > 1 {
+			self.spacing * (children.len() - 1) as f32
+		} else {
+			0.0
+		};
+
+		let mut fixed_width = 0.0f32;
 		let mut max_height = 0.0f32;
+		let mut expand_count = 0usize;
+		let mut items = Vec::with_capacity(children.len());
 
-		let child_constraints = BoxConstraints::new(
-			0.0,
-			f32::INFINITY,
-			0.0,
-			(constraints.max_height - self.padding * 2.0).max(0.0),
-		);
+		// Measure non-expanding children first
+		for child in children {
+			let anchor = ctx.child_anchor(child);
+			let is_expand_x = can_expand_x && matches!(anchor, Some(Anchor::Fill));
+			let is_fill_y = matches!(anchor, Some(Anchor::Fill | Anchor::LeftFill | Anchor::RightFill));
 
-		let mut child_sizes = Vec::with_capacity(children.len());
-		for (i, child) in children.iter().enumerate() {
-			if i > 0 {
-				current_x += self.spacing;
+			if is_expand_x {
+				expand_count += 1;
+				items.push((child, anchor, true, is_fill_y, Vec2::ZERO));
+			} else {
+				let child_constraints = if is_fill_y && tight_h {
+					BoxConstraints::new(0.0, f32::INFINITY, avail_h, avail_h)
+				} else {
+					BoxConstraints::new(0.0, f32::INFINITY, 0.0, avail_h)
+				};
+				let size = ctx.layout_child(child, child_constraints);
+				fixed_width += size.x;
+				max_height = max_height.max(size.y);
+				items.push((child, anchor, false, is_fill_y, size));
 			}
-
-			let size = ctx.layout_child(*child, child_constraints);
-			current_x += size.x;
-			max_height = max_height.max(size.y);
-			child_sizes.push(size);
 		}
 
-		current_x += self.padding;
-		let total_height = max_height + self.padding * 2.0;
+		// Distribute remaining horizontal space to `anchor: "fill"` children
+		let mut total_children_w = fixed_width;
+		if expand_count > 0 {
+			let remaining_w = (avail_w - fixed_width - total_spacing).max(0.0);
+			let share_w = remaining_w / expand_count as f32;
+			let expand_constraints = if tight_h {
+				BoxConstraints::new(share_w, share_w, avail_h, avail_h)
+			} else {
+				BoxConstraints::new(share_w, share_w, 0.0, avail_h)
+			};
+
+			for (child, _, is_expand_x, _, size) in &mut items {
+				if *is_expand_x {
+					*size = ctx.layout_child(*child, expand_constraints);
+					total_children_w += size.x;
+					max_height = max_height.max(size.y);
+				}
+			}
+		}
+
+		let current_x = total_children_w + total_spacing + pad;
+		let total_height = max_height + pad;
 		let final_size = constraints.constrain(Vec2::new(current_x, total_height));
+		let inner_h = (final_size.y - pad).max(0.0);
 
 		let scroll_offset = if self.scrollable {
 			ctx.set_clip_children(true);
@@ -237,12 +344,29 @@ impl Widget for HBox {
 		};
 
 		let mut pos_x = self.padding - scroll_offset;
-		for (i, child) in children.iter().enumerate() {
+		for (i, (child, anchor, is_expand_x, is_fill_y, mut size)) in items.into_iter().enumerate() {
 			if i > 0 {
 				pos_x += self.spacing;
 			}
-			ctx.set_child_position(*child, Vec2::new(pos_x, self.padding));
-			pos_x += child_sizes[i].x;
+			if is_fill_y && (size.y - inner_h).abs() > 0.5 {
+				let c = if is_expand_x {
+					BoxConstraints::new(size.x, size.x, inner_h, inner_h)
+				} else {
+					BoxConstraints::new(0.0, f32::INFINITY, inner_h, inner_h)
+				};
+				size = ctx.layout_child(child, c);
+			}
+			let pos_y = match anchor {
+				Some(Anchor::Center | Anchor::CenterLeft | Anchor::CenterRight) => {
+					self.padding + (inner_h - size.y).max(0.0) * 0.5
+				}
+				Some(Anchor::BottomCenter | Anchor::BottomLeft | Anchor::BottomRight | Anchor::BottomFill) => {
+					self.padding + (inner_h - size.y).max(0.0)
+				}
+				_ => self.padding,
+			};
+			ctx.set_child_position(child, Vec2::new(pos_x, pos_y));
+			pos_x += size.x;
 		}
 
 		final_size

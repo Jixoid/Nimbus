@@ -46,20 +46,45 @@ impl Widget for Card {
 
 		let mut max_child_w = 0.0f32;
 		let mut max_child_h = 0.0f32;
+		let mut laid_out = Vec::with_capacity(children.len());
 
 		for child in children {
+			let anchor = ctx.child_anchor(child);
 			let size = ctx.layout_child(child, child_constraints);
-			ctx.set_child_position(child, Vec2::new(self.padding, self.padding));
 			max_child_w = max_child_w.max(size.x);
 			max_child_h = max_child_h.max(size.y);
+			laid_out.push((child, anchor, size));
 		}
 
-		let total_size = Vec2::new(
+		let final_size = constraints.constrain(Vec2::new(
 			max_child_w + self.padding * 2.0,
 			max_child_h + self.padding * 2.0,
+		));
+		let inner_size = Vec2::new(
+			(final_size.x - self.padding * 2.0).max(0.0),
+			(final_size.y - self.padding * 2.0).max(0.0),
 		);
 
-		constraints.constrain(total_size)
+		for (child, anchor, size) in laid_out {
+			let pos = if let Some(anchor) = anchor {
+				let final_child_size = match anchor {
+					nimbus_core::Anchor::Fill
+					| nimbus_core::Anchor::TopFill
+					| nimbus_core::Anchor::BottomFill
+					| nimbus_core::Anchor::LeftFill
+					| nimbus_core::Anchor::RightFill => {
+						ctx.layout_child(child, anchor.child_constraints(inner_size))
+					}
+					_ => size,
+				};
+				Vec2::new(self.padding, self.padding) + anchor.position(inner_size, final_child_size)
+			} else {
+				Vec2::new(self.padding, self.padding)
+			};
+			ctx.set_child_position(child, pos);
+		}
+
+		final_size
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {

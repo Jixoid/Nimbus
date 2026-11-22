@@ -13,6 +13,7 @@
 use nimbus_math::Vec2;
 use nimbus_render2d::{FontId, FontManager};
 use crate::id::ObjectID;
+use crate::node::Anchor;
 use crate::tree::UiTree;
 
 
@@ -127,6 +128,10 @@ impl<'a> LayoutCtx<'a> {
 
 	pub fn set_clip_children(&mut self, clip: bool) {
 		self.tree.set_clip_children(self.node_id, clip);
+	}
+
+	pub fn child_anchor(&self, child_id: ObjectID) -> Option<Anchor> {
+		self.tree.anchor(child_id)
 	}
 
 	pub fn measure_text(&self, text: &str, font_size: f32) -> (f32, f32) {
