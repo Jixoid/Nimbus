@@ -27,7 +27,15 @@ Diğer diller: [en](README.md)
 ![Nimbus Arayüz Testi](/images/test.png)
 *Arayüz testi.*
 
-![Nimbus Arayüz Testi](/images/mstudio.png)
+#### Örnek Uygulamalar
+
+![Nimbus Arayüz Testi](/images/mstudio_proj.png)
+*Arayüz testi.*
+
+![Nimbus Arayüz Testi](/images/mstudio_newproj.png)
+*Arayüz testi.*
+
+![Nimbus Arayüz Testi](/images/mstudio_settings.png)
 *Arayüz testi.*
 
 ---
