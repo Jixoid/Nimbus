@@ -46,6 +46,9 @@ fn main() {
 	let main_window = app.window_mut(main_handle).unwrap();
 	let tasks = main_window.task_queue();
 
+	let tasks_dialog = tasks.clone();
+	let tasks_toast = tasks.clone();
+
 	let target_id = Rc::new(Cell::new(None));
 	let target_id_cb = target_id.clone();
 
@@ -55,8 +58,8 @@ fn main() {
 	});
 	events.register("OpenWaitDialog", move || {
 		if let Some(target) = target_id_cb.get() {
-			let tasks_for_worker = tasks.clone();
-			tasks.push_tree(move |tree| {
+			let tasks_for_worker = tasks_dialog.clone();
+			tasks_dialog.push_tree(move |tree| {
 				let dlg_id = nimbus_ui::Dialog::attach_wait_overlay(
 					tree,
 					target,
@@ -74,6 +77,25 @@ fn main() {
 				});
 			});
 		}
+	});
+
+	let toast_counter = Rc::new(Cell::new(0usize));
+	events.register("ShowToast", move || {
+		let idx = toast_counter.get();
+		toast_counter.set(idx + 1);
+		let (title, msg, kind) = match idx % 4 {
+			0 => ("Bilgi", "Yeni bir bildirim oluşturuldu.", nimbus_ui::ToastKind::Info),
+			1 => ("Başarılı", "Değişiklikler kaydedildi.", nimbus_ui::ToastKind::Success),
+			2 => ("Uyarı", "Bazı alanlar varsayılan değerle kaldı.", nimbus_ui::ToastKind::Warning),
+			_ => ("Hata", "Sunucuya bağlanılamadı.", nimbus_ui::ToastKind::Error),
+		};
+		tasks_toast.push_tree(move |tree| {
+			nimbus_ui::Toast::builder()
+				.title(title)
+				.message(msg)
+				.kind(kind)
+				.show(tree);
+		});
 	});
 
 	let scene = nimbus_qdl::load_into_tree(

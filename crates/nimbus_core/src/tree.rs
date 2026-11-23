@@ -368,9 +368,24 @@ impl UiTree {
 
 	pub fn layout_all(&mut self, window_size: Vec2<f32>) {
 		let roots = self.roots.clone();
-		let constraints = BoxConstraints::tight(window_size);
+		let default_constraints = BoxConstraints::tight(window_size);
 		for root_id in roots {
-			self.layout_node(root_id, constraints);
+			if let Some(anchor) = self.anchor(root_id) {
+				let constraints = anchor.child_constraints(window_size);
+				let size = self.layout_node(root_id, constraints);
+				let pos = anchor.position(window_size, size);
+				let old_origin = self
+					.nodes
+					.get(root_id)
+					.map(|n| n.bounds.min)
+					.unwrap_or(Vec2::ZERO);
+				let delta = pos - old_origin;
+				if delta.x.abs() > f32::EPSILON || delta.y.abs() > f32::EPSILON {
+					self.offset_subtree(root_id, delta);
+				}
+			} else {
+				self.layout_node(root_id, default_constraints);
+			}
 		}
 	}
 
@@ -674,12 +689,19 @@ impl UiTree {
 		match state {
 			ButtonState::Pressed => {
 				let hit = self.hit_test(pos);
-				if let Some(prev) = self.focused_node {
+				let prev_focused = self.focused_node;
+				if let Some(prev) = prev_focused {
 					if hit != Some(prev) {
 						if let Some(node) = self.nodes.get_mut(prev) {
 							node.focused = false;
 						}
 						self.focused_node = None;
+						self.send_event(
+							prev,
+							&InputEvent::FocusLost,
+							&mut redraw_requested,
+							&mut layout_requested,
+						);
 						redraw_requested = true;
 					}
 				}
@@ -690,6 +712,15 @@ impl UiTree {
 					}
 					self.pressed_node = Some(target);
 					self.focused_node = Some(target);
+
+					if prev_focused != Some(target) {
+						self.send_event(
+							target,
+							&InputEvent::FocusGained,
+							&mut redraw_requested,
+							&mut layout_requested,
+						);
+					}
 
 					self.send_event(
 						target,

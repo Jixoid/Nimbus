@@ -121,7 +121,8 @@ fn draw_rotating_chevron(
 ) {
 	let cos_a = angle.cos();
 	let sin_a = angle.sin();
-	let steps = 12usize;
+	let steps = (size / 0.35).ceil().max(12.0) as usize;
+	let r = thickness * 0.5;
 
 	let tip = Vec2::new(size * 0.4, 0.0);
 	let top = Vec2::new(-size * 0.6, -size);
@@ -139,18 +140,17 @@ fn draw_rotating_chevron(
 			bot.y + (tip.y - bot.y) * t,
 		);
 
-		for p in [p1, p2] {
+		let arms: &[Vec2<f32>] = if i == steps { &[p1] } else { &[p1, p2] };
+		for &p in arms {
 			let rx = p.x * cos_a - p.y * sin_a;
 			let ry = p.x * sin_a + p.y * cos_a;
-			canvas.draw(RectShape::new(
-				Rect::new(
-					cx + rx - thickness * 0.5,
-					cy + ry - thickness * 0.5,
-					thickness,
-					thickness,
-				),
-				color,
-			));
+			canvas.draw(
+				RectShape::new(
+					Rect::new(cx + rx - r, cy + ry - r, thickness, thickness),
+					color,
+				)
+				.radius(r),
+			);
 		}
 	}
 }

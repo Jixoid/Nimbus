@@ -62,6 +62,8 @@ pub enum InputEvent {
 	},
 	PointerEntered,
 	PointerLeft,
+	FocusGained,
+	FocusLost,
 	Click {
 		position: Vec2<f32>,
 	},

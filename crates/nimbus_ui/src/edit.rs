@@ -35,6 +35,7 @@ pub struct Edit {
 	scroll_x: Cell<f32>,
 	last_bounds: Cell<Rect<f32>>,
 	is_dragging: bool,
+	dirty: bool,
 }
 
 impl Default for Edit {
@@ -52,6 +53,7 @@ impl Default for Edit {
 			scroll_x: Cell::new(0.0),
 			last_bounds: Cell::new(Rect::ZERO),
 			is_dragging: false,
+			dirty: false,
 		}
 	}
 }
@@ -365,29 +367,40 @@ impl Widget for Edit {
 						EventResponse::Handled
 					}
 					"Backspace" => {
-						if !self.delete_selection() && self.cursor_pos > 0 {
+						let mut changed = self.delete_selection();
+						if !changed && self.cursor_pos > 0 {
 							let prev = self.prev_char_boundary(self.cursor_pos);
 							self.text.drain(prev..self.cursor_pos);
 							self.cursor_pos = prev;
+							changed = true;
 						}
-						if let Some(cb) = &mut self.on_changed {
-							cb.call1(self.text.clone());
+						if changed {
+							self.dirty = true;
+							if let Some(cb) = &mut self.on_changed {
+								cb.call1(self.text.clone());
+							}
 						}
 						ctx.request_redraw();
 						EventResponse::Handled
 					}
 					"Delete" => {
-						if !self.delete_selection() && self.cursor_pos < self.text.len() {
+						let mut changed = self.delete_selection();
+						if !changed && self.cursor_pos < self.text.len() {
 							let next = self.next_char_boundary(self.cursor_pos);
 							self.text.drain(self.cursor_pos..next);
+							changed = true;
 						}
-						if let Some(cb) = &mut self.on_changed {
-							cb.call1(self.text.clone());
+						if changed {
+							self.dirty = true;
+							if let Some(cb) = &mut self.on_changed {
+								cb.call1(self.text.clone());
+							}
 						}
 						ctx.request_redraw();
 						EventResponse::Handled
 					}
 					"Enter" => {
+						self.dirty = false;
 						if let Some(cb) = &mut self.on_submit {
 							cb.call1(self.text.clone());
 						}
@@ -401,6 +414,7 @@ impl Widget for Edit {
 								self.ensure_cursor_boundary();
 								self.text.insert_str(self.cursor_pos, &filtered);
 								self.cursor_pos += filtered.len();
+								self.dirty = true;
 								if let Some(cb) = &mut self.on_changed {
 									cb.call1(self.text.clone());
 								}
@@ -413,6 +427,19 @@ impl Widget for Edit {
 				}
 			}
 
+			InputEvent::FocusLost => {
+				self.is_dragging = false;
+				self.selection_start = None;
+				if self.dirty {
+					self.dirty = false;
+					if let Some(cb) = &mut self.on_submit {
+						cb.call1(self.text.clone());
+					}
+				}
+				ctx.request_redraw();
+				EventResponse::Handled
+			}
+
 			_ => EventResponse::Ignored,
 		}
 	}
@@ -421,6 +448,7 @@ impl Widget for Edit {
 		match name {
 			"text" => {
 				self.text = value.expect_str()?.to_string();
+				self.dirty = false;
 				self.ensure_cursor_boundary();
 			}
 			"title" => self.title = value.expect_str()?.to_string(),

@@ -79,8 +79,12 @@ root qstd::hbox {
       text: "Edit 1"
       title: "edit 1"
     }
-    node qstd::edit {
-      text: "Edit 2"
+    
+    node qstd::combobox {
+      title: "Render Backend"
+      items: ["Vulkan", "OpenGL", "DirectX 12", "Metal"]
+      selected: 0
+      on_changed: "OnBackendChanged"
     }
 
     node qstd::slider {
@@ -132,6 +136,27 @@ root qstd::hbox {
     corner_radius: 16
     scrollable: true
 
+    node qstd::spinbox {
+      title: "Count"
+      value: 10
+      min: 0
+      max: 100
+      step: 5
+      suffix: " pcs"
+      on_submit: "OnCountSubmit"
+    }
+  
+    node qstd::floatspinbox {
+      title: "Scale"
+      value: 1.5
+      min: 0.0
+      max: 10.0
+      step: 0.005
+      decimals: 3
+      on_submit: "OnScaleSubmit"
+    }
+
+
     node qstd::progressbar {
       value: 30
       max: 100
@@ -161,6 +186,12 @@ root qstd::hbox {
       text: "Open Wait Dialog"
       variant: "filled"
       on_click: "OpenWaitDialog"
+    }
+
+    node qstd::button {
+      text: "Show Toast"
+      variant: "tonal"
+      on_click: "ShowToast"
     }
   }
 }
