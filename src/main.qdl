@@ -142,9 +142,11 @@ root qstd::hbox {
 
     node qstd::collapsible {
       title: "Collapsible Section"
-      expanded: false
+      expanded: true
       color: "monet(SurfaceContainerHigh)"
       header_color: "monet(SurfaceContainerHighest)"
+
+      node qstd::spinner {}
 
       node qstd::text {
         text: "Hidden details inside collapsible"
@@ -153,6 +155,12 @@ root qstd::hbox {
         text: "Inside Action"
         variant: "tonal"
       }
+    }
+
+    node qstd::button {
+      text: "Open Wait Dialog"
+      variant: "filled"
+      on_click: "OpenWaitDialog"
     }
   }
 }

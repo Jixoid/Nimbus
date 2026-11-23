@@ -363,11 +363,15 @@ impl AshDevice {
 
 		let queue_create_infos = [queue_create_info];
 
-		let desired_device_extensions = [
+		let mut desired_device_extensions = vec![
 			ash::khr::swapchain::NAME.as_ptr(),
 			ash::khr::dynamic_rendering::NAME.as_ptr(),
 			ash::khr::synchronization2::NAME.as_ptr(),
 		];
+		#[cfg(unix)]
+		{
+			desired_device_extensions.push(ash::khr::external_memory_fd::NAME.as_ptr());
+		}
 
 		let supported_dev_exts = unsafe {
 			instance
@@ -644,6 +648,44 @@ impl AshDevice {
 		shader: &AshShader,
 	) -> RhiResult<AshPipeline> {
 		AshPipeline::create_compute(self.inner.device(), meta, shader, self.inner.bindless_set())
+	}
+
+	pub fn write_raw_texture_descriptor(&self, view: vk::ImageView, sampler: vk::Sampler) -> u32 {
+		if let Some(heap) = &self.inner.bindless_heap {
+			let mut lock = heap.next_id.lock().unwrap();
+			let id = *lock;
+			*lock += 1;
+			drop(lock);
+			self.update_raw_texture_descriptor(id, view, sampler);
+			id
+		} else {
+			0
+		}
+	}
+
+	pub fn update_raw_texture_descriptor(
+		&self,
+		id: u32,
+		view: vk::ImageView,
+		sampler: vk::Sampler,
+	) {
+		if let Some(heap) = &self.inner.bindless_heap {
+			let image_info = [vk::DescriptorImageInfo::default()
+				.sampler(sampler)
+				.image_view(view)
+				.image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+
+			let write = [vk::WriteDescriptorSet::default()
+				.dst_set(heap.set)
+				.dst_binding(0)
+				.dst_array_element(id)
+				.descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+				.image_info(&image_info)];
+
+			unsafe {
+				self.inner.device().update_descriptor_sets(&write, &[]);
+			}
+		}
 	}
 }
 

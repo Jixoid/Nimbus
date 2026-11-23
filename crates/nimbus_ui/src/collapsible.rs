@@ -324,6 +324,10 @@ impl Widget for Collapsible {
 		);
 	}
 
+	fn should_draw_children(&self) -> bool {
+		self.open || self.progress.value() > 0.001
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		let bounds = self.active_bounds();
 		let header_rect = self.header_rect(bounds);

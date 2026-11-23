@@ -10,6 +10,7 @@
 */
 
 
+use std::{cell::Cell, rc::Rc};
 use nimbus_core::{Application, MethodTable, WidgetRegistry, Window};
 use nimbus_math::Color;
 use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens, Theme};
@@ -43,14 +44,47 @@ fn main() {
 	// Window
 	let main_handle = app.create_window(Window::new("Nimbus Application", 860, 560));
 	let main_window = app.window_mut(main_handle).unwrap();
+	let tasks = main_window.task_queue();
+
+	let target_id = Rc::new(Cell::new(None));
+	let target_id_cb = target_id.clone();
 
 	let mut events = MethodTable::new();
 	events.register("ToolAction", || {
 		nimbus_disp!("QDL Event Callback!");
 	});
+	events.register("OpenWaitDialog", move || {
+		if let Some(target) = target_id_cb.get() {
+			let tasks_for_worker = tasks.clone();
+			tasks.push_tree(move |tree| {
+				let dlg_id = nimbus_ui::Dialog::attach_wait_overlay(
+					tree,
+					target,
+					"Please Wait",
+					"Loading resources, please wait...",
+				);
 
-	nimbus_qdl::load_into_tree(include_str!("main.qdl"), main_window.tree_mut(), &theme, &mut events)
-		.expect("Failed to load qdl window");
+				std::thread::spawn(move || {
+					std::thread::sleep(std::time::Duration::from_secs(3));
+					tasks_for_worker.push_tree(move |tree| {
+						if let Some(dlg) = tree.get_widget_mut::<nimbus_ui::Dialog>(dlg_id) {
+							dlg.set_open(false, true);
+						}
+					});
+				});
+			});
+		}
+	});
+
+	let scene = nimbus_qdl::load_into_tree(
+		include_str!("main.qdl"),
+		main_window.tree_mut(),
+		&theme,
+		&events,
+	)
+	.expect("Failed to load qdl window");
+
+	target_id.set(Some(scene.root_id));
 
 	
 	// Run Application

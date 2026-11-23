@@ -94,9 +94,72 @@ impl UiTree {
 		child_id
 	}
 
+	pub fn insert_overlay<W: Widget>(&mut self, target: ObjectID, widget: W) -> ObjectID {
+		self.insert_overlay_boxed(target, Box::new(widget))
+	}
+
+	pub fn insert_overlay_boxed(&mut self, target: ObjectID, widget: Box<dyn Widget>) -> ObjectID {
+		let old_overlay = self.nodes.get(target).and_then(|n| n.overlay);
+		if let Some(old_id) = old_overlay {
+			self.remove(old_id);
+		}
+
+		let mut node = NodeData::new();
+		node.parent = Some(target);
+		let overlay_id = self.nodes.insert(node);
+		self.widgets.insert(overlay_id, Some(widget));
+
+		if let Some(target_node) = self.nodes.get_mut(target) {
+			target_node.overlay = Some(overlay_id);
+		}
+
+		self.needs_layout = true;
+		self.needs_redraw = true;
+		overlay_id
+	}
+
+	pub fn set_overlay(&mut self, target: ObjectID, overlay: Option<ObjectID>) {
+		if let Some(ov_id) = overlay {
+			if ov_id == target || !self.nodes.contains_key(ov_id) || !self.nodes.contains_key(target) {
+				return;
+			}
+
+			// Detach overlay from roots or any previous parent
+			self.roots.retain(|&r| r != ov_id);
+			if let Some(prev_parent) = self.nodes.get(ov_id).and_then(|n| n.parent)
+				&& let Some(pnode) = self.nodes.get_mut(prev_parent)
+			{
+				pnode.children.retain(|&c| c != ov_id);
+				if pnode.overlay == Some(ov_id) {
+					pnode.overlay = None;
+				}
+			}
+
+			if let Some(ov_node) = self.nodes.get_mut(ov_id) {
+				ov_node.parent = Some(target);
+			}
+			if let Some(target_node) = self.nodes.get_mut(target) {
+				target_node.overlay = Some(ov_id);
+			}
+		} else if let Some(target_node) = self.nodes.get_mut(target) {
+			target_node.overlay = None;
+		}
+
+		self.needs_layout = true;
+		self.needs_redraw = true;
+	}
+
+	pub fn clear_overlay(&mut self, target: ObjectID) {
+		self.set_overlay(target, None);
+	}
+
+	pub fn overlay(&self, target: ObjectID) -> Option<ObjectID> {
+		self.nodes.get(target).and_then(|n| n.overlay)
+	}
+
 	pub fn remove(&mut self, id: ObjectID) {
-		let (children, parent) = match self.nodes.get(id) {
-			Some(node) => (node.children.clone(), node.parent),
+		let (children, overlay, parent) = match self.nodes.get(id) {
+			Some(node) => (node.children.clone(), node.overlay, node.parent),
 			None => return,
 		};
 
@@ -104,10 +167,17 @@ impl UiTree {
 			self.remove(child);
 		}
 
+		if let Some(ov_id) = overlay {
+			self.remove(ov_id);
+		}
+
 		if let Some(parent_id) = parent
 			&& let Some(parent_node) = self.nodes.get_mut(parent_id)
 		{
 			parent_node.children.retain(|&c| c != id);
+			if parent_node.overlay == Some(id) {
+				parent_node.overlay = None;
+			}
 		}
 
 		self.roots.retain(|&r| r != id);
@@ -207,11 +277,11 @@ impl UiTree {
 	}
 
 	fn clear_interaction_in_subtree(&mut self, id: ObjectID) {
-		let children = if let Some(node) = self.nodes.get_mut(id) {
+		let (children, overlay) = if let Some(node) = self.nodes.get_mut(id) {
 			node.hovered = false;
 			node.pressed = false;
 			node.focused = false;
-			node.children.clone()
+			(node.children.clone(), node.overlay)
 		} else {
 			return;
 		};
@@ -228,6 +298,9 @@ impl UiTree {
 
 		for child in children {
 			self.clear_interaction_in_subtree(child);
+		}
+		if let Some(ov_id) = overlay {
+			self.clear_interaction_in_subtree(ov_id);
 		}
 	}
 
@@ -336,6 +409,24 @@ impl UiTree {
 		}
 
 		self.widgets.insert(id, Some(widget));
+
+		if let Some(ov_id) = self.nodes.get(id).and_then(|n| n.overlay) {
+			if self.is_visible(ov_id) {
+				if let Some(anchor) = self.anchor(ov_id) {
+					let ov_constraints = anchor.child_constraints(final_size);
+					let ov_size = self.layout_node(ov_id, ov_constraints);
+					let ov_pos = anchor.position(final_size, ov_size);
+					self.set_child_position(id, ov_id, ov_pos);
+				} else {
+					let ov_constraints = BoxConstraints::tight(final_size);
+					self.layout_node(ov_id, ov_constraints);
+					self.set_child_position(id, ov_id, Vec2::ZERO);
+				}
+			} else if let Some(ov_node) = self.nodes.get_mut(ov_id) {
+				ov_node.bounds = Rect::new(ov_node.bounds.x(), ov_node.bounds.y(), 0.0, 0.0);
+			}
+		}
+
 		final_size
 	}
 
@@ -367,8 +458,12 @@ impl UiTree {
 			node.bounds.min += delta;
 			node.bounds.max += delta;
 			let children = node.children.clone();
+			let overlay = node.overlay;
 			for child in children {
 				self.offset_subtree(child, delta);
+			}
+			if let Some(ov_id) = overlay {
+				self.offset_subtree(ov_id, delta);
 			}
 		}
 	}
@@ -414,7 +509,7 @@ impl UiTree {
 			_ => return,
 		};
 
-		if let Some(Some(widget)) = self.widgets.get(id) {
+		let draw_children = if let Some(Some(widget)) = self.widgets.get(id) {
 			let ctx = DrawCtx {
 				node_id: id,
 				bounds: node.bounds,
@@ -426,17 +521,28 @@ impl UiTree {
 				layout_requested,
 			};
 			widget.draw(&ctx, canvas);
+			widget.should_draw_children()
+		} else {
+			true
+		};
+
+		if draw_children {
+			if node.clip_children {
+				canvas.push_clip(node.bounds);
+			}
+
+			for &child_id in &node.children {
+				self.draw_node(child_id, canvas, theme, redraw_requested, layout_requested);
+			}
+
+			if node.clip_children {
+				canvas.pop_clip();
+			}
 		}
 
-		if node.clip_children {
+		if let Some(overlay_id) = node.overlay {
 			canvas.push_clip(node.bounds);
-		}
-
-		for &child_id in &node.children {
-			self.draw_node(child_id, canvas, theme, redraw_requested, layout_requested);
-		}
-
-		if node.clip_children {
+			self.draw_node(overlay_id, canvas, theme, redraw_requested, layout_requested);
 			canvas.pop_clip();
 		}
 	}
@@ -457,6 +563,17 @@ impl UiTree {
 		let node = self.nodes.get(id)?;
 		if !node.visible || !node.enabled {
 			return None;
+		}
+
+		if let Some(overlay_id) = node.overlay
+			&& let Some(ov_node) = self.nodes.get(overlay_id)
+			&& ov_node.visible
+			&& ov_node.enabled
+		{
+			if !node.bounds.contains_point(pos) {
+				return None;
+			}
+			return self.hit_test_node(overlay_id, pos).or(Some(overlay_id));
 		}
 
 		if node.clip_children && !node.bounds.contains_point(pos) {

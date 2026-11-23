@@ -20,6 +20,7 @@ use crate::{RectInstance, RectPipeline, RectPushConstants};
 use crate::{GlyphInstance, TextPipeline, TextPushConstants};
 
 const INITIAL_BUFFER_CAPACITY: usize = 1024;
+const FRAME_BUFFER_SLOTS: usize = 3;
 
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -53,8 +54,9 @@ pub struct Canvas2D {
 	glyph_instances: Vec<GlyphInstance>,
 	batches: Vec<DrawBatch>,
 	clip_stack: Vec<Rect<f32>>,
-	rect_buffer: Option<Buffer>,
-	glyph_buffer: Option<Buffer>,
+	rect_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
+	glyph_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
+	frame_slot: usize,
 }
 
 impl Canvas2D {
@@ -71,8 +73,9 @@ impl Canvas2D {
 			glyph_instances: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			batches: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			clip_stack: Vec::new(),
-			rect_buffer: None,
-			glyph_buffer: None,
+			rect_buffers: std::array::from_fn(|_| None),
+			glyph_buffers: std::array::from_fn(|_| None),
+			frame_slot: 0,
 		}
 	}
 
@@ -136,11 +139,14 @@ impl Canvas2D {
 		let screen_size = [width as f32, height as f32];
 		cmd.set_viewport_and_scissor(width, height);
 
-		// Prepare rect buffer if needed
+		let slot = self.frame_slot;
+		self.frame_slot = (self.frame_slot + 1) % FRAME_BUFFER_SLOTS;
+
+		// Prepare rect buffer for this frame slot if needed
 		if !self.rect_instances.is_empty() {
 			let byte_size = (self.rect_instances.len() * std::mem::size_of::<RectInstance>()) as u64;
 
-			let needs_realloc = match &self.rect_buffer {
+			let needs_realloc = match &self.rect_buffers[slot] {
 				Some(buf) => buf.size() < byte_size,
 				None => true,
 			};
@@ -149,7 +155,7 @@ impl Canvas2D {
 				let alloc_size = byte_size
 					.max(INITIAL_BUFFER_CAPACITY as u64 * 96)
 					.next_power_of_two();
-				self.rect_buffer = Some(allocator.alloc_buffer(
+				self.rect_buffers[slot] = Some(allocator.alloc_buffer(
 					alloc_size,
 					BufferUsage::StorageBuffer | BufferUsage::DeviceAddress,
 					AllocationCreate::Mapped | AllocationCreate::HostSequentialWrite,
@@ -157,7 +163,7 @@ impl Canvas2D {
 				));
 			}
 
-			if let Some(buf) = &mut self.rect_buffer {
+			if let Some(buf) = &mut self.rect_buffers[slot] {
 				let slice = unsafe {
 					std::slice::from_raw_parts(
 						self.rect_instances.as_ptr() as *const u8,
@@ -170,11 +176,11 @@ impl Canvas2D {
 			}
 		}
 
-		// Prepare glyph buffer if needed
+		// Prepare glyph buffer for this frame slot if needed
 		if !self.glyph_instances.is_empty() {
 			let byte_size = (self.glyph_instances.len() * std::mem::size_of::<GlyphInstance>()) as u64;
 
-			let needs_realloc = match &self.glyph_buffer {
+			let needs_realloc = match &self.glyph_buffers[slot] {
 				Some(buf) => buf.size() < byte_size,
 				None => true,
 			};
@@ -183,7 +189,7 @@ impl Canvas2D {
 				let alloc_size = byte_size
 					.max(INITIAL_BUFFER_CAPACITY as u64 * 48)
 					.next_power_of_two();
-				self.glyph_buffer = Some(allocator.alloc_buffer(
+				self.glyph_buffers[slot] = Some(allocator.alloc_buffer(
 					alloc_size,
 					BufferUsage::StorageBuffer | BufferUsage::DeviceAddress,
 					AllocationCreate::Mapped | AllocationCreate::HostSequentialWrite,
@@ -191,7 +197,7 @@ impl Canvas2D {
 				));
 			}
 
-			if let Some(buf) = &mut self.glyph_buffer {
+			if let Some(buf) = &mut self.glyph_buffers[slot] {
 				let slice = unsafe {
 					std::slice::from_raw_parts(
 						self.glyph_instances.as_ptr() as *const u8,
@@ -233,7 +239,7 @@ impl Canvas2D {
 
 			match batch {
 				DrawBatch::Rects { start, count, .. } => {
-					if let Some(buf) = &self.rect_buffer {
+					if let Some(buf) = &self.rect_buffers[slot] {
 						if current_is_rect != Some(true) {
 							cmd.bind_pipeline(self.rect_pipeline.pipeline());
 							let pc = RectPushConstants {
@@ -247,7 +253,7 @@ impl Canvas2D {
 					}
 				}
 				DrawBatch::Text { start, count, .. } => {
-					if let Some(buf) = &self.glyph_buffer {
+					if let Some(buf) = &self.glyph_buffers[slot] {
 						if current_is_rect != Some(false) {
 							cmd.bind_pipeline(self.text_pipeline.pipeline());
 							let pc = TextPushConstants {

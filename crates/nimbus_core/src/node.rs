@@ -102,6 +102,7 @@ impl core::str::FromStr for Anchor {
 pub struct NodeData {
 	pub parent: Option<ObjectID>,
 	pub children: Vec<ObjectID>,
+	pub overlay: Option<ObjectID>,
 	pub bounds: Rect<f32>,
 	pub anchor: Option<Anchor>,
 	pub visible: bool,
@@ -117,6 +118,7 @@ impl Default for NodeData {
 		Self {
 			parent: None,
 			children: Vec::new(),
+			overlay: None,
 			bounds: Rect::ZERO,
 			anchor: None,
 			visible: true,

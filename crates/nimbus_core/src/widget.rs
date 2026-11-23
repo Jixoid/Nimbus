@@ -45,6 +45,10 @@ pub trait Widget: AsAny + 'static {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D);
 
+	fn should_draw_children(&self) -> bool {
+		true
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		let _ = (ctx, event);
 		EventResponse::Ignored
@@ -82,6 +86,10 @@ impl Widget for Box<dyn Widget> {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		(**self).draw(ctx, canvas);
+	}
+
+	fn should_draw_children(&self) -> bool {
+		(**self).should_draw_children()
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {

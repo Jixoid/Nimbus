@@ -27,10 +27,13 @@ use crate::task::{IntoTask, Task, TaskQueue};
 use crate::window::Window;
 
 
+pub type PreRenderCallback = Box<dyn FnMut(&Device, &CommandManager, &mut Window) + 'static>;
+
 pub struct Application {
 	pub theme: Theme,
 	pub windows: SlotMap<WindowHandle, Window>,
 	pub task_queue: TaskQueue,
+	on_pre_render: Option<PreRenderCallback>,
 }
 
 impl Application {
@@ -39,7 +42,15 @@ impl Application {
 			theme,
 			windows: SlotMap::with_key(),
 			task_queue: TaskQueue::new(),
+			on_pre_render: None,
 		}
+	}
+
+	pub fn set_on_pre_render<F>(&mut self, callback: F)
+	where
+		F: FnMut(&Device, &CommandManager, &mut Window) + 'static,
+	{
+		self.on_pre_render = Some(Box::new(callback));
 	}
 
 	pub fn task_queue(&self) -> TaskQueue {
@@ -90,6 +101,7 @@ impl Application {
 			theme: self.theme,
 			windows: self.windows,
 			task_queue: self.task_queue,
+			on_pre_render: self.on_pre_render,
 			winit_map: HashMap::new(),
 			device: None,
 			allocator: None,
@@ -109,6 +121,7 @@ struct AppRunner {
 	theme: Theme,
 	windows: SlotMap<WindowHandle, Window>,
 	task_queue: TaskQueue,
+	on_pre_render: Option<PreRenderCallback>,
 	winit_map: HashMap<WindowId, WindowHandle>,
 	device: Option<Device>,
 	allocator: Option<Allocator<AshVulkanBackend>>,
@@ -178,6 +191,9 @@ impl ApplicationHandler for AppRunner {
 
 				WindowEvent::RedrawRequested => {
 					if let (Some(allocator), Some(cmd_manager)) = (&self.allocator, &self.cmd_manager) {
+						if let Some(cb) = &mut self.on_pre_render {
+							cb(device, cmd_manager, window);
+						}
 						window.render_frame(device, allocator, cmd_manager, &self.theme);
 					}
 				}

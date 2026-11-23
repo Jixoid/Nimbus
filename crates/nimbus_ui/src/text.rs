@@ -44,6 +44,9 @@ impl Widget for Text {
 	}
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
+		if ctx.bounds.width() <= 0.0 || ctx.bounds.height() <= 0.0 || self.text.is_empty() {
+			return;
+		}
 		let color = self
 			.color
 			.unwrap_or_else(|| ctx.theme.monet[MonetRole::OnSurface]);

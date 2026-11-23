@@ -14,6 +14,7 @@ pub mod allocator;
 pub mod buffer;
 pub mod command;
 pub mod device;
+pub mod external;
 pub mod image;
 pub mod pipeline;
 pub mod sampler;
@@ -26,6 +27,7 @@ pub use allocator::*;
 pub use buffer::*;
 pub use command::*;
 pub use device::*;
+pub use external::*;
 pub use image::*;
 pub use pipeline::*;
 pub use sampler::*;
@@ -36,6 +38,7 @@ pub use types::*;
 
 use ash::vk::Handle;
 pub use nimbus_rhi::error::RhiResult;
+pub use nimbus_rhi::format::Format;
 pub use nimbus_rhi::traits::{RhiBackend, RhiDevice};
 
 
