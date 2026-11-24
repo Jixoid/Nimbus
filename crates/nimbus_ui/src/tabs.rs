@@ -74,6 +74,31 @@ impl Tabs {
 		})
 	}
 
+	pub fn set_tab(&mut self, index: usize, event: bool, animate: bool) {
+		if index >= self.tabs.len() {
+			return;
+		}
+		if self.tab_id != index as i32 {
+			self.tab_id = index as i32;
+			let bounds = self.last_bounds.get();
+			let h = if bounds != Rect::ZERO { bounds.height() } else { 32.0 };
+			
+			if let Some(target_local) = self.local_tab_rect(h, index) {
+				let mut ind = self.indicator.borrow_mut();
+				if !animate || *ind.target() == Rect::ZERO {
+					ind.snap_to(target_local);
+				} else {
+					ind.set_target_spring(target_local, Spring::INTERACTIVE);
+				}
+			}
+
+			if event && let Some(cb) = &mut self.on_changed {
+				let tab_text = self.tabs.get(index).cloned().unwrap_or_default();
+				cb.call2(self.tab_id, tab_text);
+			}
+		}
+	}
+
 	pub fn tab_at_x(&self, bounds: Rect<f32>, x: f32) -> Option<usize> {
 		let fface = FontManager::default_font();
 		let mut x_off = bounds.x() + 16.0;

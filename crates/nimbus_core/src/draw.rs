@@ -37,4 +37,18 @@ impl<'a> DrawCtx<'a> {
 	pub fn request_layout(&self) {
 		self.layout_requested.set(true);
 	}
+
+	#[inline]
+	pub fn with_bounds(&self, bounds: Rect<f32>) -> Self {
+		Self {
+			node_id: self.node_id,
+			bounds,
+			theme: self.theme,
+			hovered: self.hovered,
+			pressed: self.pressed,
+			focused: self.focused,
+			redraw_requested: self.redraw_requested,
+			layout_requested: self.layout_requested,
+		}
+	}
 }

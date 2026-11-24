@@ -25,6 +25,7 @@ use nimbus_theme::{Monet, MonetRole};
 #[derive(Clone, Debug, PartialEq)]
 pub struct PopupItem {
 	pub text: String,
+	pub action: Option<String>,
 	pub shortcut: Option<String>,
 	pub disabled: bool,
 	pub items: Vec<PopupItem>,
@@ -34,6 +35,7 @@ impl Default for PopupItem {
 	fn default() -> Self {
 		Self {
 			text: any::type_name::<Self>().to_string(),
+			action: None,
 			shortcut: None,
 			disabled: false,
 			items: Vec::new(),
@@ -726,6 +728,12 @@ impl PopupItemBuilder {
 		self
 	}
 
+	pub fn action(mut self, action: impl Into<String>) -> Self {
+		let s = action.into();
+		self.inner.action = if s.is_empty() { None } else { Some(s) };
+		self
+	}
+
 	pub fn shortcut(mut self, shortcut: impl Into<String>) -> Self {
 		self.inner.shortcut = Some(shortcut.into());
 		self
@@ -829,13 +837,19 @@ impl From<PopupBuilder> for Popup {
 }
 
 
-fn parse_popup_item(val: &PropertyValue) -> Option<PopupItem> {
+pub(crate) fn parse_popup_item(val: &PropertyValue) -> Option<PopupItem> {
 	if let Some(s) = val.as_str() {
 		return Some(PopupItem { text: s.to_string(), ..PopupItem::default()});
 	}
 	if let Some(obj) = val.as_object() {
 		let text = obj.get("text").and_then(|t| t.as_str())?;
 		let mut item = PopupItem { text: text.to_string(), ..Default::default()};
+		if let Some(act) = obj
+			.get("action")
+			.and_then(|s| s.as_str())
+		{
+			item.action = Some(act.to_string());
+		}
 		if let Some(sc) = obj.get("shortcut").and_then(|s| s.as_str()) {
 			item.shortcut = Some(sc.to_string());
 		}

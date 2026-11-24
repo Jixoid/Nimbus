@@ -53,9 +53,12 @@ fn main() {
 	let tasks_dialog = tasks.clone();
 	let tasks_toast = tasks.clone();
 	let tasks_tabs = tasks.clone();
+	let tasks_menu = tasks.clone();
 
 	let target_id = Rc::new(Cell::new(None));
 	let target_id_cb = target_id.clone();
+	let main_tabs_id = Rc::new(Cell::new(None));
+	let main_tabs_menu = main_tabs_id.clone();
 	let page_comp_id = Rc::new(Cell::new(None));
 	let page_pp_id = Rc::new(Cell::new(None));
 	let page_comp_cb = page_comp_id.clone();
@@ -64,6 +67,35 @@ fn main() {
 	let mut events = MethodTable::new();
 	events.register("ToolAction", || {
 		nimbus_disp!("QDL Event Callback!");
+	});
+	events.register("OnMenuAction", move |action: String, menu: String| {
+		nimbus_disp!("Menu action: [{}] {}", menu, action);
+		let tabs_id = main_tabs_menu.get();
+		tasks_menu.push_tree(move |tree| {
+			match action.as_str() {
+				"ViewComponents" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+					{
+						tabs.set_tab(0, true, true);
+					}
+				}
+				"ViewPurplePrint" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+					{
+						tabs.set_tab(1, true, true);
+					}
+				}
+				_ => {
+					nimbus_ui::Toast::builder()
+						.title(format!("Menu: {}", menu))
+						.message(format!("Action triggered: {}", action))
+						.kind(nimbus_ui::ToastKind::Info)
+						.show(tree);
+				}
+			}
+		});
 	});
 	events.register("SwitchPage", move |tab_idx: usize| {
 		let comp = page_comp_cb.get();
@@ -128,6 +160,7 @@ fn main() {
 	.expect("Failed to load qdl window");
 
 	target_id.set(Some(scene.root_id));
+	main_tabs_id.set(scene.named_nodes.get("main_tabs").copied());
 	page_comp_id.set(scene.named_nodes.get("page_components").copied());
 	page_pp_id.set(scene.named_nodes.get("page_purpleprint").copied());
 
