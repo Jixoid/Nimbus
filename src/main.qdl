@@ -41,7 +41,8 @@ root qstd::vbox {
         text: "View",
         items: [
           { text: "Components", action: "ViewComponents" },
-          { text: "PurplePrint", action: "ViewPurplePrint" }
+          { text: "PurplePrint", action: "ViewPurplePrint" },
+          { text: "Gizmo", action: "ViewGizmo" }
         ]
       },
       {
@@ -55,7 +56,7 @@ root qstd::vbox {
   }
 
   node qstd::tabs "main_tabs" {
-    tabs: ["Components", "PurplePrint"]
+    tabs: ["Components", "PurplePrint", "Gizmo"]
     on_changed: "SwitchPage"
   }
 
@@ -229,10 +230,6 @@ root qstd::vbox {
         node qstd::text {
           text: "Hidden details inside collapsible"
         }
-        node qstd::button {
-          text: "Inside Action"
-          variant: "tonal"
-        }
       }
 
       node qstd::button {
@@ -311,6 +308,70 @@ root qstd::vbox {
         { name: "meta", kind: "square" },
         { name: "list", kind: "array" }
       ]
+    }
+  }
+
+  node qstd::vbox "page_gizmo" {
+    anchor: "fill"
+    visible: false
+    spacing: 8
+    color: "transparent"
+
+    node qstd::hbox {
+      spacing: 12
+      paddings: 10
+      color: "monet(SurfaceContainer)"
+      corner_radius: 12
+
+      node qstd::choice {
+        tabs: ["Translate", "Rotate", "Scale"]
+        on_changed: "GizmoMode"
+      }
+
+      node qstd::choice {
+        tabs: ["World", "Local"]
+        on_changed: "GizmoSpace"
+      }
+
+      node qstd::check {
+        text: "Snap"
+        checked: false
+        on_changed: "GizmoSnap"
+      }
+
+      node qstd::button {
+        text: "Reset"
+        variant: "tonal"
+        on_click: "GizmoReset"
+      }
+    }
+
+    node qstd::stack {
+      anchor: "fill"
+      paddings: 12
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+
+      node gizmo::transform "demo_transform_gizmo" {
+        anchor: "fill"
+        mode: "translate"
+        space: "world"
+        on_changed: "GizmoTransformChanged"
+      }
+
+      node gizmo::orientation "demo_orientation_gizmo" {
+        anchor: "right-top"
+        size: 96
+        margin: 8
+        on_snap: "GizmoCameraSnap"
+        on_orbit: "GizmoCameraOrbit"
+      }
+
+      node qstd::text "gizmo_info" {
+        anchor: "left-bottom"
+        text: "Pos: (0.00, 0.00, 0.00)  |  Scale: (1.00, 1.00, 1.00)"
+        font_size: 13
+      }
     }
   }
 }

@@ -1009,6 +1009,7 @@ dependencies = [
  "nimbus_rhi_ash",
  "nimbus_theme",
  "nimbus_ui",
+ "nimbus_ui_gizmo",
  "nimbus_ui_purple_print",
 ]
 
@@ -1108,6 +1109,16 @@ version = "0.1.0"
 dependencies = [
  "nimbus_core",
  "nimbus_except",
+ "nimbus_math",
+ "nimbus_render2d",
+ "nimbus_theme",
+]
+
+[[package]]
+name = "nimbus_ui_gizmo"
+version = "0.1.0"
+dependencies = [
+ "nimbus_core",
  "nimbus_math",
  "nimbus_render2d",
  "nimbus_theme",

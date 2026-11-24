@@ -11,7 +11,7 @@
 
 
 use std::time::{Duration, Instant};
-use nimbus_math::{Color, Rect, Vec2};
+use nimbus_math::{Color, Quat, Rect, Vec2, Vec3};
 
 
 pub trait Interpolate: Clone + Send + Sync + 'static {
@@ -32,6 +32,24 @@ impl Interpolate for Vec2<f32> {
 			self.x.interpolate(&target.x, t),
 			self.y.interpolate(&target.y, t),
 		)
+	}
+}
+
+impl Interpolate for Vec3<f32> {
+	#[inline]
+	fn interpolate(&self, target: &Self, t: f32) -> Self {
+		Vec3::new(
+			self.x.interpolate(&target.x, t),
+			self.y.interpolate(&target.y, t),
+			self.z.interpolate(&target.z, t),
+		)
+	}
+}
+
+impl Interpolate for Quat<f32> {
+	#[inline]
+	fn interpolate(&self, target: &Self, t: f32) -> Self {
+		self.slerp(*target, t)
 	}
 }
 

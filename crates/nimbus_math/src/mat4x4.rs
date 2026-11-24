@@ -11,7 +11,7 @@
 
 
 use core::ops::{Index, IndexMut, Mul};
-use crate::{Float, Number, Rad, Vec3, Vec4};
+use crate::{Float, Mat3x4, Number, Rad, Vec3, Vec4};
 
 
 #[repr(C)]
@@ -334,5 +334,11 @@ impl<T: Number> From<[T; 16]> for Mat4x4<T> {
 impl<T: Number> From<Mat4x4<T>> for [T; 16] {
 	fn from(m: Mat4x4<T>) -> Self {
 		m.to_array()
+	}
+}
+
+impl<T: Number> From<Mat3x4<T>> for Mat4x4<T> {
+	fn from(m: Mat3x4<T>) -> Self {
+		m.to_mat4()
 	}
 }
