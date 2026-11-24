@@ -56,6 +56,7 @@ fn main() {
 		nimbus_ui_gizmo::register_widgets(&mut registry);
 		nimbus_ui_dock::register_widgets(&mut registry);
 		nimbus_ui_timeline::register_widgets(&mut registry);
+		nimbus_ui_inspector::register_widgets(&mut registry);
 	}
 
 	//let monet = Monet::from_system().unwrap();
@@ -97,11 +98,13 @@ fn main() {
 	let page_gizmo_id = Rc::new(Cell::new(None));
 	let page_dock_id = Rc::new(Cell::new(None));
 	let page_timeline_id = Rc::new(Cell::new(None));
+	let page_inspector_id = Rc::new(Cell::new(None));
 	let page_comp_cb = page_comp_id.clone();
 	let page_pp_cb = page_pp_id.clone();
 	let page_gizmo_cb = page_gizmo_id.clone();
 	let page_dock_cb = page_dock_id.clone();
 	let page_timeline_cb = page_timeline_id.clone();
+	let page_inspector_cb = page_inspector_id.clone();
 
 	let tl_view_id = Rc::new(Cell::new(None));
 	let tl_curve_id = Rc::new(Cell::new(None));
@@ -158,6 +161,13 @@ fn main() {
 						tabs.set_tab(4, true, true);
 					}
 				}
+				"ViewInspector" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+					{
+						tabs.set_tab(5, true, true);
+					}
+				}
 				_ => {
 					nimbus_ui::Toast::builder()
 						.title(format!("Menu: {}", menu))
@@ -174,6 +184,7 @@ fn main() {
 		let gizmo = page_gizmo_cb.get();
 		let dock = page_dock_cb.get();
 		let timeline = page_timeline_cb.get();
+		let inspector = page_inspector_cb.get();
 		tasks_tabs.push_tree(move |tree| {
 			if let Some(id) = comp {
 				tree.set_visible(id, tab_idx == 0);
@@ -189,6 +200,9 @@ fn main() {
 			}
 			if let Some(id) = timeline {
 				tree.set_visible(id, tab_idx == 4);
+			}
+			if let Some(id) = inspector {
+				tree.set_visible(id, tab_idx == 5);
 			}
 		});
 	});
@@ -694,6 +708,7 @@ fn main() {
 	page_gizmo_id.set(scene.named_nodes.get("page_gizmo").copied());
 	page_dock_id.set(scene.named_nodes.get("page_dock").copied());
 	page_timeline_id.set(scene.named_nodes.get("page_timeline").copied());
+	page_inspector_id.set(scene.named_nodes.get("page_inspector").copied());
 	tl_view_id.set(scene.named_nodes.get("demo_timeline").copied());
 	tl_curve_id.set(scene.named_nodes.get("demo_curve").copied());
 	tl_play_btn_id.set(scene.named_nodes.get("tl_play_btn").copied());

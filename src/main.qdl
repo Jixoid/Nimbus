@@ -44,7 +44,8 @@ root qstd::vbox {
           { text: "PurplePrint", action: "ViewPurplePrint" },
           { text: "Gizmo", action: "ViewGizmo" },
           { text: "Dock", action: "ViewDock" },
-          { text: "Timeline", action: "ViewTimeline" }
+          { text: "Timeline", action: "ViewTimeline" },
+          { text: "Inspector", action: "ViewInspector" }
         ]
       },
       {
@@ -86,7 +87,7 @@ root qstd::vbox {
   }
 
   node qstd::tabs "main_tabs" {
-    tabs: ["Components", "PurplePrint", "Gizmo", "Dock", "Timeline"]
+    tabs: ["Components", "PurplePrint", "Gizmo", "Dock", "Timeline", "Inspector"]
     on_changed: "SwitchPage"
   }
 
@@ -434,8 +435,8 @@ root qstd::vbox {
     }
 
     node dock::pane {
-      title: "Scene"
-      slot: "left"
+      title: "Assets"
+      slot: "center"
 
       node qstd::vbox {
         anchor: "fill"
@@ -443,10 +444,40 @@ root qstd::vbox {
         paddings: 4
         color: "transparent"
 
-        node qstd::text { text: "Main Camera" }
-        node qstd::text { text: "Directional Light" }
-        node qstd::text { text: "Player Mesh" }
-        node qstd::text { text: "Terrain" }
+        node qstd::text { text: "textures/albedo.png" }
+        node qstd::text { text: "shaders/pbr.wgsl" }
+        node qstd::text { text: "scenes/main.qdl" }
+      }
+    }
+
+    node dock::pane {
+      title: "Scene"
+      slot: "left"
+
+      node qstd::treeview {
+        anchor: "fill"
+        draggable: true
+        items: [
+          {
+            text: "World",
+            expanded: true,
+            badge: "Root",
+            items: [
+              { text: "Main Camera", badge: "Cam", color: "monet(Primary)" },
+              { text: "Sun Light", badge: "Light", color: "oklch(0.82, 0.14, 85)" },
+              {
+                text: "Player",
+                expanded: true,
+                badge: "Actor",
+                items: [
+                  { text: "Body Mesh", badge: "Mesh" },
+                  { text: "Collider", badge: "Phys" }
+                ]
+              },
+              { text: "Terrain", badge: "Mesh" }
+            ]
+          }
+        ]
       }
     }
 
@@ -488,22 +519,6 @@ root qstd::vbox {
 
         node qstd::text { text: "[INFO] Nimbus DockArea initialized." font_size: 13 }
         node qstd::text { text: "[INFO] Vulkan RHI ready." font_size: 13 }
-      }
-    }
-
-    node dock::pane {
-      title: "Assets"
-      slot: "center"
-
-      node qstd::vbox {
-        anchor: "fill"
-        spacing: 6
-        paddings: 4
-        color: "transparent"
-
-        node qstd::text { text: "textures/albedo.png" }
-        node qstd::text { text: "shaders/pbr.wgsl" }
-        node qstd::text { text: "scenes/main.qdl" }
       }
     }
   }
@@ -561,6 +576,57 @@ root qstd::vbox {
       value_min: -1.5
       value_max: 1.5
       on_curve_changed: "TimelineCurveChanged"
+    }
+  }
+
+  node qstd::hbox "page_inspector" {
+    anchor: "fill"
+    visible: false
+    spacing: 12
+    paddings: 4
+    color: "transparent"
+
+    node qstd::vbox {
+      spacing: 12
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
+
+      node qstd::text {
+        text: "Transform & Vectors"
+        color: "monet(Primary)"
+        font_size: 18
+      }
+
+      node qstd::text {
+        text: "UV Tiling"
+        font_size: 13
+      }
+      node inspector::vec2 {
+        value: [1.0, 1.0]
+        default: [1.0, 1.0]
+      }
+
+      node qstd::text {
+        text: "Velocity"
+        font_size: 13
+      }
+      node inspector::vec3 {
+        value: [0.0, 9.81, 0.0]
+        suffix: "m/s"
+      }
+
+      node qstd::text {
+        text: "Shader Tint"
+        font_size: 13
+      }
+      node inspector::vec4 {
+        value: [1.0, 0.85, 0.60, 1.0]
+        default: [1.0, 1.0, 1.0, 1.0]
+        min: 0.0
+        max: 1.0
+      }
     }
   }
 }

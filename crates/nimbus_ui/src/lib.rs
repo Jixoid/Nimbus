@@ -37,6 +37,7 @@ pub mod switch;
 pub mod tabs;
 pub mod toast;
 pub mod tooltip;
+pub mod treeview;
 pub mod viewport;
 
 pub use button::{Button, ButtonBuilder, ButtonVariant};
@@ -66,6 +67,7 @@ pub use switch::{Switch, SwitchBuilder};
 pub use tabs::{Tabs, TabsBuilder};
 pub use toast::{Toast, ToastBuilder, ToastHost, ToastKind, ToastPosition};
 pub use tooltip::{ToolTip, ToolTipBuilder, Tooltip, TooltipBuilder, TooltipPosition};
+pub use treeview::{TreeItem, TreePath, TreeView, TreeViewBuilder};
 pub use viewport::{Viewport, ViewportBuilder};
 
 use nimbus_core::WidgetRegistry;
@@ -96,6 +98,7 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::popup", || Box::new(Popup::default()));
 	registry.register("qstd::menubar", || Box::new(MenuBar::default()));
 	registry.register("qstd::tooltip", || Box::new(Tooltip::default()));
+	registry.register("qstd::treeview", || Box::new(TreeView::default()));
 	registry.register("qstd::viewport", || Box::new(Viewport::default()));
 	registry.register("qstd::spinbox", || Box::new(SpinBox::default()));
 	registry.register("qstd::floatspinbox", || Box::new(FloatSpinBox::default()));

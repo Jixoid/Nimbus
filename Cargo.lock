@@ -1011,6 +1011,7 @@ dependencies = [
  "nimbus_ui",
  "nimbus_ui_dock",
  "nimbus_ui_gizmo",
+ "nimbus_ui_inspector",
  "nimbus_ui_purple_print",
  "nimbus_ui_timeline",
 ]
@@ -1129,6 +1130,16 @@ dependencies = [
 
 [[package]]
 name = "nimbus_ui_gizmo"
+version = "0.1.0"
+dependencies = [
+ "nimbus_core",
+ "nimbus_math",
+ "nimbus_render2d",
+ "nimbus_theme",
+]
+
+[[package]]
+name = "nimbus_ui_inspector"
 version = "0.1.0"
 dependencies = [
  "nimbus_core",

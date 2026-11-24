@@ -19,6 +19,7 @@ nimbus_ui_purple_print = { path = "crates/nimbus_ui_purple_print" }
 nimbus_ui_gizmo = { path = "crates/nimbus_ui_gizmo" }
 nimbus_ui_dock = { path = "crates/nimbus_ui_dock" }
 nimbus_ui_timeline = { path = "crates/nimbus_ui_timeline" }
+nimbus_ui_inspector = { path = "crates/nimbus_ui_inspector" }
 nimbus_except = { path = "crates/nimbus_except" }
 nimbus_math = { path = "crates/nimbus_math" }
 nimbus_platform = { path = "crates/nimbus_platform" }
