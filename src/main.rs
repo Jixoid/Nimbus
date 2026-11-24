@@ -54,6 +54,7 @@ fn main() {
 		nimbus_ui::register_widgets(&mut registry);
 		nimbus_ui_purple_print::register_widgets(&mut registry);
 		nimbus_ui_gizmo::register_widgets(&mut registry);
+		nimbus_ui_dock::register_widgets(&mut registry);
 	}
 
 	//let monet = Monet::from_system().unwrap();
@@ -93,9 +94,11 @@ fn main() {
 	let page_comp_id = Rc::new(Cell::new(None));
 	let page_pp_id = Rc::new(Cell::new(None));
 	let page_gizmo_id = Rc::new(Cell::new(None));
+	let page_dock_id = Rc::new(Cell::new(None));
 	let page_comp_cb = page_comp_id.clone();
 	let page_pp_cb = page_pp_id.clone();
 	let page_gizmo_cb = page_gizmo_id.clone();
+	let page_dock_cb = page_dock_id.clone();
 
 	let transform_gizmo_id = Rc::new(Cell::new(None));
 	let orientation_gizmo_id = Rc::new(Cell::new(None));
@@ -133,6 +136,13 @@ fn main() {
 						tabs.set_tab(2, true, true);
 					}
 				}
+				"ViewDock" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+					{
+						tabs.set_tab(3, true, true);
+					}
+				}
 				_ => {
 					nimbus_ui::Toast::builder()
 						.title(format!("Menu: {}", menu))
@@ -147,6 +157,7 @@ fn main() {
 		let comp = page_comp_cb.get();
 		let pp = page_pp_cb.get();
 		let gizmo = page_gizmo_cb.get();
+		let dock = page_dock_cb.get();
 		tasks_tabs.push_tree(move |tree| {
 			if let Some(id) = comp {
 				tree.set_visible(id, tab_idx == 0);
@@ -156,6 +167,9 @@ fn main() {
 			}
 			if let Some(id) = gizmo {
 				tree.set_visible(id, tab_idx == 2);
+			}
+			if let Some(id) = dock {
+				tree.set_visible(id, tab_idx == 3);
 			}
 		});
 	});
@@ -489,6 +503,17 @@ fn main() {
 		});
 	});
 
+	let tasks_dock_close = tasks.clone();
+	events.register("OnDockPaneClosed", move |title: String| {
+		tasks_dock_close.push_tree(move |tree| {
+			nimbus_ui::Toast::builder()
+				.title("Panel Kapatıldı")
+				.message(format!("'{}' paneli kapatıldı.", title))
+				.kind(nimbus_ui::ToastKind::Info)
+				.show(tree);
+		});
+	});
+
 	let scene = nimbus_qdl::load_into_tree(
 		include_str!("main.qdl"),
 		main_window.tree_mut(),
@@ -502,6 +527,7 @@ fn main() {
 	page_comp_id.set(scene.named_nodes.get("page_components").copied());
 	page_pp_id.set(scene.named_nodes.get("page_purpleprint").copied());
 	page_gizmo_id.set(scene.named_nodes.get("page_gizmo").copied());
+	page_dock_id.set(scene.named_nodes.get("page_dock").copied());
 	transform_gizmo_id.set(scene.named_nodes.get("demo_transform_gizmo").copied());
 	orientation_gizmo_id.set(scene.named_nodes.get("demo_orientation_gizmo").copied());
 	gizmo_info_id.set(scene.named_nodes.get("gizmo_info").copied());

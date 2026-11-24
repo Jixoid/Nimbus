@@ -42,7 +42,8 @@ root qstd::vbox {
         items: [
           { text: "Components", action: "ViewComponents" },
           { text: "PurplePrint", action: "ViewPurplePrint" },
-          { text: "Gizmo", action: "ViewGizmo" }
+          { text: "Gizmo", action: "ViewGizmo" },
+          { text: "Dock", action: "ViewDock" }
         ]
       },
       {
@@ -84,7 +85,7 @@ root qstd::vbox {
   }
 
   node qstd::tabs "main_tabs" {
-    tabs: ["Components", "PurplePrint", "Gizmo"]
+    tabs: ["Components", "PurplePrint", "Gizmo", "Dock"]
     on_changed: "SwitchPage"
   }
 
@@ -399,6 +400,109 @@ root qstd::vbox {
         anchor: "left-bottom"
         text: "Pos: (0.00, 0.00, 0.00)  |  Scale: (1.00, 1.00, 1.00)"
         font_size: 13
+      }
+    }
+  }
+
+  node dock::area "page_dock" {
+    anchor: "fill"
+    visible: false
+    on_pane_closed: "OnDockPaneClosed"
+
+    node dock::pane {
+      title: "Viewport"
+      slot: "center"
+      closable: false
+
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 8
+        paddings: 12
+        color: "transparent"
+
+        node qstd::text {
+          text: "3D Viewport"
+          color: "monet(Primary)"
+          font_size: 18
+        }
+        node qstd::text {
+          text: "Drag any tab onto the center or edges of another panel to re-dock, or drag splitters to resize."
+          font_size: 13
+        }
+      }
+    }
+
+    node dock::pane {
+      title: "Scene"
+      slot: "left"
+
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 6
+        paddings: 4
+        color: "transparent"
+
+        node qstd::text { text: "Main Camera" }
+        node qstd::text { text: "Directional Light" }
+        node qstd::text { text: "Player Mesh" }
+        node qstd::text { text: "Terrain" }
+      }
+    }
+
+    node dock::pane {
+      title: "Inspector"
+      slot: "right"
+
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 8
+        paddings: 4
+        color: "transparent"
+
+        node qstd::edit {
+          title: "Name"
+          text: "Player Mesh"
+        }
+        node qstd::switch {
+          text: "Cast Shadows"
+          checked: true
+        }
+        node qstd::slider {
+          value: 60
+          min: 0
+          max: 100
+        }
+      }
+    }
+
+    node dock::pane {
+      title: "Console"
+      slot: "bottom"
+
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 4
+        paddings: 4
+        color: "transparent"
+
+        node qstd::text { text: "[INFO] Nimbus DockArea initialized." font_size: 13 }
+        node qstd::text { text: "[INFO] Vulkan RHI ready." font_size: 13 }
+      }
+    }
+
+    node dock::pane {
+      title: "Assets"
+      slot: "center"
+
+      node qstd::vbox {
+        anchor: "fill"
+        spacing: 6
+        paddings: 4
+        color: "transparent"
+
+        node qstd::text { text: "textures/albedo.png" }
+        node qstd::text { text: "shaders/pbr.wgsl" }
+        node qstd::text { text: "scenes/main.qdl" }
       }
     }
   }
