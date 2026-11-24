@@ -127,32 +127,24 @@ impl Widget for Choice {
 
 		let pill_radius = bounds.height() * 0.5;
 
-		if cur_local_pill != Rect::ZERO {
-			let pill_rect = Rect::new(
+		let pill_rect = if cur_local_pill != Rect::ZERO {
+			Some(Rect::new(
 				bounds.x() + cur_local_pill.x(),
 				bounds.y() + cur_local_pill.y(),
 				cur_local_pill.width(),
 				cur_local_pill.height(),
-			);
-			canvas.draw(
-				RectShape::new(pill_rect, monet[MonetRole::Primary])
-					.radius(pill_radius)
-					.noise(0.15),
-			);
+			))
 		} else if let Some(target_local) = self.local_tab_rect(bounds.height(), self.tab_id as usize) {
 			self.indicator.borrow_mut().snap_to(target_local);
-			let pill_rect = Rect::new(
+			Some(Rect::new(
 				bounds.x() + target_local.x(),
 				bounds.y() + target_local.y(),
 				target_local.width(),
 				target_local.height(),
-			);
-			canvas.draw(
-				RectShape::new(pill_rect, monet[MonetRole::Primary])
-					.radius(pill_radius)
-					.noise(0.15),
-			);
-		}
+			))
+		} else {
+			None
+		};
 
 		let fface = FontManager::default_font();
 		let font = match self.font {
@@ -160,29 +152,46 @@ impl Widget for Choice {
 			None => Font::new(fface, self.font_size),
 		};
 
+		// 1. Draw all labels in unselected color (OnSurface) on the track
 		let mut x_off = bounds.x() - 10.0;
-
-		for (i, tab) in self.tabs.iter().enumerate() {
+		let mut label_positions = Vec::with_capacity(self.tabs.len());
+		for tab in &self.tabs {
 			x_off += 16.0;
 			let (tab_w, tab_h) = canvas.measure_text(tab, self.font_size);
-			let is_selected = self.tab_id == i as i32;
-
-			let text_color = if is_selected {
-				monet[MonetRole::OnPrimary]
-			} else {
-				monet[MonetRole::OnSurface]
-			};
-
 			let text_y = bounds.y() + (bounds.height() - tab_h) * 0.5;
+			let pos = Vec2::new(x_off, text_y);
+			label_positions.push((pos, tab_w));
 			canvas.draw(TextShape::new(
 				tab,
 				font,
 				self.font_size,
-				Vec2::new(x_off, text_y),
-				text_color,
+				pos,
+				monet[MonetRole::OnSurface],
 			));
-
 			x_off += tab_w;
+		}
+
+		// 2. Draw sliding indicator pill on top, then mask OnPrimary labels inside the pill
+		if let Some(pill) = pill_rect {
+			canvas.draw(
+				RectShape::new(pill, monet[MonetRole::Primary])
+					.radius(pill_radius)
+					.noise(0.15),
+			);
+
+			canvas.push_clip(pill);
+			for (tab, &(pos, tab_w)) in self.tabs.iter().zip(&label_positions) {
+				if pos.x + tab_w >= pill.x() && pos.x <= pill.max.x {
+					canvas.draw(TextShape::new(
+						tab,
+						font,
+						self.font_size,
+						pos,
+						monet[MonetRole::OnPrimary],
+					));
+				}
+			}
+			canvas.pop_clip();
 		}
 	}
 

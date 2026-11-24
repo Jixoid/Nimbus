@@ -15,6 +15,7 @@ members = [
 [dependencies]
 nimbus_core = { path = "crates/nimbus_core" }
 nimbus_ui = { path = "crates/nimbus_ui" }
+nimbus_ui_purple_print = { path = "crates/nimbus_ui_purple_print" }
 nimbus_except = { path = "crates/nimbus_except" }
 nimbus_math = { path = "crates/nimbus_math" }
 nimbus_platform = { path = "crates/nimbus_platform" }

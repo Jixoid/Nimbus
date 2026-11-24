@@ -27,6 +27,9 @@ Other languages: [tr](README.tr.md)
 ![Nimbus Interface Test](/images/test.png)
 *Interface test.*
 
+![Nimbus Interface Test](/images/test_pp.png)
+*Interface test.*
+
 #### Example Apps
 
 ![Nimbus Interface Test](/images/mstudio_proj.png)

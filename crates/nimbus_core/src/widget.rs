@@ -45,6 +45,8 @@ pub trait Widget: AsAny + 'static {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D);
 
+	fn draw_foreground(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
+
 	fn should_draw_children(&self) -> bool {
 		true
 	}
@@ -86,6 +88,10 @@ impl Widget for Box<dyn Widget> {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		(**self).draw(ctx, canvas);
+	}
+
+	fn draw_foreground(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
+		(**self).draw_foreground(ctx, canvas);
 	}
 
 	fn should_draw_children(&self) -> bool {

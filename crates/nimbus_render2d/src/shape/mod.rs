@@ -10,8 +10,10 @@
 */
 
 
+mod curve;
 mod rect;
 mod text;
 
+pub use curve::*;
 pub use rect::*;
 pub use text::*;

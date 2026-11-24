@@ -555,6 +555,20 @@ impl UiTree {
 			}
 		}
 
+		if let Some(Some(widget)) = self.widgets.get(id) {
+			let ctx = DrawCtx {
+				node_id: id,
+				bounds: node.bounds,
+				theme,
+				hovered: node.hovered,
+				pressed: node.pressed,
+				focused: node.focused,
+				redraw_requested,
+				layout_requested,
+			};
+			widget.draw_foreground(&ctx, canvas);
+		}
+
 		if let Some(overlay_id) = node.overlay {
 			canvas.push_clip(node.bounds);
 			self.draw_node(overlay_id, canvas, theme, redraw_requested, layout_requested);

@@ -4,194 +4,268 @@ styles {
   }
 }
 
-root qstd::hbox {
-  spacing: 10
-  paddings: 16
+root qstd::vbox {
+  spacing: 8
+  paddings: 12
   color: "monet(SurfaceContainerLow)"
 
-  node qstd::vbox {
+  node qstd::tabs {
+    tabs: ["Components", "PurplePrint"]
+    on_changed: "SwitchPage"
+  }
+
+  node qstd::hbox "page_components" {
+    anchor: "fill"
     spacing: 10
-    paddings: 16
-    color: "monet(SurfaceContainer)"
-    corner_radius: 16
-    scrollable: true
+    paddings: 4
+    color: "transparent"
 
-    node qstd::text {
-      style: "tool_header"
-      text: "Nimbus Application"
-      color: "monet(PrimaryFixed)"
-      font_size: 25
-    }
+    node qstd::vbox {
+      spacing: 10
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
 
-    node qstd::radio {
-      text: "Radio 1"
-      checked: false
-    }
-    node qstd::radio {
-      text: "Radio 2"
-      checked: true
-    }
+      node qstd::text {
+        style: "tool_header"
+        text: "Nimbus Application"
+        color: "monet(PrimaryFixed)"
+        font_size: 25
+      }
+
+      node qstd::radio {
+        text: "Radio 1"
+        checked: false
+      }
+      node qstd::radio {
+        text: "Radio 2"
+        checked: true
+      }
+        
+      node qstd::check {
+        text: "Check 1"
+        checked: false
+      }
+      node qstd::check {
+        text: "Check 2"
+        checked: true
+      }
       
-    node qstd::check {
-      text: "Check 1"
-      checked: false
+      node qstd::switch {
+        text: "Switch 1"
+        checked: false
+      }
+      node qstd::switch {
+        text: "Switch 2"
+        checked: true
+      }
+      
+      node qstd::button {
+        text: "filled"
+        variant: "filled"
+      }
+      node qstd::button {
+        text: "tonal"
+        variant: "tonal"
+      }
+      node qstd::button {
+        text: "elevated"
+        variant: "elevated"
+      }
+      node qstd::button {
+        text: "outlined"
+        variant: "outlined"
+      }
     }
-    node qstd::check {
-      text: "Check 2"
-      checked: true
+
+    node qstd::vbox {
+      spacing: 10
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
+
+      node qstd::edit {
+        text: "Edit 1"
+        title: "edit 1"
+      }
+      
+      node qstd::combobox {
+        title: "Render Backend"
+        items: ["Vulkan", "OpenGL", "DirectX 12", "Metal"]
+        selected: 0
+      }
+
+      node qstd::slider {
+        value: 45
+        min: 0
+        max: 100
+      }
+      node qstd::interval {
+        pos1: 25
+        pos2: 75
+        min: 0
+        max: 100
+      }
+
+      node qstd::choice {
+        tabs: ["cho1", "cho2", "cho3"]
+      }
+      node qstd::tabs {
+        tabs: ["tab1", "tab2", "tab3"]
+      }
+
+      node qstd::popup {
+        items: [
+          "option 1",
+          "-",
+          {
+            text: "others",
+            items: [
+              "other 1"
+              "other 2"
+              "other 3"
+              "other 4"
+            ],
+          },
+          
+        ]
+      }
+
+      node qstd::tooltip {
+        text: "a tooltip window"
+        open: true
+      }
     }
+
+    node qstd::vbox {
+      spacing: 10
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
+
+      node qstd::spinbox {
+        title: "Count"
+        value: 10
+        min: 0
+        max: 100
+        step: 5
+        suffix: " pcs"
+      }
     
-    node qstd::switch {
-      text: "Switch 1"
-      checked: false
-    }
-    node qstd::switch {
-      text: "Switch 2"
-      checked: true
-    }
-    
-    node qstd::button {
-      text: "filled"
-      variant: "filled"
-    }
-    node qstd::button {
-      text: "tonal"
-      variant: "tonal"
-    }
-    node qstd::button {
-      text: "elevated"
-      variant: "elevated"
-    }
-    node qstd::button {
-      text: "outlined"
-      variant: "outlined"
+      node qstd::floatspinbox {
+        title: "Scale"
+        value: 1.5
+        min: 0.0
+        max: 10.0
+        step: 0.005
+        decimals: 3
+      }
+
+
+      node qstd::progressbar {
+        value: 30
+        max: 100
+      }
+      node qstd::multiprogressbar {
+        values: [40, 30, 20]
+      }
+
+      node qstd::collapsible {
+        title: "Collapsible Section"
+        expanded: true
+        color: "monet(SurfaceContainerHigh)"
+        header_color: "monet(SurfaceContainerHighest)"
+
+        node qstd::spinner {}
+
+        node qstd::text {
+          text: "Hidden details inside collapsible"
+        }
+        node qstd::button {
+          text: "Inside Action"
+          variant: "tonal"
+        }
+      }
+
+      node qstd::button {
+        text: "Open Wait Dialog"
+        variant: "filled"
+        on_click: "OpenWaitDialog"
+      }
+
+      node qstd::button {
+        text: "Show Toast"
+        variant: "tonal"
+        on_click: "ShowToast"
+      }
     }
   }
 
-  node qstd::vbox {
-    spacing: 10
-    paddings: 16
-    color: "monet(SurfaceContainer)"
-    corner_radius: 16
-    scrollable: true
+  node purpleprint::view "page_purpleprint" {
+    anchor: "fill"
+    visible: false
 
-    node qstd::edit {
-      text: "Edit 1"
-      title: "edit 1"
-    }
-    
-    node qstd::combobox {
-      title: "Render Backend"
-      items: ["Vulkan", "OpenGL", "DirectX 12", "Metal"]
-      selected: 0
-      on_changed: "OnBackendChanged"
+    node purpleprint::node "pp_var_a" {
+      point: { x: 40, y: 40 }
+      width: 170
+      color: "oklch(0.78, 0.09, 250)"
+      title: "variable: a"
+      inputs: [{ name: "write", kind: "circle" }]
+      outputs: [{ name: "value", kind: "circle" }]
     }
 
-    node qstd::slider {
-      value: 45
-      min: 0
-      max: 100
-    }
-    node qstd::interval {
-      pos1: 25
-      pos2: 75
-      min: 0
-      max: 100
-    }
-
-    node qstd::choice {
-      tabs: ["cho1", "cho2", "cho3"]
-    }
-    node qstd::tabs {
-      tabs: ["tab1", "tab2", "tab3"]
-    }
-
-    node qstd::popup {
-      items: [
-        "option 1",
-        "-",
-        {
-          text: "others",
-          items: [
-            "other 1"
-            "other 2"
-            "other 3"
-            "other 4"
-          ],
-        },
-        
+    node purpleprint::node "pp_event" {
+      point: { x: 40, y: 155 }
+      width: 170
+      color: "oklch(0.675, 0.138, 65)"
+      title: "event: tick"
+      outputs: [
+        { name: "exec", kind: "flow" },
+        { name: "active", kind: "diamond" }
       ]
     }
 
-    node qstd::tooltip {
-      text: "a tooltip window"
-      open: true
-    }
-  }
-
-  node qstd::vbox {
-    spacing: 10
-    paddings: 16
-    color: "monet(SurfaceContainer)"
-    corner_radius: 16
-    scrollable: true
-
-    node qstd::spinbox {
-      title: "Count"
-      value: 10
-      min: 0
-      max: 100
-      step: 5
-      suffix: " pcs"
-      on_submit: "OnCountSubmit"
-    }
-  
-    node qstd::floatspinbox {
-      title: "Scale"
-      value: 1.5
-      min: 0.0
-      max: 10.0
-      step: 0.005
-      decimals: 3
-      on_submit: "OnScaleSubmit"
+    node purpleprint::node "pp_const_b" {
+      point: { x: 40, y: 285 }
+      width: 170
+      color: "oklch(0.62, 0.08, 300)"
+      title: "const: b"
+      outputs: [
+        { name: "value", kind: "circle" },
+        { name: "items", kind: "array" }
+      ]
     }
 
-
-    node qstd::progressbar {
-      value: 30
-      max: 100
-    }
-    node qstd::multiprogressbar {
-      values: [40, 30, 20]
-    }
-
-    node qstd::collapsible {
-      title: "Collapsible Section"
-      expanded: true
-      color: "monet(SurfaceContainerHigh)"
-      header_color: "monet(SurfaceContainerHighest)"
-
-      node qstd::spinner {}
-
-      node qstd::text {
-        text: "Hidden details inside collapsible"
-      }
-      node qstd::button {
-        text: "Inside Action"
-        variant: "tonal"
-      }
+    node purpleprint::node "pp_add" {
+      point: { x: 330, y: 110 }
+      width: 220
+      color: "oklch(0.78, 0.11, 160)"
+      title: "add"
+      inputs: [
+        { name: "exec", kind: "flow" },
+        { name: "v1", kind: "circle" },
+        { name: "v2", kind: "circle" }
+      ]
+      outputs: [
+        { name: "next", kind: "flow" },
+        { name: "res", kind: "circle" }
+      ]
     }
 
-    node qstd::button {
-      text: "Open Wait Dialog"
-      variant: "filled"
-      on_click: "OpenWaitDialog"
-    }
-
-    node qstd::button {
-      text: "Show Toast"
-      variant: "tonal"
-      on_click: "ShowToast"
+    node purpleprint::node "pp_output" {
+      point: { x: 610, y: 140 }
+      width: 190
+      color: "oklch(0.72, 0.12, 30)"
+      title: "output"
+      inputs: [
+        { name: "exec", kind: "flow" },
+        { name: "value", kind: "circle" },
+        { name: "meta", kind: "square" },
+        { name: "list", kind: "array" }
+      ]
     }
   }
 }

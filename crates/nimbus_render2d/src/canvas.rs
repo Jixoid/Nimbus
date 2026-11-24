@@ -14,8 +14,9 @@ use nimbus_rhi::types::Rect2D;
 use nimbus_rhi::{AllocationCreate, AllocationLocation, BufferUsage, Format, ShaderStage};
 use nimbus_rhi_ash::{AshCommandQueue, Command, Device, Allocator, Buffer, RenderTarget};
 
-use crate::{RectShape, TextShape};
+use crate::{CurveShape, RectShape, TextShape};
 use crate::atlas::GlyphAtlas;
+use crate::{CurveInstance, CurvePipeline, CurvePushConstants};
 use crate::{RectInstance, RectPipeline, RectPushConstants};
 use crate::{GlyphInstance, TextPipeline, TextPushConstants};
 
@@ -35,12 +36,19 @@ pub enum DrawBatch {
 		count: u32,
 		clip: Option<Rect<f32>>,
 	},
+	Curves {
+		start: u32,
+		count: u32,
+		clip: Option<Rect<f32>>,
+	},
 }
 
 impl DrawBatch {
 	pub fn clip(&self) -> Option<Rect<f32>> {
 		match self {
-			DrawBatch::Rects { clip, .. } | DrawBatch::Text { clip, .. } => *clip,
+			DrawBatch::Rects { clip, .. }
+			| DrawBatch::Text { clip, .. }
+			| DrawBatch::Curves { clip, .. } => *clip,
 		}
 	}
 }
@@ -49,13 +57,16 @@ impl DrawBatch {
 pub struct Canvas2D {
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
+	curve_pipeline: CurvePipeline,
 	atlas: GlyphAtlas,
 	rect_instances: Vec<RectInstance>,
 	glyph_instances: Vec<GlyphInstance>,
+	curve_instances: Vec<CurveInstance>,
 	batches: Vec<DrawBatch>,
 	clip_stack: Vec<Rect<f32>>,
 	rect_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
 	glyph_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
+	curve_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
 	frame_slot: usize,
 }
 
@@ -63,18 +74,22 @@ impl Canvas2D {
 	pub fn new(device: &Device, allocator: &Allocator, color_format: Format) -> Self {
 		let rect_pipeline = RectPipeline::new(device, color_format);
 		let text_pipeline = TextPipeline::new(device, color_format);
+		let curve_pipeline = CurvePipeline::new(device, color_format);
 		let atlas = GlyphAtlas::new(device, allocator);
 
 		Self {
 			rect_pipeline,
 			text_pipeline,
+			curve_pipeline,
 			atlas,
 			rect_instances: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			glyph_instances: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
+			curve_instances: Vec::with_capacity(256),
 			batches: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			clip_stack: Vec::new(),
 			rect_buffers: std::array::from_fn(|_| None),
 			glyph_buffers: std::array::from_fn(|_| None),
+			curve_buffers: std::array::from_fn(|_| None),
 			frame_slot: 0,
 		}
 	}
@@ -82,6 +97,7 @@ impl Canvas2D {
 	pub fn clear_batches(&mut self) {
 		self.rect_instances.clear();
 		self.glyph_instances.clear();
+		self.curve_instances.clear();
 		self.batches.clear();
 		self.clip_stack.clear();
 	}
@@ -210,8 +226,49 @@ impl Canvas2D {
 			}
 		}
 
+		// Prepare curve buffer for this frame slot if needed
+		if !self.curve_instances.is_empty() {
+			let byte_size = (self.curve_instances.len() * std::mem::size_of::<CurveInstance>()) as u64;
+
+			let needs_realloc = match &self.curve_buffers[slot] {
+				Some(buf) => buf.size() < byte_size,
+				None => true,
+			};
+
+			if needs_realloc {
+				let alloc_size = byte_size
+					.max(256u64 * std::mem::size_of::<CurveInstance>() as u64)
+					.next_power_of_two();
+				self.curve_buffers[slot] = Some(allocator.alloc_buffer(
+					alloc_size,
+					BufferUsage::StorageBuffer | BufferUsage::DeviceAddress,
+					AllocationCreate::Mapped | AllocationCreate::HostSequentialWrite,
+					AllocationLocation::PreferHost,
+				));
+			}
+
+			if let Some(buf) = &mut self.curve_buffers[slot] {
+				let slice = unsafe {
+					std::slice::from_raw_parts(
+						self.curve_instances.as_ptr() as *const u8,
+						byte_size as usize,
+					)
+				};
+				buf
+					.write_bytes(0, slice)
+					.expect("Failed to write curve instances to GPU buffer");
+			}
+		}
+
+		#[derive(Copy, Clone, PartialEq, Eq)]
+		enum ActivePipeline {
+			Rect,
+			Text,
+			Curve,
+		}
+
 		let mut current_scissor: Option<Rect2D> = None;
-		let mut current_is_rect: Option<bool> = None;
+		let mut active_pipeline: Option<ActivePipeline> = None;
 
 		for batch in &self.batches {
 			let desired_scissor = match batch.clip() {
@@ -240,21 +297,21 @@ impl Canvas2D {
 			match batch {
 				DrawBatch::Rects { start, count, .. } => {
 					if let Some(buf) = &self.rect_buffers[slot] {
-						if current_is_rect != Some(true) {
+						if active_pipeline != Some(ActivePipeline::Rect) {
 							cmd.bind_pipeline(self.rect_pipeline.pipeline());
 							let pc = RectPushConstants {
 								instance_addr: buf.address(),
 								screen_size,
 							};
 							cmd.push_constant(ShaderStage::Vertex, 0, &pc);
-							current_is_rect = Some(true);
+							active_pipeline = Some(ActivePipeline::Rect);
 						}
 						cmd.draw(6, *count, 0, *start);
 					}
 				}
 				DrawBatch::Text { start, count, .. } => {
 					if let Some(buf) = &self.glyph_buffers[slot] {
-						if current_is_rect != Some(false) {
+						if active_pipeline != Some(ActivePipeline::Text) {
 							cmd.bind_pipeline(self.text_pipeline.pipeline());
 							let pc = TextPushConstants {
 								glyph_addr: buf.address(),
@@ -263,7 +320,21 @@ impl Canvas2D {
 								_pad: 0,
 							};
 							cmd.push_constant(ShaderStage::Vertex | ShaderStage::Pixel, 0, &pc);
-							current_is_rect = Some(false);
+							active_pipeline = Some(ActivePipeline::Text);
+						}
+						cmd.draw(6, *count, 0, *start);
+					}
+				}
+				DrawBatch::Curves { start, count, .. } => {
+					if let Some(buf) = &self.curve_buffers[slot] {
+						if active_pipeline != Some(ActivePipeline::Curve) {
+							cmd.bind_pipeline(self.curve_pipeline.pipeline());
+							let pc = CurvePushConstants {
+								instance_addr: buf.address(),
+								screen_size,
+							};
+							cmd.push_constant(ShaderStage::Vertex, 0, &pc);
+							active_pipeline = Some(ActivePipeline::Curve);
 						}
 						cmd.draw(6, *count, 0, *start);
 					}
@@ -298,6 +369,37 @@ impl DrawShape for RectShape {
 		canvas.batches.push(DrawBatch::Rects {
 			start: idx,
 			count: 1,
+			clip,
+		});
+	}
+}
+
+impl DrawShape for CurveShape {
+	fn draw(canvas: &mut Canvas2D, shape: Self) {
+		if shape.count == 0 {
+			return;
+		}
+		let clip = canvas.current_clip();
+		let start = canvas.curve_instances.len() as u32;
+		let added = shape.count as u32;
+		for inst in &shape.instances[..shape.count] {
+			canvas.curve_instances.push(*inst);
+		}
+
+		if let Some(DrawBatch::Curves {
+			count,
+			clip: batch_clip,
+			..
+		}) = canvas.batches.last_mut()
+			&& *batch_clip == clip
+		{
+			*count += added;
+			return;
+		}
+
+		canvas.batches.push(DrawBatch::Curves {
+			start,
+			count: added,
 			clip,
 		});
 	}

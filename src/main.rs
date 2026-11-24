@@ -19,7 +19,11 @@ use nimbus_except::*;
 
 fn main() {
 	nimbus_except::start();
-	nimbus_ui::register_widgets(&mut WidgetRegistry::global().write().unwrap());
+	{
+		let mut registry = WidgetRegistry::global().write().unwrap();
+		nimbus_ui::register_widgets(&mut registry);
+		nimbus_ui_purple_print::register_widgets(&mut registry);
+	}
 
 	//let monet = Monet::from_system().unwrap();
 	let monet = Monet::new(
@@ -48,13 +52,30 @@ fn main() {
 
 	let tasks_dialog = tasks.clone();
 	let tasks_toast = tasks.clone();
+	let tasks_tabs = tasks.clone();
 
 	let target_id = Rc::new(Cell::new(None));
 	let target_id_cb = target_id.clone();
+	let page_comp_id = Rc::new(Cell::new(None));
+	let page_pp_id = Rc::new(Cell::new(None));
+	let page_comp_cb = page_comp_id.clone();
+	let page_pp_cb = page_pp_id.clone();
 
 	let mut events = MethodTable::new();
 	events.register("ToolAction", || {
 		nimbus_disp!("QDL Event Callback!");
+	});
+	events.register("SwitchPage", move |tab_idx: usize| {
+		let comp = page_comp_cb.get();
+		let pp = page_pp_cb.get();
+		tasks_tabs.push_tree(move |tree| {
+			if let Some(id) = comp {
+				tree.set_visible(id, tab_idx == 0);
+			}
+			if let Some(id) = pp {
+				tree.set_visible(id, tab_idx == 1);
+			}
+		});
 	});
 	events.register("OpenWaitDialog", move || {
 		if let Some(target) = target_id_cb.get() {
@@ -107,6 +128,22 @@ fn main() {
 	.expect("Failed to load qdl window");
 
 	target_id.set(Some(scene.root_id));
+	page_comp_id.set(scene.named_nodes.get("page_components").copied());
+	page_pp_id.set(scene.named_nodes.get("page_purpleprint").copied());
+
+	// Pre-connect example PurplePrint wires
+	if let (Some(&pp_id), Some(&var_a), Some(&ev), Some(&add)) = (
+		scene.named_nodes.get("page_purpleprint"),
+		scene.named_nodes.get("pp_var_a"),
+		scene.named_nodes.get("pp_event"),
+		scene.named_nodes.get("pp_add"),
+	) && let Some(pp) = main_window
+		.tree_mut()
+		.get_widget_mut::<nimbus_ui_purple_print::PurplePrintView>(pp_id)
+	{
+		pp.connect(ev, 0, add, 0);
+		pp.connect(var_a, 0, add, 1);
+	}
 
 	
 	// Run Application
