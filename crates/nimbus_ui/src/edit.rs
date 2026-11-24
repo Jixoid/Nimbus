@@ -26,7 +26,7 @@ pub struct Edit {
 	pub title: String,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub border_radius: f32,
+	pub border_radius: Option<f32>,
 	pub cursor_pos: usize,
 	pub selection_start: Option<usize>,
 	pub on_changed: Option<MethodCallback>,
@@ -45,7 +45,7 @@ impl Default for Edit {
 			title: String::new(),
 			font: None,
 			font_size: 15.0,
-			border_radius: 8.0,
+			border_radius: None,
 			cursor_pos: 0,
 			selection_start: None,
 			on_changed: None,
@@ -171,10 +171,12 @@ impl Widget for Edit {
 			bounds
 		};
 
+		let stroke_w = ctx.theme.stroke.thick;
+		let border_radius = self.border_radius.unwrap_or(ctx.theme.radius.small);
 		canvas.draw(
 			RectShape::new(box_bounds, Color::TRANSPARENT)
-				.border(border_color, 2.0)
-				.radius(self.border_radius),
+				.border(border_color, stroke_w)
+				.radius(border_radius),
 		);
 
 		let fface = FontManager::default_font();
@@ -183,9 +185,9 @@ impl Widget for Edit {
 			let (title_w, _) = canvas.measure_text(&self.title, 12.0);
 			let notch_rect = Rect::new(
 				box_bounds.x() + 10.0,
-				box_bounds.y() - 2.0 * 0.5,
+				box_bounds.y() - stroke_w * 0.5,
 				title_w + 8.0,
-				2.0 + 1.0,
+				stroke_w + 1.0,
 			);
 			canvas.draw(RectShape::new(notch_rect, monet[MonetRole::SurfaceContainer]));
 
@@ -453,7 +455,7 @@ impl Widget for Edit {
 			}
 			"title" => self.title = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"border_radius" => self.border_radius = value.expect_f32()?,
+			"border_radius" => self.border_radius = Some(value.expect_f32()?),
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
@@ -519,7 +521,7 @@ impl EditBuilder {
 	}
 
 	pub fn border_radius(mut self, radius: f32) -> Self {
-		self.inner.border_radius = radius;
+		self.inner.border_radius = Some(radius);
 		self
 	}
 

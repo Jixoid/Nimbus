@@ -191,7 +191,7 @@ fn draw_spinbox_chrome(
 	scroll_x: &Cell<f32>,
 	font: Option<FontId>,
 	font_size: f32,
-	border_radius: f32,
+	corner_radius: Option<f32>,
 	hovered_part: StepperPart,
 	pressed_part: StepperPart,
 ) {
@@ -210,10 +210,12 @@ fn draw_spinbox_chrome(
 	let divider_x = up_rect.x();
 
 	// Outer border
+	let stroke_w = ctx.theme.stroke.thick;
+	let resolved_radius = corner_radius.unwrap_or(ctx.theme.radius.small);
 	canvas.draw(
 		RectShape::new(box_bounds, Color::TRANSPARENT)
-			.border(border_color, 2.0)
-			.radius(border_radius),
+			.border(border_color, stroke_w)
+			.radius(resolved_radius),
 	);
 
 	// Minimalist Qt-style stepper arrow icons (color-only hover & press feedback)
@@ -358,7 +360,7 @@ pub struct SpinBox {
 	pub suffix: String,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub border_radius: f32,
+	pub corner_radius: Option<f32>,
 	pub on_changed: Option<MethodCallback>,
 	pub on_submit: Option<MethodCallback>,
 
@@ -392,7 +394,7 @@ impl Default for SpinBox {
 			suffix: String::new(),
 			font: None,
 			font_size: 15.0,
-			border_radius: 8.0,
+			corner_radius: None,
 			on_changed: None,
 			on_submit: None,
 			buffer: "0".to_string(),
@@ -539,7 +541,7 @@ impl Widget for SpinBox {
 			&self.scroll_x,
 			self.font,
 			self.font_size,
-			self.border_radius,
+			self.corner_radius,
 			self.hovered_part,
 			self.pressed_part,
 		);
@@ -866,7 +868,7 @@ impl Widget for SpinBox {
 			"prefix" => self.prefix = value.expect_str()?.to_string(),
 			"suffix" => self.suffix = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"corner_radius" => self.border_radius = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			_ => return Err(PropertyError::NotFound),
 		}
 		Ok(())
@@ -964,8 +966,8 @@ impl SpinBoxBuilder {
 		self
 	}
 
-	pub fn border_radius(mut self, radius: f32) -> Self {
-		self.inner.border_radius = radius;
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
 		self
 	}
 
@@ -1004,7 +1006,7 @@ pub struct FloatSpinBox {
 	pub suffix: String,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub border_radius: f32,
+	pub corner_radius: Option<f32>,
 	pub on_changed: Option<MethodCallback>,
 	pub on_submit: Option<MethodCallback>,
 
@@ -1039,7 +1041,7 @@ impl Default for FloatSpinBox {
 			suffix: String::new(),
 			font: None,
 			font_size: 15.0,
-			border_radius: 8.0,
+			corner_radius: None,
 			on_changed: None,
 			on_submit: None,
 			buffer: "0.00".to_string(),
@@ -1206,7 +1208,7 @@ impl Widget for FloatSpinBox {
 			&self.scroll_x,
 			self.font,
 			self.font_size,
-			self.border_radius,
+			self.corner_radius,
 			self.hovered_part,
 			self.pressed_part,
 		);
@@ -1552,7 +1554,7 @@ impl Widget for FloatSpinBox {
 			"prefix" => self.prefix = value.expect_str()?.to_string(),
 			"suffix" => self.suffix = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"border_radius" => self.border_radius = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			_ => return Err(PropertyError::NotFound),
 		}
 		Ok(())
@@ -1658,8 +1660,8 @@ impl FloatSpinBoxBuilder {
 		self
 	}
 
-	pub fn border_radius(mut self, radius: f32) -> Self {
-		self.inner.border_radius = radius;
+	pub fn corner_radius(mut self, radius: f32) -> Self {
+		self.inner.corner_radius = Some(radius);
 		self
 	}
 

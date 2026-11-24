@@ -13,16 +13,16 @@
 use std::any;
 
 use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, Widget};
-use nimbus_math::{Color, Vec2};
+use nimbus_math::Vec2;
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Text {
 	pub text: String,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub color: Option<Color>,
+	pub color: Option<DColor>,
 }
 
 impl Default for Text {
@@ -49,6 +49,7 @@ impl Widget for Text {
 		}
 		let color = self
 			.color
+			.map(|c| c.get(&ctx.theme.monet))
 			.unwrap_or_else(|| ctx.theme.monet[MonetRole::OnSurface]);
 		let fface = FontManager::default_font();
 		let font = match self.font {
@@ -68,12 +69,12 @@ impl Widget for Text {
 		&mut self,
 		key: &str,
 		value: &nimbus_core::PropertyValue,
-		ctx: &nimbus_core::PropertyCtx,
+		_ctx: &nimbus_core::PropertyCtx,
 	) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"text" => self.text = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
@@ -114,8 +115,8 @@ impl TextBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 

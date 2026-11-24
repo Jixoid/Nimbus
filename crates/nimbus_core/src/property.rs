@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use nimbus_except::nimbus_log;
 pub use nimbus_math::parse_color;
 use nimbus_math::{Color, Vec2};
-use nimbus_theme::{Monet, MonetRole, Theme};
+use nimbus_theme::{DColor, Monet, MonetRole, Theme};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,9 +104,9 @@ impl PropertyValue {
 	}
 
 	
-	pub fn resolve_color(&self, monet: &Monet) -> Option<Color<f32>> {
+	pub fn resolve_dcolor(&self) -> Option<DColor> {
 		if let Some(c) = self.as_color() {
-			return Some(c);
+			return Some(DColor::new_color(c));
 		}
 		if let Some(s) = self.as_str() {
 			let s_trim = s.trim();
@@ -193,20 +193,16 @@ impl PropertyValue {
 					}
 				};
 
-				let mut color = match role {
-					Some(r) => monet[r],
-					None => monet[MonetRole::Primary],
-				};
-
-				if alpha < 1.0 {
-					color.a *= alpha;
-				}
-				return Some(color);
+				return Some(DColor::new_monet(role.unwrap_or(MonetRole::Primary), alpha));
 			} else if let Some(color) = nimbus_math::parse_color(s_trim) {
-				return Some(color);
+				return Some(DColor::new_color(color));
 			}
 		}
 		None
+	}
+
+	pub fn resolve_color(&self, monet: &Monet) -> Option<Color<f32>> {
+		self.resolve_dcolor().map(|d| d.get(monet))
 	}
 
 	pub fn expect_str(&self) -> Result<&str, PropertyError> {
@@ -235,6 +231,10 @@ impl PropertyValue {
 
 	pub fn expect_object(&self) -> Result<&HashMap<String, PropertyValue>, PropertyError> {
 		self.as_object().ok_or(PropertyError::InvalidValue { expected: "object" })
+	}
+
+	pub fn expect_dcolor(&self) -> Result<DColor, PropertyError> {
+		self.resolve_dcolor().ok_or(PropertyError::InvalidValue { expected: "color" })
 	}
 
 	pub fn expect_color(&self, monet: &Monet) -> Result<Color<f32>, PropertyError> {

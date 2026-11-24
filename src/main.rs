@@ -13,8 +13,38 @@
 use std::{cell::Cell, rc::Rc};
 use nimbus_core::{Application, MethodTable, WidgetRegistry, Window};
 use nimbus_math::Color;
-use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens, Theme};
+use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StrokeTokens, Theme};
 use nimbus_except::*;
+
+
+fn make_monet(palette: i32, is_dark: bool) -> Monet {
+	match palette {
+		1 => Monet::new(
+			Color::from_oklch(0.65, 0.14, 245.0),
+			Color::from_oklch(0.58, 0.06, 220.0),
+			Color::from_oklch(0.60, 0.10, 175.0),
+			is_dark,
+		),
+		2 => Monet::new(
+			Color::from_oklch(0.64, 0.13, 145.0),
+			Color::from_oklch(0.56, 0.05, 130.0),
+			Color::from_oklch(0.62, 0.10, 95.0),
+			is_dark,
+		),
+		3 => Monet::new(
+			Color::from_oklch(0.66, 0.15, 355.0),
+			Color::from_oklch(0.58, 0.06, 330.0),
+			Color::from_oklch(0.62, 0.11, 35.0),
+			is_dark,
+		),
+		_ => Monet::new(
+			Color::from_oklch(0.675, 0.138, 65.0),
+			Color::from_oklch(0.563, 0.038, 65.0),
+			Color::from_oklch(0.517, 0.052, 300.0),
+			is_dark,
+		),
+	}
+}
 
 
 fn main() {
@@ -37,7 +67,6 @@ fn main() {
 	let theme = Theme {
 		elevation: ElevationTokens::default(),
 		radius: RadiusTokens::default(),
-		state: StateTokens::default(),
 		stroke: StrokeTokens::default(),
 		monet,
 	};
@@ -45,9 +74,10 @@ fn main() {
 	// Application
 	let mut app = Application::new(theme);
 	let theme = app.theme.clone();
+	let app_tasks = app.task_queue();
 
 	// Window
-	let main_handle = app.create_window(Window::new("Nimbus Application", 860, 580));
+	let main_handle = app.create_window(Window::new("Nimbus Application", 860, 620));
 	let main_window = app.window_mut(main_handle).unwrap();
 	let tasks = main_window.task_queue();
 
@@ -373,6 +403,89 @@ fn main() {
 			{
 				orient.set_camera(cam);
 			}
+		});
+	});
+
+	let theme_palette = Rc::new(Cell::new(0i32));
+	let theme_is_dark = Rc::new(Cell::new(true));
+
+	let app_tasks_pal = app_tasks.clone();
+	let pal_cb = theme_palette.clone();
+	let dark_for_pal = theme_is_dark.clone();
+	events.register("ChangePalette", move |idx: i32, _label: String| {
+		pal_cb.set(idx);
+		let dark = dark_for_pal.get();
+		app_tasks_pal.push_theme(move |theme| {
+			theme.monet = make_monet(idx, dark);
+		});
+	});
+
+	let app_tasks_mode = app_tasks.clone();
+	let pal_for_mode = theme_palette.clone();
+	let dark_cb = theme_is_dark.clone();
+	events.register("ChangeThemeMode", move |idx: i32, _label: String| {
+		let dark = idx == 0;
+		dark_cb.set(dark);
+		let pal = pal_for_mode.get();
+		app_tasks_mode.push_theme(move |theme| {
+			theme.monet = make_monet(pal, dark);
+		});
+	});
+
+	let app_tasks_radius = app_tasks.clone();
+	events.register("ChangeRadius", move |idx: i32, _label: String| {
+		let radius = match idx {
+			0 => RadiusTokens {
+				none: 0.0,
+				xsmall: 0.0,
+				small: 0.0,
+				medium: 0.0,
+				large: 0.0,
+				xlarge: 0.0,
+				full: 0.0,
+			},
+			1 => RadiusTokens {
+				none: 0.0,
+				xsmall: 0.0,
+				small: 2.0,
+				medium: 4.0,
+				large: 6.0,
+				xlarge: 10.0,
+				full: f32::MAX,
+			},
+			3 => RadiusTokens {
+				none: 0.0,
+				xsmall: 8.0,
+				small: 14.0,
+				medium: 20.0,
+				large: 26.0,
+				xlarge: 36.0,
+				full: f32::MAX,
+			},
+			_ => RadiusTokens::default(),
+		};
+		app_tasks_radius.push_theme(move |theme| {
+			theme.radius = radius;
+		});
+	});
+
+	let app_tasks_stroke = app_tasks.clone();
+	events.register("ChangeStroke", move |idx: i32, _label: String| {
+		let stroke = match idx {
+			0 => StrokeTokens {
+				thin: 0.5,
+				thick: 1.0,
+				heavier: 1.5,
+			},
+			2 => StrokeTokens {
+				thin: 2.0,
+				thick: 3.5,
+				heavier: 5.0,
+			},
+			_ => StrokeTokens::default(),
+		};
+		app_tasks_stroke.push_theme(move |theme| {
+			theme.stroke = stroke;
 		});
 	});
 

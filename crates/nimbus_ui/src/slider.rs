@@ -93,13 +93,18 @@ impl Widget for Slider {
 		let gap = if is_hover { 7.0 } else { 6.0 };
 		let handle_half_w = if is_hover { 3.0 } else { 2.0 };
 
+		let track_h = (h - 8.0).max(0.0);
+		let outer_r = ctx.theme.radius.large.min(track_h * 0.5);
+		let inner_r = ctx.theme.radius.xsmall.min(track_h * 0.5);
+		let handle_r = ctx.theme.radius.xsmall.min(handle_half_w);
+
 		// Filled (Left)
 		let left_w = (val_pos - gap - 1.0).max(0.0);
 		if left_w > 0.0 {
-			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + 4.0, left_w, (h - 8.0).max(0.0));
+			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + 4.0, left_w, track_h);
 			canvas.draw(
 				RectShape::new(left_rect, monet[MonetRole::Secondary])
-					.radius4([14.0, 4.0, 4.0, 14.0])
+					.radius4([outer_r, inner_r, inner_r, outer_r])
 					.noise(0.15),
 			);
 		}
@@ -116,7 +121,7 @@ impl Widget for Slider {
 			handle_half_w * 2.0,
 			(h - 2.0).max(0.0),
 		);
-		canvas.draw(RectShape::new(handle_rect, handle_color).radius(4.0));
+		canvas.draw(RectShape::new(handle_rect, handle_color).radius(handle_r));
 
 		// Empty Part (Right)
 		let right_start = val_pos + gap;
@@ -126,11 +131,11 @@ impl Widget for Slider {
 				bounds.x() + right_start,
 				bounds.y() + 4.0,
 				right_w,
-				(h - 8.0).max(0.0),
+				track_h,
 			);
 			canvas.draw(
-				RectShape::new(right_rect, monet[MonetRole::PrimaryOutline] *0.5)
-					.radius4([4.0, 14.0, 14.0, 4.0]),
+				RectShape::new(right_rect, monet[MonetRole::PrimaryOutline] * 0.5)
+					.radius4([inner_r, outer_r, outer_r, inner_r]),
 			);
 		}
 	}

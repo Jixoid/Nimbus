@@ -14,6 +14,8 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
+use nimbus_theme::Theme;
+
 use crate::tree::UiTree;
 use crate::window::Window;
 
@@ -22,11 +24,13 @@ pub enum Task {
 	Plain(Box<dyn FnOnce() + Send + 'static>),
 	Tree(Box<dyn FnOnce(&mut UiTree) + Send + 'static>),
 	Window(Box<dyn FnOnce(&mut Window) + Send + 'static>),
+	Theme(Box<dyn FnOnce(&mut Theme) + Send + 'static>),
 }
 
 pub struct NoArgTask;
 pub struct TreeTask;
 pub struct WindowTask;
+pub struct ThemeTask;
 
 pub trait IntoTask<Marker = NoArgTask> {
 	fn into_task(self) -> Task;
@@ -56,6 +60,15 @@ where
 {
 	fn into_task(self) -> Task {
 		Task::Window(Box::new(self))
+	}
+}
+
+impl<F> IntoTask<ThemeTask> for F
+where
+	F: FnOnce(&mut Theme) + Send + 'static,
+{
+	fn into_task(self) -> Task {
+		Task::Theme(Box::new(self))
 	}
 }
 
@@ -89,6 +102,10 @@ impl TaskQueue {
 
 	pub fn push_window<F: FnOnce(&mut Window) + Send + 'static>(&self, task: F) {
 		self.push::<WindowTask, _>(task);
+	}
+
+	pub fn push_theme<F: FnOnce(&mut Theme) + Send + 'static>(&self, task: F) {
+		self.push::<ThemeTask, _>(task);
 	}
 
 	pub fn is_empty(&self) -> bool {

@@ -19,7 +19,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
@@ -48,10 +48,10 @@ pub struct Tooltip {
 	pub position: TooltipPosition,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub corner_radius: f32,
+	pub corner_radius: Option<f32>,
 	pub show_arrow: bool,
-	pub background: Option<Color>,
-	pub color: Option<Color>,
+	pub background: Option<DColor>,
+	pub color: Option<DColor>,
 	pub open: Option<bool>,
 	pub progress: Animated<f32>,
 	hovered: bool,
@@ -67,7 +67,7 @@ impl Default for Tooltip {
 			position: TooltipPosition::Top,
 			font: None,
 			font_size: 12.0,
-			corner_radius: 6.0,
+			corner_radius: None,
 			show_arrow: true,
 			background: None,
 			color: None,
@@ -99,16 +99,19 @@ impl Tooltip {
 	fn draw_bubble(
 		&self,
 		canvas: &mut Canvas2D,
-		monet: &nimbus_theme::Monet,
+		theme: &nimbus_theme::Theme,
 		font: Font,
 		bubble_rect: Rect<f32>,
 		t: f32,
 	) {
+		let monet = &theme.monet;
 		let bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainerHighest]);
 		let text_color = self
 			.color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 		let border_color = monet[MonetRole::SurfaceOutlineVariant];
 		let shadow_color = Color::new(0.0, 0.0, 0.0, 0.3 * t);
@@ -116,8 +119,8 @@ impl Tooltip {
 		// Bubble background with border & soft shadow
 		canvas.draw(
 			RectShape::new(bubble_rect, bg)
-				.radius(self.corner_radius)
-				.border(border_color, 1.0)
+				.radius(self.corner_radius.unwrap_or(theme.radius.small))
+				.border(border_color, theme.stroke.thin)
 				.shadow(shadow_color, Vec2::new(0.0, 2.0), 6.0)
 				.noise(0.02),
 		);
@@ -267,7 +270,6 @@ impl Widget for Tooltip {
 			return;
 		}
 
-		let monet = &ctx.theme.monet;
 		let fface = FontManager::default_font();
 		let font = match self.font {
 			Some(id) => Font::with_id(id, fface, self.font_size),
@@ -309,7 +311,7 @@ impl Widget for Tooltip {
 			ctx.bounds
 		};
 
-		self.draw_bubble(canvas, monet, font, bubble_rect, t);
+		self.draw_bubble(canvas, ctx.theme, font, bubble_rect, t);
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
@@ -344,7 +346,7 @@ impl Widget for Tooltip {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"text" => self.text = value.expect_str()?.to_string(),
 			"position" => {
@@ -356,15 +358,15 @@ impl Widget for Tooltip {
 				)?;
 			}
 			"font_size" => self.font_size = value.expect_f32()?,
-			"corner_radius" => self.corner_radius = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			"show_arrow" => self.show_arrow = value.expect_bool()?,
 			"open" => {
 				let b = value.expect_bool()?;
 				self.open = Some(b);
 				self.progress.snap_to(if b { 1.0 } else { 0.0 });
 			}
-			"background" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"background" => self.background = Some(value.expect_dcolor()?),
+			"color" => self.color = Some(value.expect_dcolor()?),
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
@@ -413,7 +415,7 @@ impl TooltipBuilder {
 	}
 
 	pub fn corner_radius(mut self, radius: f32) -> Self {
-		self.inner.corner_radius = radius;
+		self.inner.corner_radius = Some(radius);
 		self
 	}
 
@@ -422,13 +424,13 @@ impl TooltipBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 

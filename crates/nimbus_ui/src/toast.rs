@@ -490,8 +490,8 @@ impl Widget for ToastHost {
 
 			canvas.draw(
 				RectShape::new(card, bg)
-					.radius(12.0)
-					.border(border, 1.0)
+					.radius(ctx.theme.radius.medium)
+					.border(border, ctx.theme.stroke.thin)
 					.shadow(shadow, Vec2::new(0.0, 4.0), 14.0),
 			);
 

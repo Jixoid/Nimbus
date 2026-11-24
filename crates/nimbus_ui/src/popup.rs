@@ -19,7 +19,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::{Monet, MonetRole};
+use nimbus_theme::MonetRole;
 
 
 #[derive(Clone, Debug, PartialEq)]
@@ -258,7 +258,7 @@ impl Popup {
 	fn draw_menu_page(
 		&self,
 		canvas: &mut Canvas2D,
-		monet: &Monet,
+		theme: &nimbus_theme::Theme,
 		font: Font,
 		fface: &nimbus_render2d::FontFace,
 		bounds: Rect<f32>,
@@ -269,6 +269,7 @@ impl Popup {
 		hovered_idx: Option<usize>,
 		hovered_header: bool,
 	) {
+		let monet = &theme.monet;
 		let page_bounds = Rect::new(bounds.x() + offset_x, bounds.y(), bounds.width(), bounds.height());
 
 		// Header Bar
@@ -276,14 +277,15 @@ impl Popup {
 			let header_h = self.header_height(true);
 			let header_rect = Rect::new(page_bounds.x()+1.0, page_bounds.y()+1.0, page_bounds.width()-2.0, header_h);
 
+			let top_r = theme.radius.medium;
 			canvas.draw(
 				if is_sub_level && hovered_header {
 					RectShape::new(header_rect, monet[MonetRole::Primary])
-						.radius4([13.0, 13.0, 0.0, 0.0])
+						.radius4([top_r, top_r, 0.0, 0.0])
 						.noise(0.10)
 				} else {
 					RectShape::new(header_rect, monet[MonetRole::SurfaceContainer])
-						.radius4([13.0, 13.0, 0.0, 0.0])	
+						.radius4([top_r, top_r, 0.0, 0.0])
 				}
 			);
 
@@ -343,7 +345,7 @@ impl Popup {
 			if is_hovered {
 				canvas.draw(
 					RectShape::new(row_rect, monet[MonetRole::Primary])
-						.radius(10.0)
+						.radius(theme.radius.small)
 						.noise(0.10),
 				);
 			}
@@ -509,11 +511,12 @@ impl Widget for Popup {
 		let bg_color = monet[MonetRole::SurfaceContainerHigh];
 		let border_color = monet[MonetRole::SurfaceOutlineVariant];
 
+		let card_r = ctx.theme.radius.medium;
 		canvas.draw(
 			RectShape::new(bounds, bg_color)
-				.radius(13.0)
+				.radius(card_r)
 				.shadow(shadow_color, Vec2::new(0.0, 4.0), 12.0)
-				.border(border_color, 1.0)
+				.border(border_color, ctx.theme.stroke.thin)
 				.noise(0.03),
 		);
 
@@ -538,7 +541,7 @@ impl Widget for Popup {
 
 			self.draw_menu_page(
 				canvas,
-				monet,
+				ctx.theme,
 				font,
 				fface,
 				bounds,
@@ -563,7 +566,7 @@ impl Widget for Popup {
 
 			self.draw_menu_page(
 				canvas,
-				monet,
+				ctx.theme,
 				font,
 				fface,
 				bounds,
@@ -582,7 +585,7 @@ impl Widget for Popup {
 
 			self.draw_menu_page(
 				canvas,
-				monet,
+				ctx.theme,
 				font,
 				fface,
 				bounds,

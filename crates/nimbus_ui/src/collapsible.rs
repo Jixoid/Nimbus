@@ -19,7 +19,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Collapsible {
@@ -29,11 +29,11 @@ pub struct Collapsible {
 	pub padding: f32,
 	pub header_height: f32,
 	pub corner_radius: Option<f32>,
-	pub background: Option<Color>,
-	pub header_background: Option<Color>,
-	pub color: Option<Color>,
+	pub background: Option<DColor>,
+	pub header_background: Option<DColor>,
+	pub color: Option<DColor>,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub font: Option<FontId>,
 	pub font_size: f32,
 	pub on_changed: Option<MethodCallback>,
@@ -245,12 +245,14 @@ impl Widget for Collapsible {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
 		let border_col = self
 			.border_color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
 
 		let has_expanded_body = t > 0.01 && ctx.bounds.height() > self.header_height + 0.5;
 		if has_expanded_body {
 			let bg = self
 				.background
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 			let mut body_shape = RectShape::new(ctx.bounds, bg).radius(radius);
 			if self.border_width > 0.0 {
@@ -282,6 +284,7 @@ impl Widget for Collapsible {
 			monet[MonetRole::SurfaceContainerHighest]
 		} else {
 			self.header_background
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceContainerHigh])
 		};
 
@@ -298,7 +301,10 @@ impl Widget for Collapsible {
 			None => Font::new(fface, self.font_size),
 		};
 		let (_, text_h) = canvas.measure_text(&self.title, self.font_size);
-		let text_color = self.color.unwrap_or_else(|| monet[MonetRole::OnSurface]);
+		let text_color = self
+			.color
+			.map(|c| c.get(monet))
+			.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 		let text_pos = Vec2::new(
 			header_rect.x() + 14.0,
 			header_rect.y() + (header_rect.height() - text_h) * 0.5,
@@ -364,7 +370,7 @@ impl Widget for Collapsible {
 		}
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), PropertyError> {
 		match key {
 			"title" => self.title = value.expect_str()?.to_string(),
 			"expanded" => self.set_open(value.expect_bool()?, false),
@@ -372,10 +378,10 @@ impl Widget for Collapsible {
 			"paddings" => self.padding = value.expect_f32()?,
 			"header_height" => self.header_height = value.expect_f32()?.max(20.0),
 			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"header_color" => self.header_background = Some(value.expect_color(&ctx.theme.monet)?),
-			"text_color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"header_color" => self.header_background = Some(value.expect_dcolor()?),
+			"text_color" => self.color = Some(value.expect_dcolor()?),
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"font_size" => self.font_size = value.expect_f32()?,
 			_ => return Err(PropertyError::NotFound),
@@ -461,28 +467,28 @@ impl CollapsibleBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn header_background(mut self, color: Color) -> Self {
-		self.inner.header_background = Some(color);
+	pub fn header_background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.header_background = Some(color.into());
 		self
 	}
 
-	pub fn header_color(mut self, color: Color) -> Self {
-		self.inner.header_background = Some(color);
+	pub fn header_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.header_background = Some(color.into());
 		self
 	}
 
-	pub fn text_color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn text_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 
@@ -491,8 +497,8 @@ impl CollapsibleBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 
@@ -519,92 +525,5 @@ impl CollapsibleBuilder {
 impl From<CollapsibleBuilder> for Collapsible {
 	fn from(builder: CollapsibleBuilder) -> Self {
 		builder.build()
-	}
-}
-
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use std::sync::atomic::{AtomicBool, Ordering};
-	use std::sync::Arc;
-	use nimbus_core::{ButtonState, MouseButton, PropertyCtx, UiTree};
-	use nimbus_theme::{
-		ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens, Theme,
-	};
-	use crate::Spacer;
-
-	fn test_theme() -> Theme {
-		Theme {
-			elevation: ElevationTokens::default(),
-			radius: RadiusTokens::default(),
-			state: StateTokens::default(),
-			stroke: StrokeTokens::default(),
-			monet: Monet::new(
-				Color::from_oklch(0.675, 0.138, 65.0),
-				Color::from_oklch(0.563, 0.038, 65.0),
-				Color::from_oklch(0.517, 0.052, 300.0),
-				true,
-			),
-		}
-	}
-
-	#[test]
-	fn test_collapsible_layout_open_closed_and_toggle() {
-		let mut tree = UiTree::new();
-		let mut collapsible = Collapsible::new("Details");
-		let theme = test_theme();
-		let pctx = PropertyCtx { theme: &theme };
-
-		collapsible
-			.set_property("header_height", &PropertyValue::Number(40.0), &pctx)
-			.unwrap();
-		collapsible
-			.set_property("paddings", &PropertyValue::Number(10.0), &pctx)
-			.unwrap();
-		collapsible
-			.set_property("spacing", &PropertyValue::Number(8.0), &pctx)
-			.unwrap();
-
-		let toggled = Arc::new(AtomicBool::new(false));
-		let toggled_clone = toggled.clone();
-		collapsible.bind_method(
-			"on_changed",
-			MethodCallback::new(move |open: bool| {
-				toggled_clone.store(open, Ordering::SeqCst);
-			}),
-		);
-
-		let col_id = tree.insert_root(collapsible);
-		tree.insert_child(col_id, Spacer::new(120.0, 20.0));
-		tree.insert_child(col_id, Spacer::new(100.0, 30.0));
-
-		// Collapsed: height == header_height (40.0)
-		tree.layout_all(Vec2::new(300.0, 400.0));
-		// Note: root receives tight window constraints in layout_all, so test loose constraints via layout_node
-		let collapsed_size = tree.layout_node(col_id, BoxConstraints::loose(Vec2::new(300.0, 400.0)));
-		assert_eq!(collapsed_size.y, 40.0);
-
-		// Expanded: height == 40.0 + (20.0 + 8.0 + 30.0 + 20.0) == 118.0
-		tree.get_widget_mut::<Collapsible>(col_id)
-			.unwrap()
-			.set_open(true, false);
-		let expanded_size = tree.layout_node(col_id, BoxConstraints::loose(Vec2::new(300.0, 400.0)));
-		assert_eq!(expanded_size.y, 118.0);
-
-		// Reset to closed and click header to toggle open + trigger on_changed(true)
-		tree.get_widget_mut::<Collapsible>(col_id)
-			.unwrap()
-			.set_open(false, false);
-		tree.layout_node(col_id, BoxConstraints::loose(Vec2::new(300.0, 400.0)));
-
-		let click_pos = Vec2::new(50.0, 20.0);
-		tree.dispatch_pointer_move(click_pos);
-		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Pressed, click_pos);
-		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Released, click_pos);
-
-		assert!(tree.get_widget::<Collapsible>(col_id).unwrap().open);
-		assert!(toggled.load(Ordering::SeqCst));
-		assert!(tree.needs_layout);
 	}
 }

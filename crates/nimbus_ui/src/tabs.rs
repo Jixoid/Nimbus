@@ -135,7 +135,7 @@ impl Widget for Tabs {
 		let monet = &theme.monet;
 		let bounds = ctx.bounds;
 
-		let radius = bounds.height() * 0.5;
+		let radius = theme.radius.large.min(bounds.height() * 0.5);
 		canvas.draw(
 			RectShape::new(bounds, monet[MonetRole::SurfaceContainerHigh]).radius(radius),
 		);
@@ -191,7 +191,7 @@ impl Widget for Tabs {
 
 		// 2. Draw sliding indicator pill on top, then mask OnPrimary labels inside the pill
 		if let Some(pill) = pill_rect {
-			let pill_radius = pill.height() * 0.5;
+			let pill_radius = theme.radius.large.min(pill.height() * 0.5);
 			canvas.draw(
 				RectShape::new(pill, monet[MonetRole::Primary])
 					.radius(pill_radius)

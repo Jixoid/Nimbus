@@ -237,6 +237,12 @@ impl ApplicationHandler for AppRunner {
 							window.tree.needs_redraw = true;
 						}
 					}
+					Task::Theme(f) => {
+						f(&mut self.theme);
+						for window in self.windows.values_mut() {
+							window.tree.needs_redraw = true;
+						}
+					}
 				}
 			}
 		}

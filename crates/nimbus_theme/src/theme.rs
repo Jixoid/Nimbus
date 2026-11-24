@@ -20,7 +20,6 @@ pub struct Theme {
   pub monet: Monet,
   pub radius: RadiusTokens,
   pub elevation: ElevationTokens,
-  pub state: StateTokens,
   pub stroke: StrokeTokens,
 }
 
@@ -79,28 +78,6 @@ impl Default for RadiusTokens {
       large: 16.0,
       xlarge: 28.0,
       full: f32::MAX,
-    }
-  }
-}
-
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct StateTokens {
-  pub hover: f32,
-  pub focus: f32,
-  pub pressed: f32,
-  pub dragged: f32,
-  pub disabled: f32,
-}
-
-impl Default for StateTokens {
-  fn default() -> Self {
-    Self {
-      hover: 0.08,
-      focus: 0.12,
-      pressed: 0.12,
-      dragged: 0.16,
-      disabled: 0.38,
     }
   }
 }

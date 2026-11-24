@@ -49,7 +49,11 @@ impl Monet {
       tertiary,
       error,
       surface,
-      shadow: Color::from_oklch(0.0, 0.0, 0.0),
+      shadow: if is_dark {
+        Color::from_oklch(0.0, 0.0, 0.0)
+      } else {
+        Color::new(0.0, 0.0, 0.0, 0.22)
+      },
     }
   }
   
@@ -248,20 +252,22 @@ impl SubMonetSurface {
         outline_variant: Color::from_oklch(0.30, c_variant, hue),
       }
     } else {
+      let c_light = 0.008;
+      let c_light_variant = 0.015;
       Self {
-        main: Color::from_oklch(0.98, c_neutral, hue),
-        on_main: Color::from_oklch(0.10, c_neutral, hue),
-        variant: Color::from_oklch(0.90, c_variant, hue),
-        on_variant: Color::from_oklch(0.30, c_variant, hue),
-        dim: Color::from_oklch(0.87, c_neutral, hue),
-        bright: Color::from_oklch(0.98, c_neutral, hue),
+        main: Color::from_oklch(0.985, c_light, hue),
+        on_main: Color::from_oklch(0.18, c_light, hue),
+        variant: Color::from_oklch(0.90, c_light_variant, hue),
+        on_variant: Color::from_oklch(0.40, c_light_variant, hue),
+        dim: Color::from_oklch(0.86, c_light, hue),
+        bright: Color::from_oklch(0.99, c_light, hue),
         container_lowest: Color::from_oklch(1.00, 0.0, hue),
-        container_low: Color::from_oklch(0.96, c_neutral, hue),
-        container: Color::from_oklch(0.94, c_neutral, hue),
-        container_high: Color::from_oklch(0.92, c_neutral, hue),
-        container_highest: Color::from_oklch(0.90, c_neutral, hue),
-        outline: Color::from_oklch(0.50, c_variant, hue),
-        outline_variant: Color::from_oklch(0.80, c_variant, hue),
+        container_low: Color::from_oklch(0.955, c_light, hue),
+        container: Color::from_oklch(0.92, c_light, hue),
+        container_high: Color::from_oklch(0.88, c_light * 1.2, hue),
+        container_highest: Color::from_oklch(0.835, c_light * 1.4, hue),
+        outline: Color::from_oklch(0.54, c_light_variant, hue),
+        outline_variant: Color::from_oklch(0.76, c_light_variant, hue),
       }
     }
   }
@@ -305,15 +311,15 @@ impl SubMonetPalette {
       }
     } else {
       Self {
-        main: Color::from_oklch(0.40, chroma, hue),
-        on_main: Color::from_oklch(1.00, 0.0, hue),
-        container: Color::from_oklch(0.90, chroma, hue),
-        on_container: Color::from_oklch(0.10, chroma, hue),
+        main: Color::from_oklch(0.55, chroma.min(0.16), hue),
+        on_main: Color::from_oklch(0.99, 0.0, hue),
+        container: Color::from_oklch(0.88, (chroma * 0.45).min(0.075), hue),
+        on_container: Color::from_oklch(0.22, (chroma * 0.65).min(0.10), hue),
         fixed,
         fixed_dim,
         on_fixed,
         on_fixed_variant,
-        outline,
+        outline: Color::from_oklch(0.56, (chroma * 0.35).min(0.06), hue),
       }
     }
   }
@@ -349,7 +355,24 @@ impl DColor {
   pub fn get(&self, monet: &Monet) -> Color {
     match &self.key {
       DColorKey::Color(v) => *v,
-      DColorKey::Monet(m, o) => monet[*m] * Color::new(0.0, 0.0, 0.0, *o),
+      DColorKey::Monet(m, o) => {
+        let mut c = monet[*m];
+        c.a *= *o;
+        c
+      }
     }
+  }
+}
+
+
+impl From<MonetRole> for DColor {
+  fn from(value: MonetRole) -> Self {
+    Self::new_monet(value, 1.0)
+  }
+}
+
+impl From<Color> for DColor {
+  fn from(value: Color) -> Self {
+    Self::new_color(value)
   }
 }

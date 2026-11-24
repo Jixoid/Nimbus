@@ -99,13 +99,16 @@ impl Widget for Interval {
 		let pos2 = (usable_w / range * (p2 - self.min)) + 2.0;
 
 		let track_h = (h - track_padding * 2.0).max(0.0);
+		let outer_r = ctx.theme.radius.large.min(track_h * 0.5);
+		let inner_r = ctx.theme.radius.xsmall.min(track_h * 0.5);
+		let handle_r = ctx.theme.radius.xsmall.min(handle_half_w);
 		let empty_color = monet[MonetRole::SurfaceContainerHighest];
 
 		// Sol Boş Kısım (Start -> Pos1)
 		let left_w = (pos1 - gap - 1.0).max(0.0);
 		if left_w > 0.0 {
 			let left_rect = Rect::new(bounds.x() + 1.0, bounds.y() + track_padding, left_w, track_h);
-			canvas.draw(RectShape::new(left_rect, empty_color).radius4([14.0, 4.0, 4.0, 14.0]));
+			canvas.draw(RectShape::new(left_rect, empty_color).radius4([outer_r, inner_r, inner_r, outer_r]));
 		}
 
 		// Orta Dolu Kısım (Pos1 -> Pos2)
@@ -115,7 +118,7 @@ impl Widget for Interval {
 			let mid_rect = Rect::new(bounds.x() + mid_start, bounds.y() + track_padding, mid_w, track_h);
 			canvas.draw(
 				RectShape::new(mid_rect, monet[MonetRole::Secondary])
-					.radius(4.0)
+					.radius(inner_r)
 					.noise(0.15),
 			);
 		}
@@ -125,7 +128,7 @@ impl Widget for Interval {
 		let right_w = (w - 1.0 - right_start).max(0.0);
 		if right_w > 0.0 {
 			let right_rect = Rect::new(bounds.x() + right_start, bounds.y() + track_padding, right_w, track_h);
-			canvas.draw(RectShape::new(right_rect, empty_color).radius4([4.0, 14.0, 14.0, 4.0]));
+			canvas.draw(RectShape::new(right_rect, empty_color).radius4([inner_r, outer_r, outer_r, inner_r]));
 		}
 
 		// Handles (Pos1 ve Pos2)
@@ -147,7 +150,7 @@ impl Widget for Interval {
 			handle_half_w * 2.0,
 			handle_h,
 		);
-		canvas.draw(RectShape::new(h1_rect, h1_color).radius(4.0));
+		canvas.draw(RectShape::new(h1_rect, h1_color).radius(handle_r));
 
 		let h2_rect = Rect::new(
 			bounds.x() + pos2 - handle_half_w,
@@ -155,7 +158,7 @@ impl Widget for Interval {
 			handle_half_w * 2.0,
 			handle_h,
 		);
-		canvas.draw(RectShape::new(h2_rect, h2_color).radius(4.0));
+		canvas.draw(RectShape::new(h2_rect, h2_color).radius(handle_r));
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {

@@ -19,7 +19,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Viewport {
@@ -27,10 +27,10 @@ pub struct Viewport {
 	pub height: Option<f32>,
 	pub texture_id: Option<u32>,
 	pub corner_radius: Option<f32>,
-	pub background: Option<Color>,
-	pub tint: Color,
+	pub background: Option<DColor>,
+	pub tint: DColor,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub shadow_blur: f32,
 	pub clip_children: bool,
 
@@ -53,7 +53,7 @@ impl Default for Viewport {
 			texture_id: None,
 			corner_radius: None,
 			background: None,
-			tint: Color::WHITE,
+			tint: DColor::new_color(Color::WHITE),
 			border_width: 0.0,
 			border_color: None,
 			shadow_blur: 0.0,
@@ -145,13 +145,14 @@ impl Widget for Viewport {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
 		let border_col = self
 			.border_color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
 
 		if let Some(tex_id) = self.texture_id {
 			if let Some(bg) = self.background {
-				canvas.draw(RectShape::new(ctx.bounds, bg).radius(radius));
+				canvas.draw(RectShape::new(ctx.bounds, bg.get(monet)).radius(radius));
 			}
-			let mut shape = RectShape::new(ctx.bounds, self.tint)
+			let mut shape = RectShape::new(ctx.bounds, self.tint.get(monet))
 				.radius(radius)
 				.texture(tex_id);
 			if self.border_width > 0.0 {
@@ -168,6 +169,7 @@ impl Widget for Viewport {
 		} else {
 			let bg = self
 				.background
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceContainerLowest]);
 			let mut shape = RectShape::new(ctx.bounds, bg).radius(radius);
 			if self.border_width > 0.0 {
@@ -242,7 +244,7 @@ impl Widget for Viewport {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), PropertyError> {
 		match key {
 			"width" => self.width = Some(value.expect_f32()?.max(0.0)),
@@ -261,10 +263,10 @@ impl Widget for Viewport {
 				let id = value.expect_f64()? as i64;
 				self.texture_id = if id >= 0 { Some(id as u32) } else { None };
 			}
-			"corner_radius" | "radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" | "background" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"tint" => self.tint = value.expect_color(&ctx.theme.monet)?,
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
+			"background" => self.background = Some(value.expect_dcolor()?),
+			"tint" => self.tint = value.expect_dcolor()?,
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
 			"clip_children" => self.clip_children = value.expect_bool()?,
@@ -355,18 +357,18 @@ impl ViewportBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn tint(mut self, tint: Color) -> Self {
-		self.inner.tint = tint;
+	pub fn tint(mut self, tint: impl Into<DColor>) -> Self {
+		self.inner.tint = tint.into();
 		self
 	}
 
@@ -375,8 +377,8 @@ impl ViewportBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 

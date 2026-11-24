@@ -20,7 +20,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 use crate::{HBox, Spinner, Text};
 
@@ -37,11 +37,11 @@ pub struct Dialog {
 	pub padding: f32,
 	pub corner_radius: Option<f32>,
 	pub backdrop_radius: Option<f32>,
-	pub background: Option<Color>,
-	pub backdrop_color: Option<Color>,
-	pub title_color: Option<Color>,
+	pub background: Option<DColor>,
+	pub backdrop_color: Option<DColor>,
+	pub title_color: Option<DColor>,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub shadow_blur: f32,
 	pub font: Option<FontId>,
 	pub title_font_size: f32,
@@ -354,6 +354,7 @@ impl Widget for Dialog {
 		// Backdrop scrim
 		let mut backdrop = self
 			.backdrop_color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| Color::new(0.0, 0.0, 0.0, 0.48));
 		backdrop.a *= t;
 		if backdrop.a > 0.001 {
@@ -376,6 +377,7 @@ impl Widget for Dialog {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.large);
 		let mut bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainerHigh]);
 		bg.a *= t;
 
@@ -384,6 +386,7 @@ impl Widget for Dialog {
 		if self.border_width > 0.0 {
 			let mut border_col = self
 				.border_color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceOutlineVariant]);
 			border_col.a *= t;
 			card_shape = card_shape.border(border_col, self.border_width);
@@ -410,6 +413,7 @@ impl Widget for Dialog {
 				let (_, text_h) = canvas.measure_text(title, self.title_font_size);
 				let mut text_col = self
 					.title_color
+					.map(|c| c.get(monet))
 					.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 				text_col.a *= t;
 
@@ -525,32 +529,30 @@ impl Widget for Dialog {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), PropertyError> {
 		match key {
-			"title" | "text" => {
+			"title" => {
 				let s = value.expect_str()?;
 				self.title = if s.is_empty() { None } else { Some(s.to_string()) };
 			}
-			"open" | "expanded" => self.set_open(value.expect_bool()?, false),
+			"open" => self.set_open(value.expect_bool()?, false),
 			"closable" => self.closable = value.expect_bool()?,
 			"close_on_backdrop" => self.close_on_backdrop = value.expect_bool()?,
 			"width" => self.width = Some(value.expect_f32()?.max(0.0)),
 			"height" => self.height = Some(value.expect_f32()?.max(0.0)),
 			"min_width" => self.min_width = value.expect_f32()?.max(0.0),
 			"spacing" => self.spacing = value.expect_f32()?,
-			"paddings" | "padding" => self.padding = value.expect_f32()?,
-			"corner_radius" | "radius" => self.corner_radius = Some(value.expect_f32()?),
+			"paddings" => self.padding = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			"backdrop_radius" => self.backdrop_radius = Some(value.expect_f32()?),
-			"color" | "background" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"backdrop_color" => self.backdrop_color = Some(value.expect_color(&ctx.theme.monet)?),
-			"title_color" | "text_color" => {
-				self.title_color = Some(value.expect_color(&ctx.theme.monet)?)
-			}
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"backdrop_color" => self.backdrop_color = Some(value.expect_dcolor()?),
+			"title_color" => self.title_color = Some(value.expect_dcolor()?),
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
-			"font_size" | "title_font_size" => self.title_font_size = value.expect_f32()?,
+			"title_font_size" => self.title_font_size = value.expect_f32()?,
 			_ => return Err(PropertyError::NotFound),
 		}
 		Ok(())
@@ -650,23 +652,23 @@ impl DialogBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn backdrop_color(mut self, color: Color) -> Self {
-		self.inner.backdrop_color = Some(color);
+	pub fn backdrop_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.backdrop_color = Some(color.into());
 		self
 	}
 
-	pub fn title_color(mut self, color: Color) -> Self {
-		self.inner.title_color = Some(color);
+	pub fn title_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.title_color = Some(color.into());
 		self
 	}
 
@@ -675,8 +677,8 @@ impl DialogBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 

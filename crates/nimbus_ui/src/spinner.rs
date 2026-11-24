@@ -18,15 +18,15 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, FontId, RectShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Spinner {
 	pub size: f32,
 	pub thickness: Option<f32>,
 	pub speed: f32,
-	pub color: Option<Color>,
-	pub track_color: Option<Color>,
+	pub color: Option<DColor>,
+	pub track_color: Option<DColor>,
 	pub active: bool,
 	pub font: Option<FontId>,
 	start_time: Instant,
@@ -97,12 +97,13 @@ impl Widget for Spinner {
 			canvas.draw(
 				RectShape::new(ring_rect, Color::TRANSPARENT)
 					.radius(diameter * 0.5)
-					.border(track_col, (item_size * 0.25).max(1.5)),
+					.border(track_col.get(monet), (item_size * 0.25).max(1.5)),
 			);
 		}
 
 		let base_color = self
 			.color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::Primary]);
 
 		let elapsed = if self.active {
@@ -136,14 +137,14 @@ impl Widget for Spinner {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), PropertyError> {
 		match key {
 			"size" => self.size = value.expect_f32()?.max(8.0),
 			"thickness" => self.thickness = Some(value.expect_f32()?.max(1.0)),
 			"speed" => self.speed = value.expect_f32()?.max(0.05),
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
-			"track_color" => self.track_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
+			"track_color" => self.track_color = Some(value.expect_dcolor()?),
 			"active" => self.active = value.expect_bool()?,
 			_ => return Err(PropertyError::NotFound),
 		}
@@ -179,13 +180,13 @@ impl SpinnerBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 
-	pub fn track_color(mut self, color: Color) -> Self {
-		self.inner.track_color = Some(color);
+	pub fn track_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.track_color = Some(color.into());
 		self
 	}
 

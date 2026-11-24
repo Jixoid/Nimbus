@@ -18,7 +18,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Switch {
@@ -26,7 +26,7 @@ pub struct Switch {
 	pub checked: bool,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub color: Option<Color>,
+	pub color: Option<DColor>,
 	pub on_changed: Option<MethodCallback>,
 	pub progress: Animated<f32>,
 }
@@ -92,9 +92,10 @@ impl Widget for Switch {
 		} else {
 			monet[MonetRole::PrimaryOutline]
 		};
-		let border_w = (1.0 - t_clamped) * 2.0;
+		let border_w = (1.0 - t_clamped) * ctx.theme.stroke.thick;
 
-		let mut track_shape = RectShape::new(track_rect, track_bg).radius(13.0);
+		let track_radius = ctx.theme.radius.large.min(switch_h * 0.5);
+		let mut track_shape = RectShape::new(track_rect, track_bg).radius(track_radius);
 		if border_w > 0.05 {
 			track_shape = track_shape.border(border_color, border_w);
 		}
@@ -134,6 +135,7 @@ impl Widget for Switch {
 
 			let text_color = self
 				.color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 			canvas.draw(TextShape::new(
 				&self.label,
@@ -162,7 +164,7 @@ impl Widget for Switch {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"checked" => {
 				let b = value.expect_bool()?;
@@ -171,7 +173,7 @@ impl Widget for Switch {
 			}
 			"text" => self.label = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
@@ -236,8 +238,8 @@ impl SwitchBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 

@@ -18,9 +18,9 @@ use nimbus_core::{
 	LayoutCtx, MethodCallback, MouseButton, ObjectID, PropertyCtx, PropertyError, PropertyValue,
 	UiTree, Widget,
 };
-use nimbus_math::{Color, Rect, Vec2};
+use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 use crate::popup::{Popup, PopupItem, parse_popup_item};
 
@@ -35,8 +35,8 @@ const POPUP_GAP_Y: f32 = 4.0;
 
 pub struct MenuBar {
 	pub items: Vec<PopupItem>,
-	pub background: Option<Color>,
-	pub corner_radius: f32,
+	pub background: Option<DColor>,
+	pub corner_radius: Option<f32>,
 	pub font: Option<FontId>,
 	pub font_size: f32,
 	pub on_action: Option<MethodCallback>,
@@ -52,7 +52,7 @@ impl Default for MenuBar {
 		Self {
 			items: Vec::new(),
 			background: None,
-			corner_radius: 10.0,
+			corner_radius: None,
 			font: None,
 			font_size: 14.0,
 			on_action: None,
@@ -211,8 +211,10 @@ impl Widget for MenuBar {
 
 		let bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
-		canvas.draw(RectShape::new(bounds, bg).radius(self.corner_radius));
+		let bar_radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
+		canvas.draw(RectShape::new(bounds, bg).radius(bar_radius));
 
 		let fface = FontManager::default_font();
 		let font = match self.font {
@@ -221,7 +223,7 @@ impl Widget for MenuBar {
 		};
 
 		let rects = self.item_rects(bounds);
-		let item_radius = (self.corner_radius - 2.0).clamp(4.0, 8.0);
+		let item_radius = ctx.theme.radius.small.min(bar_radius);
 
 		for (i, (item, rect)) in self.items.iter().zip(rects.iter()).enumerate() {
 			let is_active = self.active_index == Some(i);
@@ -305,7 +307,7 @@ impl Widget for MenuBar {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), PropertyError> {
 		match key {
 			"items" => {
@@ -314,8 +316,8 @@ impl Widget for MenuBar {
 				self.active_index = None;
 				self.hovered_index = None;
 			}
-			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"corner_radius" => self.corner_radius = value.expect_f32()?,
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			"font_size" => self.font_size = value.expect_f32()?,
 			_ => return Err(PropertyError::NotFound),
 		}
@@ -364,18 +366,18 @@ impl MenuBarBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
 	pub fn corner_radius(mut self, radius: f32) -> Self {
-		self.inner.corner_radius = radius;
+		self.inner.corner_radius = Some(radius);
 		self
 	}
 

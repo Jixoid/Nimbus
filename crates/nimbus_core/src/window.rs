@@ -118,6 +118,7 @@ impl Window {
 						self.tree.needs_redraw = true;
 						executed = true;
 					}
+					Task::Theme(_) => {}
 				}
 			}
 		}

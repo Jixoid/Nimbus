@@ -11,17 +11,17 @@
 
 
 use nimbus_core::{BoxConstraints, DrawCtx, LayoutCtx, PropertyCtx, PropertyValue, Widget};
-use nimbus_math::{Color, Vec2};
+use nimbus_math::Vec2;
 use nimbus_render2d::{Canvas2D, RectShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Card {
 	pub padding: f32,
 	pub corner_radius: Option<f32>,
-	pub background: Option<Color>,
+	pub background: Option<DColor>,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub shadow_blur: f32,
 }
 
@@ -92,6 +92,7 @@ impl Widget for Card {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
 		let bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 
 		let mut shape = RectShape::new(ctx.bounds, bg).radius(radius);
@@ -99,6 +100,7 @@ impl Widget for Card {
 		if self.border_width > 0.0 {
 			let border_col = self
 				.border_color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
 			shape = shape.border(border_col, self.border_width);
 		}
@@ -114,7 +116,7 @@ impl Widget for Card {
 		canvas.draw(shape);
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"paddings" => {
 				if let Some(p) = value.as_f32() {
@@ -131,8 +133,8 @@ impl Widget for Card {
 				}
 			}
 			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
 			_ => return Err(nimbus_core::PropertyError::NotFound),
@@ -175,13 +177,13 @@ impl CardBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
@@ -190,8 +192,8 @@ impl CardBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 

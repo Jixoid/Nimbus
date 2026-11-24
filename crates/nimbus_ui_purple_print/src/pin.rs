@@ -15,6 +15,7 @@ use std::cell::Cell;
 use nimbus_core::ObjectID;
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, CurveShape, RectShape};
+use nimbus_theme::{Monet, MonetRole};
 
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -91,6 +92,20 @@ impl NodePin {
 
 	pub fn effective_color(&self) -> Color {
 		self.color.unwrap_or_else(|| self.kind.default_color())
+	}
+
+	pub fn effective_color_for(&self, monet: &Monet) -> Color {
+		if let Some(c) = self.color {
+			return c;
+		}
+		match self.kind {
+			NodeBindKind::Flow => monet[MonetRole::OnSurface],
+			_ => self.kind.default_color(),
+		}
+	}
+
+	pub fn uses_theme_flow_color(&self) -> bool {
+		self.color.is_none() && self.kind == NodeBindKind::Flow
 	}
 
 	pub fn local_pos(&self) -> Vec2<f32> {

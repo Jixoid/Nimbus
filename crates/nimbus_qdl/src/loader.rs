@@ -263,7 +263,7 @@ mod tests {
 	use super::*;
 	use nimbus_core::{BoxConstraints, Canvas2D, DrawCtx, LayoutCtx};
 	use nimbus_math::{Color, Vec2};
-	use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StateTokens, StrokeTokens};
+	use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StrokeTokens};
 
 	struct DummyBox {
 		spacing: f32,
@@ -316,7 +316,6 @@ mod tests {
 		let theme = Theme {
 			elevation: ElevationTokens::default(),
 			radius: RadiusTokens::default(),
-			state: StateTokens::default(),
 			stroke: StrokeTokens::default(),
 			monet: Monet::new(
 				Color::from_oklch(0.675, 0.138, 65.0),

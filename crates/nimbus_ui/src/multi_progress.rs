@@ -58,8 +58,10 @@ impl Widget for MultiProgressBar {
 
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
-		let pill_rad = self.corner_radius.unwrap_or(ctx.bounds.height() * 0.5);
-		let inner_rad = 5.0f32;
+		let pill_rad = self
+			.corner_radius
+			.unwrap_or_else(|| ctx.theme.radius.large.min(ctx.bounds.height() * 0.5));
+		let inner_rad = ctx.theme.radius.xsmall.min(pill_rad);
 
 		let default_palette = [
 			monet[MonetRole::Primary],

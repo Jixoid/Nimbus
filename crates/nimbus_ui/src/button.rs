@@ -148,11 +148,11 @@ impl Widget for Button {
 						monet[MonetRole::SurfaceOutline],
 					)
 				};
-				(bg, fg, border, 2.0, 0.0)
+				(bg, fg, border, ctx.theme.stroke.thick, 0.0)
 			}
 		};
 
-		let radius = (ctx.bounds.height() * 0.5).min(14.0);
+		let radius = (ctx.bounds.height() * 0.5).min(ctx.theme.radius.large);
 		let mut shape = RectShape::new(ctx.bounds, bg_color).radius(radius);
 		if border_width > 0.0 {
 			shape = shape.border(border_color, border_width);

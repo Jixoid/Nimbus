@@ -19,7 +19,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct Check {
@@ -27,7 +27,7 @@ pub struct Check {
 	pub checked: bool,
 	pub font: Option<FontId>,
 	pub font_size: f32,
-	pub color: Option<Color>,
+	pub color: Option<DColor>,
 	pub on_changed: Option<MethodCallback>,
 	pub progress: Animated<f32>,
 }
@@ -78,10 +78,11 @@ impl Widget for Check {
 		};
 		let border_color = inactive_border.interpolate(&monet[MonetRole::Primary], t_clamped);
 		
+		let box_radius = ctx.theme.radius.small.min(box_size * 0.34);
 		canvas.draw(
 			RectShape::new(box_rect, Color::TRANSPARENT)
-				.radius(8.0)
-				.border(border_color, 2.0),
+				.radius(box_radius)
+				.border(border_color, ctx.theme.stroke.thick),
 		);
 
 		if t > 0.01 {
@@ -92,9 +93,10 @@ impl Widget for Check {
 				inner_size,
 				inner_size,
 			);
+			let inner_radius = (ctx.theme.radius.xsmall * 0.75 * t_clamped).min(inner_size * 0.32);
 			canvas.draw(
 				RectShape::new(inner_rect, monet[MonetRole::Primary])
-					.radius(3.0 * t_clamped)
+					.radius(inner_radius)
 					.noise(0.15),
 			);
 		}
@@ -112,6 +114,7 @@ impl Widget for Check {
 
 			let text_color = self
 				.color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::OnSurface]);
 			canvas.draw(TextShape::new(
 				&self.label,
@@ -141,7 +144,7 @@ impl Widget for Check {
 		EventResponse::Ignored
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"checked" => {
 				let b = value.expect_bool()?;
@@ -150,7 +153,7 @@ impl Widget for Check {
 			}
 			"text" => self.label = value.expect_str()?.to_string(),
 			"font_size" => self.font_size = value.expect_f32()?,
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
 			_ => return Err(nimbus_core::PropertyError::NotFound),
 		}
 		Ok(())
@@ -215,8 +218,8 @@ impl CheckBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 

@@ -332,7 +332,7 @@ impl UiTree {
 						self.needs_redraw = true;
 						executed = true;
 					}
-					other @ Task::Window(_) => {
+					other @ (Task::Window(_) | Task::Theme(_)) => {
 						deferred_window_tasks.push(other);
 					}
 				}

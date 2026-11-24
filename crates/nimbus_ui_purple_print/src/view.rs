@@ -20,7 +20,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 use crate::node::PurplePrintNode;
 use crate::pin::{
@@ -37,6 +37,7 @@ struct CachedPin {
 	kind: NodeBindKind,
 	data_type: Option<String>,
 	color: Color,
+	theme_flow: bool,
 	pos: Vec2<f32>, // relative to view origin
 }
 
@@ -54,6 +55,7 @@ struct RenderWire {
 	start: Vec2<f32>, // relative to view origin
 	end: Vec2<f32>,   // relative to view origin
 	color: Color,
+	theme_flow: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -62,6 +64,7 @@ struct ActiveWire {
 	source_kind: NodeBindKind,
 	source_data_type: Option<String>,
 	source_color: Color,
+	theme_flow: bool,
 	source_pos: Vec2<f32>, // relative to view origin
 	cursor: Vec2<f32>,     // relative to view origin
 	snap_target: Option<PinRef>,
@@ -70,7 +73,7 @@ struct ActiveWire {
 
 
 pub struct PurplePrintView {
-	pub color: Option<Color>,
+	pub color: Option<DColor>,
 	pub pan: Vec2<f32>,
 	pub grid_size: f32,
 	pub major_step: u32,
@@ -398,6 +401,7 @@ impl Widget for PurplePrintView {
 							kind: pin.kind,
 							data_type: pin.data_type.clone(),
 							color: pin.effective_color(),
+							theme_flow: pin.uses_theme_flow_color(),
 							pos: local_origin + pin.local_pos(),
 						});
 					}
@@ -411,6 +415,7 @@ impl Widget for PurplePrintView {
 							kind: pin.kind,
 							data_type: pin.data_type.clone(),
 							color: pin.effective_color(),
+							theme_flow: pin.uses_theme_flow_color(),
 							pos: local_origin + pin.local_pos(),
 						});
 					}
@@ -448,6 +453,7 @@ impl Widget for PurplePrintView {
 					start: sp.pos,
 					end: ep.pos,
 					color: sp.color,
+					theme_flow: sp.theme_flow,
 				});
 			}
 		}
@@ -464,6 +470,7 @@ impl Widget for PurplePrintView {
 		// Background
 		let bg = self
 			.color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 		canvas.draw(RectShape::new(bounds, bg));
 
@@ -472,8 +479,9 @@ impl Widget for PurplePrintView {
 		// Panning minor / major grid
 		let cell = self.grid_size.max(8.0);
 		let major = self.major_step.max(2) as i32;
-		let minor_col = Color::new(1.0, 1.0, 1.0, 0.055);
-		let major_col = Color::new(1.0, 1.0, 1.0, 0.12);
+		let grid_base = monet[MonetRole::OnSurface];
+		let minor_col = Color::new(grid_base.r, grid_base.g, grid_base.b, 0.06);
+		let major_col = Color::new(grid_base.r, grid_base.g, grid_base.b, 0.14);
 
 		let start_col = ((-self.pan.x) / cell).floor() as i32;
 		let end_col = ((bounds.width() - self.pan.x) / cell).ceil() as i32;
@@ -495,12 +503,17 @@ impl Widget for PurplePrintView {
 
 		// Connected Bezier wires (drawn behind nodes)
 		for wire in &self.render_wires {
+			let wire_color = if wire.theme_flow {
+				monet[MonetRole::OnSurface]
+			} else {
+				wire.color
+			};
 			draw_bezier_wire(
 				canvas,
 				bounds.min + wire.start,
 				bounds.min + wire.end,
 				2.8,
-				wire.color,
+				wire_color,
 			);
 		}
 
@@ -510,12 +523,19 @@ impl Widget for PurplePrintView {
 	fn draw_foreground(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		// Active dragging wire preview (drawn on top of all nodes)
 		if let Some(active) = &self.wiring {
+			let monet = &ctx.theme.monet;
 			let bounds = ctx.bounds;
 			canvas.push_clip(bounds);
 
 			let wire_col = match active.state {
-				WireState::Normal => Color::new(0.65, 0.65, 0.70, 0.90),
-				WireState::Valid => active.source_color,
+				WireState::Normal => monet[MonetRole::OnSurfaceVariant],
+				WireState::Valid => {
+					if active.theme_flow {
+						monet[MonetRole::OnSurface]
+					} else {
+						active.source_color
+					}
+				}
 				WireState::Invalid => Color::new(0.90, 0.20, 0.20, 0.95),
 				WireState::NoSuitable => Color::new(0.92, 0.35, 0.20, 0.95),
 				WireState::Cycle => Color::new(0.95, 0.55, 0.15, 0.95),
@@ -587,6 +607,7 @@ impl Widget for PurplePrintView {
 								source_kind: src_pin.kind,
 								source_data_type: src_pin.data_type,
 								source_color: src_pin.color,
+								theme_flow: src_pin.theme_flow,
 								source_pos: src_pin.pos,
 								cursor: local_pos,
 								snap_target: None,
@@ -603,6 +624,7 @@ impl Widget for PurplePrintView {
 						source_kind: clicked_pin.kind,
 						source_data_type: clicked_pin.data_type,
 						source_color: clicked_pin.color,
+						theme_flow: clicked_pin.theme_flow,
 						source_pos: clicked_pin.pos,
 						cursor: local_pos,
 						snap_target: None,
@@ -724,10 +746,10 @@ impl Widget for PurplePrintView {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), PropertyError> {
 		match key {
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
 			"grid_size" => self.grid_size = value.expect_f32()?.max(8.0),
 			"major_step" => self.major_step = (value.expect_f64()?.max(2.0).round()) as u32,
 			"allow_cycles" => self.allow_cycles = value.expect_bool()?,
@@ -769,8 +791,8 @@ impl PurplePrintViewBuilder {
 		}
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 

@@ -55,6 +55,34 @@ root qstd::vbox {
     on_action: "OnMenuAction"
   }
 
+  node qstd::hbox {
+    spacing: 10
+    color: "transparent"
+    scrollable: true
+
+    node qstd::choice "theme_palette" {
+      tabs: ["Amber", "Ocean", "Forest", "Rose"]
+      on_changed: "ChangePalette"
+    }
+
+    node qstd::choice "theme_mode" {
+      tabs: ["Dark", "Light"]
+      on_changed: "ChangeThemeMode"
+    }
+
+    node qstd::choice "theme_radius" {
+      tabs: ["None", "Sharp", "Default", "Round"]
+      tab_id: 2
+      on_changed: "ChangeRadius"
+    }
+
+    node qstd::choice "theme_stroke" {
+      tabs: ["Thin", "Default", "Bold"]
+      tab_id: 1
+      on_changed: "ChangeStroke"
+    }
+  }
+
   node qstd::tabs "main_tabs" {
     tabs: ["Components", "PurplePrint", "Gizmo"]
     on_changed: "SwitchPage"
@@ -76,7 +104,7 @@ root qstd::vbox {
       node qstd::text {
         style: "tool_header"
         text: "Nimbus Application"
-        color: "monet(PrimaryFixed)"
+        color: "monet(Primary)"
         font_size: 25
       }
 

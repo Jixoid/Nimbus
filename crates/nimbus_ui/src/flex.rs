@@ -16,9 +16,9 @@ use nimbus_core::{
 	Anchor, BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, LayoutCtx, PropertyCtx,
 	PropertyValue, Widget,
 };
-use nimbus_math::{Color, Rect, Vec2};
+use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, RectShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 use crate::scroll::ScrollState;
 
@@ -28,9 +28,9 @@ pub struct VBox {
 	pub spacing: f32,
 	pub padding: f32,
 	pub corner_radius: Option<f32>,
-	pub background: Option<Color>,
+	pub background: Option<DColor>,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub shadow_blur: f32,
 	pub scrollable: bool,
 	pub scroll: ScrollState,
@@ -172,6 +172,7 @@ impl Widget for VBox {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.none);
 		let bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 
 		let mut shape = RectShape::new(ctx.bounds, bg).radius(radius);
@@ -179,6 +180,7 @@ impl Widget for VBox {
 		if self.border_width > 0.0 {
 			let border_col = self
 				.border_color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
 			shape = shape.border(border_col, self.border_width);
 		}
@@ -211,14 +213,14 @@ impl Widget for VBox {
 		}
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"scrollable" => self.scrollable = value.expect_bool()?,
 			"spacing" => self.spacing = value.expect_f32()?,
 			"paddings" => self.padding = value.expect_f32()?,
 			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
 			_ => return Err(nimbus_core::PropertyError::NotFound),
@@ -266,13 +268,13 @@ impl VBoxBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
@@ -281,8 +283,8 @@ impl VBoxBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 
@@ -313,9 +315,9 @@ pub struct HBox {
 	pub spacing: f32,
 	pub padding: f32,
 	pub corner_radius: Option<f32>,
-	pub background: Option<Color>,
+	pub background: Option<DColor>,
 	pub border_width: f32,
-	pub border_color: Option<Color>,
+	pub border_color: Option<DColor>,
 	pub shadow_blur: f32,
 	pub scrollable: bool,
 	pub scroll: ScrollState,
@@ -457,6 +459,7 @@ impl Widget for HBox {
 		let radius = self.corner_radius.unwrap_or(ctx.theme.radius.none);
 		let bg = self
 			.background
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainer]);
 
 		let mut shape = RectShape::new(ctx.bounds, bg).radius(radius);
@@ -464,6 +467,7 @@ impl Widget for HBox {
 		if self.border_width > 0.0 {
 			let border_col = self
 				.border_color
+				.map(|c| c.get(monet))
 				.unwrap_or_else(|| monet[MonetRole::SurfaceOutline]);
 			shape = shape.border(border_col, self.border_width);
 		}
@@ -496,14 +500,14 @@ impl Widget for HBox {
 		}
 	}
 
-	fn set_property(&mut self, key: &str, value: &PropertyValue, ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
+	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"scrollable" => self.scrollable = value.expect_bool()?,
 			"spacing" => self.spacing = value.expect_f32()?,
 			"paddings" => self.padding = value.expect_f32()?,
 			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" => self.background = Some(value.expect_color(&ctx.theme.monet)?),
-			"border_color" => self.border_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.background = Some(value.expect_dcolor()?),
+			"border_color" => self.border_color = Some(value.expect_dcolor()?),
 			"border_width" => self.border_width = value.expect_f32()?,
 			"shadow_blur" => self.shadow_blur = value.expect_f32()?,
 			_ => return Err(nimbus_core::PropertyError::NotFound),
@@ -551,13 +555,13 @@ impl HBoxBuilder {
 		self
 	}
 
-	pub fn background(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn background(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.background = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.background = Some(color.into());
 		self
 	}
 
@@ -566,8 +570,8 @@ impl HBoxBuilder {
 		self
 	}
 
-	pub fn border_color(mut self, color: Color) -> Self {
-		self.inner.border_color = Some(color);
+	pub fn border_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.border_color = Some(color.into());
 		self
 	}
 

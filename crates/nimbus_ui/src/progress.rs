@@ -16,9 +16,9 @@ use std::time::Duration;
 use nimbus_core::{
 	Animated, BoxConstraints, DrawCtx, Easing, LayoutCtx, PropertyCtx, PropertyValue, Widget,
 };
-use nimbus_math::{Color, Rect, Vec2};
+use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 
 pub struct ProgressBar {
@@ -27,8 +27,8 @@ pub struct ProgressBar {
 	pub max: Option<f32>,
 	pub height: f32,
 	pub corner_radius: Option<f32>,
-	pub color: Option<Color>,
-	pub track_color: Option<Color>,
+	pub color: Option<DColor>,
+	pub track_color: Option<DColor>,
 	pub text: Option<String>,
 	pub font: Option<FontId>,
 	pub font_size: f32,
@@ -101,7 +101,9 @@ impl Widget for ProgressBar {
 	fn draw(&self, ctx: &DrawCtx, canvas: &mut Canvas2D) {
 		let monet = &ctx.theme.monet;
 		let bounds = ctx.bounds;
-		let radius = self.corner_radius.unwrap_or(bounds.height() * 0.5);
+		let radius = self
+			.corner_radius
+			.unwrap_or_else(|| ctx.theme.radius.large.min(bounds.height() * 0.5));
 
 		let target_ratio = self.ratio();
 
@@ -119,6 +121,7 @@ impl Widget for ProgressBar {
 		// Track
 		let track_color = self
 			.track_color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::SurfaceContainerHighest]);
 		canvas.draw(
 			RectShape::new(bounds, track_color).radius(radius),
@@ -128,12 +131,13 @@ impl Widget for ProgressBar {
 		let fill_width = (bounds.width() * cur_ratio).clamp(0.0, bounds.width());
 		let fill_color = self
 			.color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::Primary]);
 
 		if fill_width > 0.5 {
 			let is_full = fill_width >= bounds.width() - 0.5;
 			let fill_rect = Rect::new(bounds.x(), bounds.y(), fill_width, bounds.height());
-			let inner_rad = 4.0f32.min(radius);
+			let inner_rad = ctx.theme.radius.xsmall.min(radius);
 
 			let shape = if is_full {
 				RectShape::new(fill_rect, fill_color)
@@ -177,7 +181,7 @@ impl Widget for ProgressBar {
 		&mut self,
 		key: &str,
 		value: &PropertyValue,
-		ctx: &PropertyCtx,
+		_ctx: &PropertyCtx,
 	) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"value" => {
@@ -199,9 +203,9 @@ impl Widget for ProgressBar {
 				self.update_animation();
 			}
 			"height" => self.height = value.expect_f32()?,
-			"corner_radius" | "radius" => self.corner_radius = Some(value.expect_f32()?),
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
-			"track_color" => self.track_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
+			"color" => self.color = Some(value.expect_dcolor()?),
+			"track_color" => self.track_color = Some(value.expect_dcolor()?),
 			"text" => self.text = Some(value.expect_str()?.to_string()),
 			"show_percentage" => self.show_percentage = value.expect_bool()?,
 			"font_size" => self.font_size = value.expect_f32()?,
@@ -262,13 +266,13 @@ impl ProgressBarBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 
-	pub fn track_color(mut self, color: Color) -> Self {
-		self.inner.track_color = Some(color);
+	pub fn track_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.track_color = Some(color.into());
 		self
 	}
 

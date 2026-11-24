@@ -17,7 +17,7 @@ use nimbus_core::{
 };
 use nimbus_math::{Color, Rect, Vec2};
 use nimbus_render2d::{Canvas2D, Font, FontId, FontManager, RectShape, TextShape};
-use nimbus_theme::MonetRole;
+use nimbus_theme::{DColor, MonetRole};
 
 use crate::pin::{NodeBindKind, NodePin, PinDirection, draw_pin_icon};
 
@@ -34,9 +34,9 @@ pub struct PurplePrintNode {
 	pub position: Vec2<f32>,
 	pub width: f32,
 	pub title: String,
-	pub color: Option<Color>,
-	pub back_color: Option<Color>,
-	pub corner_radius: f32,
+	pub color: Option<DColor>,
+	pub back_color: Option<DColor>,
+	pub corner_radius: Option<f32>,
 	pub font: Option<FontId>,
 	pub font_size: f32,
 	pub inputs: Vec<NodePin>,
@@ -55,9 +55,9 @@ impl Default for PurplePrintNode {
 			position: Vec2::new(40.0, 40.0),
 			width: 180.0,
 			title: "PurplePrint Node".to_string(),
-			color: Some(Color::from_oklch(0.675, 0.138, 65.0)),
+			color: Some(DColor::new_color(Color::from_oklch(0.675, 0.138, 65.0))),
 			back_color: None,
-			corner_radius: 12.0,
+			corner_radius: None,
 			font: None,
 			font_size: 14.0,
 			inputs: Vec::new(),
@@ -240,7 +240,7 @@ impl Widget for PurplePrintNode {
 		let bounds = ctx.bounds;
 
 		// Node body card
-		let back_col = self.back_color.unwrap_or_else(|| {
+		let back_col = self.back_color.map(|c| c.get(monet)).unwrap_or_else(|| {
 			let mut c = monet[MonetRole::SurfaceContainerLow];
 			c.a *= 0.90;
 			c
@@ -250,21 +250,29 @@ impl Widget for PurplePrintNode {
 		} else {
 			monet[MonetRole::SurfaceOutlineVariant]
 		};
-		let border_w = if self.selected { 2.0 } else { 1.0 };
+		let border_w = if self.selected {
+			ctx.theme.stroke.thick
+		} else {
+			ctx.theme.stroke.thin
+		};
+		let corner_radius = self.corner_radius.unwrap_or(ctx.theme.radius.medium);
 
+		let mut shadow_col = monet[MonetRole::Shadow];
+		shadow_col.a = (shadow_col.a * 0.40).min(0.36);
 		canvas.draw(
 			RectShape::new(bounds, back_col)
-				.radius(self.corner_radius)
+				.radius(corner_radius)
 				.border(border_col, border_w)
-				.shadow(Color::new(0.0, 0.0, 0.0, 0.36), Vec2::new(0.0, 4.0), 12.0),
+				.shadow(shadow_col, Vec2::new(0.0, 4.0), 12.0),
 		);
 
 		// Colored title bar
 		let header_col = self
 			.color
+			.map(|c| c.get(monet))
 			.unwrap_or_else(|| monet[MonetRole::Primary]);
 		let inset = border_w;
-		let header_r = (self.corner_radius - inset).max(0.0);
+		let header_r = (corner_radius - inset).max(0.0);
 		let header_rect = Rect::new(
 			bounds.x() + inset,
 			bounds.y() + inset,
@@ -310,7 +318,7 @@ impl Widget for PurplePrintNode {
 			let local = pin.local_pos.get();
 			let pos = bounds.min + local;
 			let connected = self.connected_inputs.get(i).copied().unwrap_or(false);
-			draw_pin_icon(canvas, pos, pin.kind, pin.effective_color(), connected);
+			draw_pin_icon(canvas, pos, pin.kind, pin.effective_color_for(monet), connected);
 
 			if !pin.name.is_empty() {
 				let (_, lh) = canvas.measure_text(&pin.name, self.font_size);
@@ -329,7 +337,7 @@ impl Widget for PurplePrintNode {
 			let local = pin.local_pos.get();
 			let pos = bounds.min + local;
 			let connected = self.connected_outputs.get(i).copied().unwrap_or(false);
-			draw_pin_icon(canvas, pos, pin.kind, pin.effective_color(), connected);
+			draw_pin_icon(canvas, pos, pin.kind, pin.effective_color_for(monet), connected);
 
 			if !pin.name.is_empty() {
 				let (lw, lh) = canvas.measure_text(&pin.name, self.font_size);
@@ -352,8 +360,8 @@ impl Widget for PurplePrintNode {
 	) -> Result<(), PropertyError> {
 		match key {
 			"title" => self.title = value.expect_str()?.to_string(),
-			"color" => self.color = Some(value.expect_color(&ctx.theme.monet)?),
-			"background" => self.back_color = Some(value.expect_color(&ctx.theme.monet)?),
+			"color" => self.color = Some(value.expect_dcolor()?),
+			"background" => self.back_color = Some(value.expect_dcolor()?),
 			"point" => self.position = value.expect_vec2()?,
 			"width" => self.width = value.expect_f32()?.max(100.0),
 			"size" => {
@@ -367,7 +375,7 @@ impl Widget for PurplePrintNode {
 					self.width = value.expect_f32()?.max(100.0);
 				}
 			}
-			"corner_radius" => self.corner_radius = value.expect_f32()?,
+			"corner_radius" => self.corner_radius = Some(value.expect_f32()?),
 			"font_size" => self.font_size = value.expect_f32()?,
 			"inputs" => {
 				let arr = value.expect_array()?;
@@ -451,18 +459,18 @@ impl PurplePrintNodeBuilder {
 		self
 	}
 
-	pub fn color(mut self, color: Color) -> Self {
-		self.inner.color = Some(color);
+	pub fn color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.color = Some(color.into());
 		self
 	}
 
-	pub fn back_color(mut self, color: Color) -> Self {
-		self.inner.back_color = Some(color);
+	pub fn back_color(mut self, color: impl Into<DColor>) -> Self {
+		self.inner.back_color = Some(color.into());
 		self
 	}
 
 	pub fn corner_radius(mut self, radius: f32) -> Self {
-		self.inner.corner_radius = radius;
+		self.inner.corner_radius = Some(radius);
 		self
 	}
 

@@ -112,7 +112,7 @@ impl Widget for Choice {
 		let monet = &theme.monet;
 		let bounds = ctx.bounds;
 
-		let track_radius = bounds.height() * 0.5;
+		let track_radius = theme.radius.large.min(bounds.height() * 0.5);
 
 		canvas.draw(
 			RectShape::new(bounds, monet[MonetRole::SurfaceContainerHigh])
@@ -125,7 +125,7 @@ impl Widget for Choice {
 			ctx.request_redraw();
 		}
 
-		let pill_radius = bounds.height() * 0.5;
+		let pill_radius = track_radius;
 
 		let pill_rect = if cur_local_pill != Rect::ZERO {
 			Some(Rect::new(
