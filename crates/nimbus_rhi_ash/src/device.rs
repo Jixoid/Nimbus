@@ -363,6 +363,7 @@ impl AshDevice {
 
 		let queue_create_infos = [queue_create_info];
 
+		#[allow(unused_mut)]
 		let mut desired_device_extensions = vec![
 			ash::khr::swapchain::NAME.as_ptr(),
 			ash::khr::dynamic_rendering::NAME.as_ptr(),

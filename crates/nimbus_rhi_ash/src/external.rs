@@ -19,7 +19,9 @@ use nimbus_rhi::format::Format;
 use nimbus_rhi::traits::RhiCommandQueue;
 
 use crate::command::AshCommandQueue;
+#[cfg(unix)]
 use crate::device::AshDevice;
+#[cfg(unix)]
 use crate::types::to_vk_format;
 
 
@@ -269,6 +271,7 @@ impl Drop for ImportedExternalTexture {
 }
 
 
+#[cfg(unix)]
 fn find_memory_type(
 	mem_props: &vk::PhysicalDeviceMemoryProperties,
 	type_filter: u32,

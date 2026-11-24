@@ -293,25 +293,49 @@ impl Pi for f128 {
 		self.to_radians()
 	}
 	fn sin(self) -> Self {
-		self.sin()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).sin() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.sin() }
 	}
 	fn cos(self) -> Self {
-		self.cos()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).cos() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.cos() }
 	}
 	fn tan(self) -> Self {
-		self.tan()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).tan() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.tan() }
 	}
 	fn sin_cos(self) -> (Self, Self) {
-		self.sin_cos()
+		#[cfg(target_env = "msvc")]
+		{
+			let (s, c) = (self as f64).sin_cos();
+			(s as f128, c as f128)
+		}
+		#[cfg(not(target_env = "msvc"))]
+		{ self.sin_cos() }
 	}
 	fn asin(self) -> Self {
-		self.asin()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).asin() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.asin() }
 	}
 	fn acos(self) -> Self {
-		self.acos()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).acos() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.acos() }
 	}
 	fn atan2(self, other: Self) -> Self {
-		self.atan2(other)
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).atan2(other as f64) as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.atan2(other) }
 	}
 }
 
@@ -593,7 +617,10 @@ impl Sqrt for f64 {
 }
 impl Sqrt for f128 {
 	fn sqrt(self) -> Self {
-		self.sqrt()
+		#[cfg(target_env = "msvc")]
+		{ (self as f64).sqrt() as f128 }
+		#[cfg(not(target_env = "msvc"))]
+		{ self.sqrt() }
 	}
 }
 
