@@ -55,6 +55,7 @@ fn main() {
 		nimbus_ui_purple_print::register_widgets(&mut registry);
 		nimbus_ui_gizmo::register_widgets(&mut registry);
 		nimbus_ui_dock::register_widgets(&mut registry);
+		nimbus_ui_timeline::register_widgets(&mut registry);
 	}
 
 	//let monet = Monet::from_system().unwrap();
@@ -95,10 +96,17 @@ fn main() {
 	let page_pp_id = Rc::new(Cell::new(None));
 	let page_gizmo_id = Rc::new(Cell::new(None));
 	let page_dock_id = Rc::new(Cell::new(None));
+	let page_timeline_id = Rc::new(Cell::new(None));
 	let page_comp_cb = page_comp_id.clone();
 	let page_pp_cb = page_pp_id.clone();
 	let page_gizmo_cb = page_gizmo_id.clone();
 	let page_dock_cb = page_dock_id.clone();
+	let page_timeline_cb = page_timeline_id.clone();
+
+	let tl_view_id = Rc::new(Cell::new(None));
+	let tl_curve_id = Rc::new(Cell::new(None));
+	let tl_play_btn_id = Rc::new(Cell::new(None));
+	let tl_readout_id = Rc::new(Cell::new(None));
 
 	let transform_gizmo_id = Rc::new(Cell::new(None));
 	let orientation_gizmo_id = Rc::new(Cell::new(None));
@@ -143,6 +151,13 @@ fn main() {
 						tabs.set_tab(3, true, true);
 					}
 				}
+				"ViewTimeline" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+					{
+						tabs.set_tab(4, true, true);
+					}
+				}
 				_ => {
 					nimbus_ui::Toast::builder()
 						.title(format!("Menu: {}", menu))
@@ -158,6 +173,7 @@ fn main() {
 		let pp = page_pp_cb.get();
 		let gizmo = page_gizmo_cb.get();
 		let dock = page_dock_cb.get();
+		let timeline = page_timeline_cb.get();
 		tasks_tabs.push_tree(move |tree| {
 			if let Some(id) = comp {
 				tree.set_visible(id, tab_idx == 0);
@@ -170,6 +186,9 @@ fn main() {
 			}
 			if let Some(id) = dock {
 				tree.set_visible(id, tab_idx == 3);
+			}
+			if let Some(id) = timeline {
+				tree.set_visible(id, tab_idx == 4);
 			}
 		});
 	});
@@ -514,6 +533,152 @@ fn main() {
 		});
 	});
 
+	let tasks_tl_play = tasks.clone();
+	let tl_view_play = tl_view_id.clone();
+	let tl_btn_play = tl_play_btn_id.clone();
+	events.register("TimelineTogglePlay", move || {
+		let vid = tl_view_play.get();
+		let bid = tl_btn_play.get();
+		tasks_tl_play.push_tree(move |tree| {
+			let mut now_playing = false;
+			if let Some(id) = vid
+				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+			{
+				now_playing = !tl.playing;
+				tl.set_playing(now_playing);
+			}
+			if let Some(id) = bid
+				&& let Some(btn) = tree.get_widget_mut::<nimbus_ui::Button>(id)
+			{
+				btn.label = if now_playing { "Pause" } else { "Play" }.to_string();
+			}
+		});
+	});
+
+	let tasks_tl_stop = tasks.clone();
+	let tl_view_stop = tl_view_id.clone();
+	let tl_curve_stop = tl_curve_id.clone();
+	let tl_btn_stop = tl_play_btn_id.clone();
+	let tl_ro_stop = tl_readout_id.clone();
+	events.register("TimelineStop", move || {
+		let vid = tl_view_stop.get();
+		let cid = tl_curve_stop.get();
+		let bid = tl_btn_stop.get();
+		let rid = tl_ro_stop.get();
+		tasks_tl_stop.push_tree(move |tree| {
+			let mut summary = None;
+			if let Some(id) = vid
+				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+			{
+				tl.set_playing(false);
+				tl.set_playhead(0.0);
+				let x = tl.tracks.first().map(|tr| tr.sample(0.0)).unwrap_or(0.0);
+				let y = tl.tracks.get(1).map(|tr| tr.sample(0.0)).unwrap_or(0.0);
+				summary = Some(format!("t = 0.00s  |  Pos X: {:.2}  |  Pos Y: {:.2}", x, y));
+			}
+			if let Some(id) = cid
+				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+			{
+				curve.playhead = 0.0;
+			}
+			if let Some(id) = bid
+				&& let Some(btn) = tree.get_widget_mut::<nimbus_ui::Button>(id)
+			{
+				btn.label = "Play".to_string();
+			}
+			if let (Some(id), Some(txt)) = (rid, summary)
+				&& let Some(label) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+			{
+				label.text = txt;
+			}
+		});
+	});
+
+	let tasks_tl_snap = tasks.clone();
+	let tl_view_snap = tl_view_id.clone();
+	let tl_curve_snap = tl_curve_id.clone();
+	events.register("TimelineSnap", move |enabled: bool| {
+		let vid = tl_view_snap.get();
+		let cid = tl_curve_snap.get();
+		tasks_tl_snap.push_tree(move |tree| {
+			if let Some(id) = vid
+				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+			{
+				tl.snap = enabled;
+			}
+			if let Some(id) = cid
+				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+			{
+				curve.snap = enabled;
+			}
+		});
+	});
+
+	let tasks_tl_time = tasks.clone();
+	let tl_view_time = tl_view_id.clone();
+	let tl_curve_time = tl_curve_id.clone();
+	let tl_ro_time = tl_readout_id.clone();
+	events.register("TimelineTimeChanged", move |t: f32| {
+		let vid = tl_view_time.get();
+		let cid = tl_curve_time.get();
+		let rid = tl_ro_time.get();
+		tasks_tl_time.push_tree(move |tree| {
+			let summary = vid
+				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::TimelineView>(id))
+				.map(|tl| {
+					let x = tl.tracks.first().map(|tr| tr.sample(t)).unwrap_or(0.0);
+					let y = tl.tracks.get(1).map(|tr| tr.sample(t)).unwrap_or(0.0);
+					format!("t = {:.2}s  |  Pos X: {:.2}  |  Pos Y: {:.2}", t, x, y)
+				});
+			if let Some(id) = cid
+				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+			{
+				curve.playhead = t;
+			}
+			if let (Some(id), Some(txt)) = (rid, summary)
+				&& let Some(label) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+			{
+				label.text = txt;
+			}
+		});
+	});
+
+	let tasks_tl_kf = tasks.clone();
+	let tl_view_kf = tl_view_id.clone();
+	let tl_curve_kf = tl_curve_id.clone();
+	events.register("TimelineKeyframeChanged", move |_track: i32, _time: f32| {
+		let vid = tl_view_kf.get();
+		let cid = tl_curve_kf.get();
+		tasks_tl_kf.push_tree(move |tree| {
+			let tracks = vid
+				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::TimelineView>(id))
+				.map(|tl| tl.tracks.clone());
+			if let (Some(id), Some(tracks)) = (cid, tracks)
+				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+			{
+				curve.tracks = tracks;
+			}
+		});
+	});
+
+	let tasks_tl_curve = tasks.clone();
+	let tl_view_curve = tl_view_id.clone();
+	let tl_curve_curve = tl_curve_id.clone();
+	events.register("TimelineCurveChanged", move || {
+		let vid = tl_view_curve.get();
+		let cid = tl_curve_curve.get();
+		tasks_tl_curve.push_tree(move |tree| {
+			let tracks = cid
+				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::CurveEditor>(id))
+				.map(|c| c.tracks.clone());
+			if let (Some(id), Some(tracks)) = (vid, tracks)
+				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+			{
+				tl.tracks = tracks;
+			}
+		});
+	});
+
 	let scene = nimbus_qdl::load_into_tree(
 		include_str!("main.qdl"),
 		main_window.tree_mut(),
@@ -528,6 +693,51 @@ fn main() {
 	page_pp_id.set(scene.named_nodes.get("page_purpleprint").copied());
 	page_gizmo_id.set(scene.named_nodes.get("page_gizmo").copied());
 	page_dock_id.set(scene.named_nodes.get("page_dock").copied());
+	page_timeline_id.set(scene.named_nodes.get("page_timeline").copied());
+	tl_view_id.set(scene.named_nodes.get("demo_timeline").copied());
+	tl_curve_id.set(scene.named_nodes.get("demo_curve").copied());
+	tl_play_btn_id.set(scene.named_nodes.get("tl_play_btn").copied());
+	tl_readout_id.set(scene.named_nodes.get("tl_readout").copied());
+
+	// Seed example tracks for the Timeline + CurveEditor demo
+	let demo_tracks = vec![
+		nimbus_ui_timeline::TimelineTrack::new("Position X")
+			.with_keyframes(vec![
+				nimbus_ui_timeline::Keyframe::new(0.0, -0.8)
+					.with_tangents(nimbus_math::Vec2::new(-0.3, 0.0), nimbus_math::Vec2::new(0.6, 0.2)),
+				nimbus_ui_timeline::Keyframe::new(2.0, 1.0)
+					.with_tangents(nimbus_math::Vec2::new(-0.5, 0.1), nimbus_math::Vec2::new(0.5, -0.1)),
+				nimbus_ui_timeline::Keyframe::new(4.2, -0.4)
+					.with_tangents(nimbus_math::Vec2::new(-0.4, -0.2), nimbus_math::Vec2::new(0.5, 0.2)),
+				nimbus_ui_timeline::Keyframe::new(6.0, 0.6),
+			]),
+		nimbus_ui_timeline::TimelineTrack::new("Position Y")
+			.with_keyframes(vec![
+				nimbus_ui_timeline::Keyframe::new(0.0, 0.2).with_interp(nimbus_ui_timeline::KeyframeInterp::Linear),
+				nimbus_ui_timeline::Keyframe::new(1.5, -0.9).with_interp(nimbus_ui_timeline::KeyframeInterp::Bezier),
+				nimbus_ui_timeline::Keyframe::new(3.5, 0.85).with_interp(nimbus_ui_timeline::KeyframeInterp::Linear),
+				nimbus_ui_timeline::Keyframe::new(5.5, 0.0),
+			]),
+		nimbus_ui_timeline::TimelineTrack::new("Camera Cut")
+			.with_clips(vec![
+				nimbus_ui_timeline::TimelineClip::new(0.2, 2.2, "Intro Shot"),
+				nimbus_ui_timeline::TimelineClip::new(2.7, 2.8, "Hero Orbit"),
+			]),
+	];
+	if let Some(id) = tl_view_id.get()
+		&& let Some(tl) = main_window
+			.tree_mut()
+			.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+	{
+		tl.tracks = demo_tracks.clone();
+	}
+	if let Some(id) = tl_curve_id.get()
+		&& let Some(curve) = main_window
+			.tree_mut()
+			.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+	{
+		curve.tracks = demo_tracks;
+	}
 	transform_gizmo_id.set(scene.named_nodes.get("demo_transform_gizmo").copied());
 	orientation_gizmo_id.set(scene.named_nodes.get("demo_orientation_gizmo").copied());
 	gizmo_info_id.set(scene.named_nodes.get("gizmo_info").copied());

@@ -502,7 +502,7 @@ impl RhiCommandBuffer<AshVulkanBackend> for AshCommandBuffer {
 
 
 pub struct CommandQueueInner {
-	device: ash::Device,
+	device: crate::device::AshDevice,
 	command_pool: vk::CommandPool,
 	queue: vk::Queue,
 	submit_lock: Mutex<()>,
@@ -515,7 +515,7 @@ impl Drop for CommandQueueInner {
 	fn drop(&mut self) {
 		if self.command_pool != vk::CommandPool::null() {
 			unsafe {
-				self.device.destroy_command_pool(self.command_pool, None);
+				self.device.device().destroy_command_pool(self.command_pool, None);
 			}
 			self.command_pool = vk::CommandPool::null();
 		}
@@ -531,20 +531,21 @@ unsafe impl Send for AshCommandQueue {}
 unsafe impl Sync for AshCommandQueue {}
 
 impl AshCommandQueue {
-	pub fn new(device: &ash::Device, queue_family: u32, queue: vk::Queue) -> RhiResult<Self> {
+	pub fn new(device: crate::device::AshDevice, queue_family: u32, queue: vk::Queue) -> RhiResult<Self> {
 		let pool_info = vk::CommandPoolCreateInfo::default()
 			.flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
 			.queue_family_index(queue_family);
 
 		let command_pool = unsafe {
 			device
+				.device()
 				.create_command_pool(&pool_info, None)
 				.map_err(|e| RhiError::BackendError(format!("Failed to create command pool: {e}")))?
 		};
 
 		Ok(Self {
 			inner: Arc::new(CommandQueueInner {
-				device: device.clone(),
+				device,
 				command_pool,
 				queue,
 				submit_lock: Mutex::new(()),
@@ -564,11 +565,12 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 			self
 				.inner
 				.device
+				.device()
 				.allocate_command_buffers(&alloc_info)
 				.map_err(|e| RhiError::BackendError(format!("Failed to allocate command buffer: {e}")))?
 		};
 
-		Ok(AshCommandBuffer::new(&self.inner.device, bufs[0]))
+		Ok(AshCommandBuffer::new(self.inner.device.device(), bufs[0]))
 	}
 
 	fn submit(&self, cmd: &AshCommandBuffer) -> RhiResult<()> {
@@ -581,6 +583,7 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 			self
 				.inner
 				.device
+				.device()
 				.queue_submit(self.inner.queue, &submits, vk::Fence::null())
 				.map_err(|e| RhiError::BackendError(format!("queue_submit failed: {e}")))?;
 		}
@@ -622,6 +625,7 @@ impl RhiCommandQueue<AshVulkanBackend> for AshCommandQueue {
 			self
 				.inner
 				.device
+				.device()
 				.queue_submit(self.inner.queue, &submits, fence_handle)
 				.map_err(|e| RhiError::BackendError(format!("queue_submit with sync failed: {e}")))?;
 		}

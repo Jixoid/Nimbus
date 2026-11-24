@@ -43,7 +43,8 @@ root qstd::vbox {
           { text: "Components", action: "ViewComponents" },
           { text: "PurplePrint", action: "ViewPurplePrint" },
           { text: "Gizmo", action: "ViewGizmo" },
-          { text: "Dock", action: "ViewDock" }
+          { text: "Dock", action: "ViewDock" },
+          { text: "Timeline", action: "ViewTimeline" }
         ]
       },
       {
@@ -85,7 +86,7 @@ root qstd::vbox {
   }
 
   node qstd::tabs "main_tabs" {
-    tabs: ["Components", "PurplePrint", "Gizmo", "Dock"]
+    tabs: ["Components", "PurplePrint", "Gizmo", "Dock", "Timeline"]
     on_changed: "SwitchPage"
   }
 
@@ -504,6 +505,62 @@ root qstd::vbox {
         node qstd::text { text: "shaders/pbr.wgsl" }
         node qstd::text { text: "scenes/main.qdl" }
       }
+    }
+  }
+
+  node qstd::vbox "page_timeline" {
+    anchor: "fill"
+    visible: false
+    spacing: 8
+    color: "transparent"
+
+    node qstd::hbox {
+      spacing: 12
+      paddings: 8
+      color: "monet(SurfaceContainer)"
+      corner_radius: 12
+
+      node qstd::button "tl_play_btn" {
+        text: "Play"
+        variant: "filled"
+        on_click: "TimelineTogglePlay"
+      }
+
+      node qstd::button {
+        text: "Stop"
+        variant: "tonal"
+        on_click: "TimelineStop"
+      }
+
+      node qstd::check {
+        text: "Snap (30fps)"
+        checked: true
+        on_changed: "TimelineSnap"
+      }
+
+      node qstd::text "tl_readout" {
+        anchor: "center"
+        text: "t = 0.00s  |  Pos X: 0.00  |  Pos Y: 0.00"
+        font_size: 13
+      }
+    }
+
+    node timeline::view "demo_timeline" {
+      anchor: "top-fill"
+      duration: 6.0
+      fps: 30.0
+      snap: true
+      on_time_changed: "TimelineTimeChanged"
+      on_keyframe_changed: "TimelineKeyframeChanged"
+    }
+
+    node timeline::curve "demo_curve" {
+      anchor: "fill"
+      time_min: 0.0
+      time_max: 6.0
+      value_min: -1.5
+      value_max: 1.5
+      on_curve_changed: "TimelineCurveChanged"
     }
   }
 }

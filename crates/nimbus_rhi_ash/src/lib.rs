@@ -91,7 +91,7 @@ impl RhiBackend for AshVulkanBackend {
 	}
 
 	fn create_command_queue(device: &Self::Device) -> RhiResult<Self::CommandQueue> {
-		AshCommandQueue::new(device.device(), device.main_queue_family(), device.queue())
+		AshCommandQueue::new(device.clone(), device.main_queue_family(), device.queue())
 	}
 
 	fn create_swapchain(

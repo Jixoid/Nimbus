@@ -123,9 +123,22 @@ struct AppRunner {
 	task_queue: TaskQueue,
 	on_pre_render: Option<PreRenderCallback>,
 	winit_map: HashMap<WindowId, WindowHandle>,
-	device: Option<Device>,
-	allocator: Option<Allocator<AshVulkanBackend>>,
 	cmd_manager: Option<CommandManager>,
+	allocator: Option<Allocator<AshVulkanBackend>>,
+	device: Option<Device>,
+}
+
+impl Drop for AppRunner {
+	fn drop(&mut self) {
+		if let Some(device) = &self.device {
+			device.wait_idle();
+		}
+		self.windows.clear();
+		self.winit_map.clear();
+		self.cmd_manager = None;
+		self.allocator = None;
+		self.device = None;
+	}
 }
 
 impl ApplicationHandler for AppRunner {

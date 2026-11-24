@@ -1,0 +1,11 @@
+[package]
+name = "nimbus_ui_timeline"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+nimbus_core = { path = "../nimbus_core" }
+nimbus_math = { path = "../nimbus_math" }
+nimbus_render2d = { path = "../nimbus_render2d" }
+nimbus_theme = { path = "../nimbus_theme" }
