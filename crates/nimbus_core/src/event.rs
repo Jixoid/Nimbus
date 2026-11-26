@@ -10,7 +10,10 @@
 */
 
 
+use std::sync::Arc;
+
 use nimbus_math::Vec2;
+use crate::dnd::{DragPayload, DropEffect};
 use crate::id::ObjectID;
 use crate::property::PropertyValue;
 use crate::task::{IntoTask, TaskQueue};
@@ -110,6 +113,23 @@ pub enum InputEvent {
 		text: Option<String>,
 		pressed: bool,
 	},
+	DragEnter {
+		position: Vec2<f32>,
+		payload: Arc<DragPayload>,
+	},
+	DragOver {
+		position: Vec2<f32>,
+		payload: Arc<DragPayload>,
+	},
+	DragLeave,
+	Drop {
+		position: Vec2<f32>,
+		payload: Arc<DragPayload>,
+	},
+	DragEnded {
+		accepted: bool,
+		effect: DropEffect,
+	},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -124,6 +144,8 @@ pub struct EventCtx<'a> {
 	pub(crate) layout_requested: &'a mut bool,
 	pub(crate) messages: Vec<Message>,
 	pub(crate) task_queue: TaskQueue,
+	pub(crate) pending_drag: Option<(Vec2<f32>, DragPayload)>,
+	pub(crate) drop_effect: Option<DropEffect>,
 }
 
 impl<'a> EventCtx<'a> {
@@ -138,7 +160,21 @@ impl<'a> EventCtx<'a> {
 			layout_requested,
 			messages: Vec::new(),
 			task_queue: TaskQueue::new(),
+			pending_drag: None,
+			drop_effect: None,
 		}
+	}
+
+	pub fn begin_drag(&mut self, origin: Vec2<f32>, payload: DragPayload) {
+		self.pending_drag = Some((origin, payload));
+	}
+
+	pub fn set_drop_effect(&mut self, effect: DropEffect) {
+		self.drop_effect = Some(effect);
+	}
+
+	pub fn accept_drop(&mut self) {
+		self.drop_effect = Some(DropEffect::Move);
 	}
 
 	pub fn node_id(&self) -> ObjectID {

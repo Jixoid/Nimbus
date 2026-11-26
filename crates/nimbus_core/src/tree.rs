@@ -10,11 +10,15 @@
 */
 
 
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use nimbus_theme::Theme;
 use slotmap::{SecondaryMap, SlotMap};
 use nimbus_math::{Rect, Vec2};
 use nimbus_render2d::Canvas2D;
 
+use crate::dnd::{DRAG_THRESHOLD_PX, DragPayload, DragSession, DropEffect};
 use crate::draw::DrawCtx;
 use crate::event::{
 	ButtonState, Cursor, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
@@ -33,6 +37,7 @@ pub struct UiTree {
 	pub hovered_node: Option<ObjectID>,
 	pub pressed_node: Option<ObjectID>,
 	pub focused_node: Option<ObjectID>,
+	pub drag_session: Option<DragSession>,
 	pub needs_layout: bool,
 	pub needs_redraw: bool,
 	pub task_queue: TaskQueue,
@@ -47,6 +52,7 @@ impl UiTree {
 			hovered_node: None,
 			pressed_node: None,
 			focused_node: None,
+			drag_session: None,
 			needs_layout: true,
 			needs_redraw: true,
 			task_queue: TaskQueue::new(),
@@ -508,6 +514,9 @@ impl UiTree {
 		for &root_id in &self.roots {
 			self.draw_node(root_id, canvas, theme, &redraw_requested, &layout_requested);
 		}
+		if let Some(session) = &self.drag_session {
+			session.draw_preview(canvas, theme);
+		}
 		(redraw_requested.get(), layout_requested.get())
 	}
 
@@ -580,6 +589,16 @@ impl UiTree {
 	// Event & Hit-Testing Pass
 
 	pub fn active_cursor(&self) -> Cursor {
+		if let Some(session) = &self.drag_session
+			&& session.active
+		{
+			return if session.effect != DropEffect::None {
+				Cursor::Grabbing
+			} else {
+				Cursor::NotAllowed
+			};
+		}
+
 		if let Some(pressed_id) = self.pressed_node
 			&& let Some(Some(widget)) = self.widgets.get(pressed_id)
 		{
@@ -649,6 +668,31 @@ impl UiTree {
 	pub fn dispatch_pointer_move(&mut self, pos: Vec2<f32>) -> bool {
 		let mut redraw_requested = false;
 		let mut layout_requested = false;
+
+		if let Some(session) = &mut self.drag_session {
+			session.pointer = pos;
+			if !session.active {
+				let d = pos - session.origin;
+				if (d.x * d.x + d.y * d.y).sqrt() >= DRAG_THRESHOLD_PX {
+					session.active = true;
+					redraw_requested = true;
+				}
+			}
+			if session.active {
+				self.update_drag_hover(pos, &mut redraw_requested, &mut layout_requested);
+				redraw_requested = true;
+				if !self.task_queue.is_empty() && self.process_tasks() {
+					redraw_requested = true;
+				}
+				if layout_requested {
+					self.needs_layout = true;
+				}
+				if redraw_requested {
+					self.needs_redraw = true;
+				}
+				return true;
+			}
+		}
 
 		let hit_target = self.hit_test(pos);
 
@@ -775,6 +819,67 @@ impl UiTree {
 			}
 
 			ButtonState::Released => {
+				if button == MouseButton::Left
+					&& let Some(session) = self.drag_session.take()
+				{
+					if session.active {
+						let mut accepted = false;
+						if let Some(target) = session.current_target {
+							if session.effect != DropEffect::None {
+								self.send_event(
+									target,
+									&InputEvent::Drop {
+										position: pos,
+										payload: session.payload.clone(),
+									},
+									&mut redraw_requested,
+									&mut layout_requested,
+								);
+								accepted = true;
+							} else {
+								self.send_event(
+									target,
+									&InputEvent::DragLeave,
+									&mut redraw_requested,
+									&mut layout_requested,
+								);
+							}
+						}
+						if let Some(source) = session.source {
+							self.send_event(
+								source,
+								&InputEvent::DragEnded {
+									accepted,
+									effect: if accepted {
+										session.effect
+									} else {
+										DropEffect::None
+									},
+								},
+								&mut redraw_requested,
+								&mut layout_requested,
+							);
+						}
+						if let Some(pressed) = self.pressed_node.take()
+							&& let Some(node) = self.nodes.get_mut(pressed)
+						{
+							node.pressed = false;
+						}
+						redraw_requested = true;
+
+						if !self.task_queue.is_empty() && self.process_tasks() {
+							redraw_requested = true;
+						}
+						if layout_requested {
+							self.needs_layout = true;
+						}
+						if redraw_requested {
+							self.needs_redraw = true;
+						}
+						return true;
+					}
+				}
+
 				if let Some(target) = self.pressed_node.take() {
 					if let Some(node) = self.nodes.get_mut(target) {
 						node.pressed = false;
@@ -822,6 +927,22 @@ impl UiTree {
 	pub fn dispatch_key(&mut self, event: &InputEvent) -> bool {
 		let mut redraw_requested = false;
 		let mut layout_requested = false;
+
+		if self.drag_session.as_ref().is_some_and(|s| s.active)
+			&& matches!(event, InputEvent::Key { key_name, pressed: true, .. } if key_name == "Escape")
+		{
+			self.cancel_drag(&mut redraw_requested, &mut layout_requested);
+			if !self.task_queue.is_empty() && self.process_tasks() {
+				redraw_requested = true;
+			}
+			if layout_requested {
+				self.needs_layout = true;
+			}
+			if redraw_requested {
+				self.needs_redraw = true;
+			}
+			return true;
+		}
 
 		if let Some(target) = self.focused_node {
 			self.send_event(
@@ -883,6 +1004,282 @@ impl UiTree {
 		redraw_requested || layout_requested
 	}
 
+	fn update_drag_hover(
+		&mut self,
+		pos: Vec2<f32>,
+		redraw_requested: &mut bool,
+		layout_requested: &mut bool,
+	) {
+		let (payload, prev_target) = match &self.drag_session {
+			Some(s) => (s.payload.clone(), s.current_target),
+			None => return,
+		};
+
+		let mut new_target = None;
+		let mut new_effect = DropEffect::None;
+		let mut curr = self.hit_test(pos);
+
+		while let Some(id) = curr {
+			let (resp, effect) = self.send_event_ex(
+				id,
+				&InputEvent::DragOver {
+					position: pos,
+					payload: payload.clone(),
+				},
+				redraw_requested,
+				layout_requested,
+			);
+			if let Some(eff) = effect
+				&& eff != DropEffect::None
+			{
+				new_target = Some(id);
+				new_effect = eff;
+				break;
+			}
+			if resp == EventResponse::Handled {
+				new_target = Some(id);
+				new_effect = effect.unwrap_or(DropEffect::None);
+				break;
+			}
+			curr = self.nodes.get(id).and_then(|n| n.parent);
+		}
+
+		if new_target != prev_target {
+			if let Some(old) = prev_target {
+				self.send_event(old, &InputEvent::DragLeave, redraw_requested, layout_requested);
+			}
+			if let Some(new_id) = new_target {
+				self.send_event(
+					new_id,
+					&InputEvent::DragEnter {
+						position: pos,
+						payload,
+					},
+					redraw_requested,
+					layout_requested,
+				);
+			}
+			*redraw_requested = true;
+		}
+
+		if let Some(session) = &mut self.drag_session {
+			session.current_target = new_target;
+			session.effect = new_effect;
+		}
+	}
+
+	fn cancel_drag(&mut self, redraw_requested: &mut bool, layout_requested: &mut bool) {
+		if let Some(session) = self.drag_session.take() {
+			if let Some(target) = session.current_target {
+				self.send_event(target, &InputEvent::DragLeave, redraw_requested, layout_requested);
+			}
+			if let Some(source) = session.source {
+				self.send_event(
+					source,
+					&InputEvent::DragEnded {
+						accepted: false,
+						effect: DropEffect::None,
+					},
+					redraw_requested,
+					layout_requested,
+				);
+			}
+			if let Some(pressed) = self.pressed_node.take()
+				&& let Some(node) = self.nodes.get_mut(pressed)
+			{
+				node.pressed = false;
+			}
+			*redraw_requested = true;
+		}
+	}
+
+	fn find_fallback_drop_target(
+		&mut self,
+		pos: Vec2<f32>,
+		payload: &Arc<DragPayload>,
+		redraw_requested: &mut bool,
+		layout_requested: &mut bool,
+	) -> Option<(ObjectID, DropEffect)> {
+		let mut visible_ids = Vec::new();
+		for &root_id in self.roots.iter().rev() {
+			self.collect_visible_postorder(root_id, &mut visible_ids);
+		}
+		for id in visible_ids {
+			let (_, effect) = self.send_event_ex(
+				id,
+				&InputEvent::DragOver {
+					position: pos,
+					payload: payload.clone(),
+				},
+				redraw_requested,
+				layout_requested,
+			);
+			if let Some(eff) = effect
+				&& eff != DropEffect::None
+			{
+				return Some((id, eff));
+			}
+			self.send_event(id, &InputEvent::DragLeave, redraw_requested, layout_requested);
+		}
+		None
+	}
+
+	fn collect_visible_postorder(&self, id: ObjectID, out: &mut Vec<ObjectID>) {
+		let Some(node) = self.nodes.get(id) else {
+			return;
+		};
+		if !node.visible || !node.enabled {
+			return;
+		}
+		if let Some(ov) = node.overlay {
+			self.collect_visible_postorder(ov, out);
+		}
+		for &child in node.children.iter().rev() {
+			self.collect_visible_postorder(child, out);
+		}
+		out.push(id);
+	}
+
+	pub fn dispatch_os_file_hover(&mut self, path: PathBuf, pos: Vec2<f32>) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+
+		let payload = Arc::new(DragPayload::files(vec![path]));
+		let prev_target = self.drag_session.as_ref().and_then(|s| s.current_target);
+		self.drag_session = Some(DragSession {
+			source: None,
+			origin: pos,
+			pointer: pos,
+			payload: payload.clone(),
+			active: true,
+			current_target: prev_target,
+			effect: DropEffect::None,
+		});
+		self.update_drag_hover(pos, &mut redraw_requested, &mut layout_requested);
+
+		if self
+			.drag_session
+			.as_ref()
+			.is_some_and(|s| s.effect == DropEffect::None)
+			&& let Some((fallback_id, eff)) = self.find_fallback_drop_target(
+				pos,
+				&payload,
+				&mut redraw_requested,
+				&mut layout_requested,
+			)
+		{
+			if let Some(session) = &mut self.drag_session {
+				session.current_target = Some(fallback_id);
+				session.effect = eff;
+			}
+			self.send_event(
+				fallback_id,
+				&InputEvent::DragEnter {
+					position: pos,
+					payload,
+				},
+				&mut redraw_requested,
+				&mut layout_requested,
+			);
+		}
+		redraw_requested = true;
+
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		true
+	}
+
+	pub fn dispatch_os_file_drop(&mut self, path: PathBuf, pos: Vec2<f32>) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+
+		let payload = Arc::new(DragPayload::files(vec![path]));
+		let prev_target = self.drag_session.as_ref().and_then(|s| s.current_target);
+		self.drag_session = Some(DragSession {
+			source: None,
+			origin: pos,
+			pointer: pos,
+			payload: payload.clone(),
+			active: true,
+			current_target: prev_target,
+			effect: DropEffect::None,
+		});
+		self.update_drag_hover(pos, &mut redraw_requested, &mut layout_requested);
+
+		if self
+			.drag_session
+			.as_ref()
+			.is_some_and(|s| s.effect == DropEffect::None)
+			&& let Some((fallback_id, eff)) = self.find_fallback_drop_target(
+				pos,
+				&payload,
+				&mut redraw_requested,
+				&mut layout_requested,
+			)
+			&& let Some(session) = &mut self.drag_session
+		{
+			session.current_target = Some(fallback_id);
+			session.effect = eff;
+		}
+
+		if let Some(session) = self.drag_session.take()
+			&& let Some(target) = session.current_target
+		{
+			if session.effect != DropEffect::None {
+				self.send_event(
+					target,
+					&InputEvent::Drop {
+						position: pos,
+						payload,
+					},
+					&mut redraw_requested,
+					&mut layout_requested,
+				);
+			} else {
+				self.send_event(
+					target,
+					&InputEvent::DragLeave,
+					&mut redraw_requested,
+					&mut layout_requested,
+				);
+			}
+		}
+		redraw_requested = true;
+
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		true
+	}
+
+	pub fn dispatch_os_file_cancel(&mut self) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+		if self.drag_session.as_ref().is_some_and(|s| s.source.is_none()) {
+			self.cancel_drag(&mut redraw_requested, &mut layout_requested);
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		redraw_requested || layout_requested
+	}
+
 	fn send_event(
 		&mut self,
 		id: ObjectID,
@@ -890,9 +1287,19 @@ impl UiTree {
 		redraw_requested: &mut bool,
 		layout_requested: &mut bool,
 	) -> EventResponse {
+		self.send_event_ex(id, event, redraw_requested, layout_requested).0
+	}
+
+	fn send_event_ex(
+		&mut self,
+		id: ObjectID,
+		event: &InputEvent,
+		redraw_requested: &mut bool,
+		layout_requested: &mut bool,
+	) -> (EventResponse, Option<DropEffect>) {
 		let mut widget = match self.widgets.get_mut(id).and_then(|w| w.take()) {
 			Some(w) => w,
-			None => return EventResponse::Ignored,
+			None => return (EventResponse::Ignored, None),
 		};
 
 		let mut ctx = EventCtx {
@@ -901,10 +1308,26 @@ impl UiTree {
 			layout_requested,
 			messages: Vec::new(),
 			task_queue: self.task_queue.clone(),
+			pending_drag: None,
+			drop_effect: None,
 		};
 
 		let resp = widget.handle_event(&mut ctx, event);
 		self.widgets.insert(id, Some(widget));
+
+		if let Some((origin, payload)) = ctx.pending_drag {
+			self.drag_session = Some(DragSession {
+				source: Some(id),
+				origin,
+				pointer: origin,
+				payload: Arc::new(payload),
+				active: false,
+				current_target: None,
+				effect: DropEffect::None,
+			});
+		}
+
+		let drop_effect = ctx.drop_effect;
 
 		if !ctx.messages.is_empty() {
 			self.process_messages(ctx.messages);
@@ -920,7 +1343,7 @@ impl UiTree {
 		if *redraw_requested {
 			self.needs_redraw = true;
 		}
-		resp
+		(resp, drop_effect)
 	}
 
 	pub fn process_messages(&mut self, initial_messages: Vec<Message>) {
@@ -970,6 +1393,8 @@ impl UiTree {
 						layout_requested: &mut layout,
 						messages: Vec::new(),
 						task_queue: self.task_queue.clone(),
+						pending_drag: None,
+						drop_effect: None,
 					};
 
 					let _ = target_widget.handle_message(&mut target_ctx, &msg.name, &msg.payload);
@@ -1234,5 +1659,119 @@ mod tests {
 		assert!(!tree.is_visible(child));
 		assert!(tree.needs_layout);
 		assert!(tree.needs_redraw);
+	}
+
+	struct MockDragSource {
+		ended: Option<bool>,
+	}
+
+	impl Widget for MockDragSource {
+		fn layout(&mut self, _ctx: &mut LayoutCtx, c: BoxConstraints) -> Vec2<f32> {
+			c.constrain(Vec2::new(80.0, 40.0))
+		}
+		fn draw(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
+		fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
+			match event {
+				InputEvent::PointerButton {
+					button: MouseButton::Left,
+					state: ButtonState::Pressed,
+					position,
+				} => {
+					ctx.begin_drag(*position, DragPayload::text("test/item", "hello"));
+					EventResponse::Handled
+				}
+				InputEvent::DragEnded { accepted, .. } => {
+					self.ended = Some(*accepted);
+					EventResponse::Handled
+				}
+				_ => EventResponse::Ignored,
+			}
+		}
+	}
+
+	struct MockDropTarget {
+		accept_kind: &'static str,
+		dropped: Option<String>,
+	}
+
+	impl Widget for MockDropTarget {
+		fn layout(&mut self, _ctx: &mut LayoutCtx, c: BoxConstraints) -> Vec2<f32> {
+			c.constrain(Vec2::new(80.0, 40.0))
+		}
+		fn draw(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
+		fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
+			match event {
+				InputEvent::DragOver { payload, .. } => {
+					if payload.kind == self.accept_kind {
+						ctx.set_drop_effect(DropEffect::Copy);
+					} else {
+						ctx.set_drop_effect(DropEffect::None);
+					}
+					EventResponse::Handled
+				}
+				InputEvent::Drop { payload, .. } => {
+					self.dropped = payload.downcast_ref::<String>().cloned();
+					EventResponse::Handled
+				}
+				_ => EventResponse::Ignored,
+			}
+		}
+	}
+
+	#[test]
+	fn test_drag_and_drop_lifecycle_and_cancel() {
+		let mut tree = UiTree::new();
+		let root = tree.insert_root(TestWidget::new(200.0, 200.0));
+		let src = tree.insert_child(root, MockDragSource { ended: None });
+		let dst_ok = tree.insert_child(
+			root,
+			MockDropTarget {
+				accept_kind: "test/item",
+				dropped: None,
+			},
+		);
+		let dst_no = tree.insert_child(
+			root,
+			MockDropTarget {
+				accept_kind: "other/kind",
+				dropped: None,
+			},
+		);
+		tree.layout_all(Vec2::new(200.0, 200.0));
+
+		// Press on source (y: 0..40)
+		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Pressed, Vec2::new(10.0, 10.0));
+		assert!(tree.drag_session.is_some());
+		assert!(!tree.drag_session.as_ref().unwrap().active);
+
+		// Move over rejecting target (y: 80..120) -> activates drag, cursor is NotAllowed
+		tree.dispatch_pointer_move(Vec2::new(10.0, 90.0));
+		assert!(tree.drag_session.as_ref().unwrap().active);
+		assert_eq!(tree.active_cursor(), Cursor::NotAllowed);
+
+		// Move over accepting target (y: 40..80) -> cursor is Grabbing
+		tree.dispatch_pointer_move(Vec2::new(10.0, 50.0));
+		assert_eq!(tree.active_cursor(), Cursor::Grabbing);
+
+		// Release -> drops on dst_ok, notifies src
+		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Released, Vec2::new(10.0, 50.0));
+		assert!(tree.drag_session.is_none());
+		assert_eq!(
+			tree.get_widget::<MockDropTarget>(dst_ok).unwrap().dropped.as_deref(),
+			Some("hello")
+		);
+		assert_eq!(tree.get_widget::<MockDropTarget>(dst_no).unwrap().dropped, None);
+		assert_eq!(tree.get_widget::<MockDragSource>(src).unwrap().ended, Some(true));
+
+		// Start another drag and cancel with Escape
+		tree.dispatch_pointer_button(MouseButton::Left, ButtonState::Pressed, Vec2::new(10.0, 10.0));
+		tree.dispatch_pointer_move(Vec2::new(10.0, 50.0));
+		tree.dispatch_key(&InputEvent::Key {
+			key_name: "Escape".to_string(),
+			text: None,
+			pressed: true,
+		});
+		assert!(tree.drag_session.is_none());
+		assert_eq!(tree.get_widget::<MockDragSource>(src).unwrap().ended, Some(false));
 	}
 }

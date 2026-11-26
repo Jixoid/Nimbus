@@ -17,6 +17,7 @@ pub mod choice;
 pub mod collapsible;
 pub mod combobox;
 pub mod dialog;
+pub mod dnd;
 pub mod edit;
 pub mod flex;
 pub mod flow;
@@ -47,6 +48,7 @@ pub use choice::{Choice, ChoiceBuilder};
 pub use collapsible::{Collapsible, CollapsibleBuilder};
 pub use combobox::{ComboBox, ComboBoxBuilder};
 pub use dialog::{Dialog, DialogBuilder};
+pub use dnd::{DragSource, DragSourceBuilder, DropZone, DropZoneBuilder};
 pub use edit::{Edit, EditBuilder};
 pub use flex::{HBox, HBoxBuilder, VBox, VBoxBuilder};
 pub use flow::{Flow, FlowBuilder};
@@ -104,4 +106,6 @@ pub fn register_widgets(registry: &mut WidgetRegistry) {
 	registry.register("qstd::floatspinbox", || Box::new(FloatSpinBox::default()));
 	registry.register("qstd::spinner", || Box::new(Spinner::default()));
 	registry.register("qstd::dialog", || Box::new(Dialog::default()));
+	registry.register("qstd::drag_source", || Box::new(DragSource::default()));
+	registry.register("qstd::drop_zone", || Box::new(DropZone::default()));
 }

@@ -99,12 +99,17 @@ fn main() {
 	let page_dock_id = Rc::new(Cell::new(None));
 	let page_timeline_id = Rc::new(Cell::new(None));
 	let page_inspector_id = Rc::new(Cell::new(None));
+	let page_dnd_id = Rc::new(Cell::new(None));
 	let page_comp_cb = page_comp_id.clone();
 	let page_pp_cb = page_pp_id.clone();
 	let page_gizmo_cb = page_gizmo_id.clone();
 	let page_dock_cb = page_dock_id.clone();
 	let page_timeline_cb = page_timeline_id.clone();
 	let page_inspector_cb = page_inspector_id.clone();
+	let page_dnd_cb = page_dnd_id.clone();
+	let dnd_zone_shader_id = Rc::new(Cell::new(None));
+	let dnd_zone_any_id = Rc::new(Cell::new(None));
+	let dnd_zone_files_id = Rc::new(Cell::new(None));
 
 	let tl_view_id = Rc::new(Cell::new(None));
 	let tl_curve_id = Rc::new(Cell::new(None));
@@ -168,6 +173,13 @@ fn main() {
 						tabs.set_tab(5, true, true);
 					}
 				}
+				"ViewDragDrop" => {
+					if let Some(id) = tabs_id
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
+					{
+						tabs.set_tab(6, true, true);
+					}
+				}
 				_ => {
 					nimbus::ui::Toast::builder()
 						.title(format!("Menu: {}", menu))
@@ -185,6 +197,7 @@ fn main() {
 		let dock = page_dock_cb.get();
 		let timeline = page_timeline_cb.get();
 		let inspector = page_inspector_cb.get();
+		let dnd = page_dnd_cb.get();
 		tasks_tabs.push_tree(move |tree| {
 			if let Some(id) = comp {
 				tree.set_visible(id, tab_idx == 0);
@@ -203,6 +216,9 @@ fn main() {
 			}
 			if let Some(id) = inspector {
 				tree.set_visible(id, tab_idx == 5);
+			}
+			if let Some(id) = dnd {
+				tree.set_visible(id, tab_idx == 6);
 			}
 		});
 	});
@@ -693,6 +709,34 @@ fn main() {
 		});
 	});
 
+	let tasks_dnd_drop = tasks.clone();
+	events.register("OnDndDrop", move |kind: String, value: String| {
+		tasks_dnd_drop.push_tree(move |tree| {
+			nimbus::ui::Toast::builder()
+				.title(format!("Dropped [{}]", kind))
+				.message(value)
+				.kind(nimbus::ui::ToastKind::Success)
+				.show(tree);
+		});
+	});
+
+	let tasks_dnd_clear = tasks.clone();
+	let z_shader = dnd_zone_shader_id.clone();
+	let z_any = dnd_zone_any_id.clone();
+	let z_files = dnd_zone_files_id.clone();
+	events.register("DndClearZones", move || {
+		let ids = [z_shader.get(), z_any.get(), z_files.get()];
+		tasks_dnd_clear.push_tree(move |tree| {
+			for id in ids.into_iter().flatten() {
+				if let Some(zone) = tree.get_widget_mut::<nimbus::ui::DropZone>(id) {
+					zone.clear();
+				}
+			}
+			tree.needs_layout = true;
+			tree.needs_redraw = true;
+		});
+	});
+
 	let scene = nimbus::qdl::load_into_tree(
 		include_str!("main.qdl"),
 		main_window.tree_mut(),
@@ -709,6 +753,10 @@ fn main() {
 	page_dock_id.set(scene.named_nodes.get("page_dock").copied());
 	page_timeline_id.set(scene.named_nodes.get("page_timeline").copied());
 	page_inspector_id.set(scene.named_nodes.get("page_inspector").copied());
+	page_dnd_id.set(scene.named_nodes.get("page_dnd").copied());
+	dnd_zone_shader_id.set(scene.named_nodes.get("dnd_zone_shader").copied());
+	dnd_zone_any_id.set(scene.named_nodes.get("dnd_zone_any").copied());
+	dnd_zone_files_id.set(scene.named_nodes.get("dnd_zone_files").copied());
 	tl_view_id.set(scene.named_nodes.get("demo_timeline").copied());
 	tl_curve_id.set(scene.named_nodes.get("demo_curve").copied());
 	tl_play_btn_id.set(scene.named_nodes.get("tl_play_btn").copied());

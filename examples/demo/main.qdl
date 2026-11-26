@@ -45,7 +45,8 @@ root qstd::vbox {
           { text: "Gizmo", action: "ViewGizmo" },
           { text: "Dock", action: "ViewDock" },
           { text: "Timeline", action: "ViewTimeline" },
-          { text: "Inspector", action: "ViewInspector" }
+          { text: "Inspector", action: "ViewInspector" },
+          { text: "Drag & Drop", action: "ViewDragDrop" }
         ]
       },
       {
@@ -87,7 +88,7 @@ root qstd::vbox {
   }
 
   node qstd::tabs "main_tabs" {
-    tabs: ["Components", "PurplePrint", "Gizmo", "Dock", "Timeline", "Inspector"]
+    tabs: ["Components", "PurplePrint", "Gizmo", "Dock", "Timeline", "Inspector", "Drag & Drop"]
     on_changed: "SwitchPage"
   }
 
@@ -626,6 +627,114 @@ root qstd::vbox {
         default: [1.0, 1.0, 1.0, 1.0]
         min: 0.0
         max: 1.0
+      }
+    }
+  }
+
+  node qstd::hbox "page_dnd" {
+    anchor: "fill"
+    visible: false
+    spacing: 12
+    paddings: 4
+    color: "transparent"
+
+    node qstd::vbox {
+      spacing: 10
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
+
+      node qstd::text {
+        text: "Draggable Assets"
+        color: "monet(Primary)"
+        font_size: 18
+      }
+
+      node qstd::text {
+        text: "Drag any item into the drop zones on the right. Press Esc to cancel."
+        color: "monet(OnSurfaceVariant)"
+        font_size: 12
+      }
+
+      node qstd::drag_source {
+        text: "PBR_Metal.glsl"
+        badge: "Shader"
+        kind: "nimbus/shader"
+        color: "#e85d63"
+      }
+
+      node qstd::drag_source {
+        text: "Water_Ripple.glsl"
+        badge: "Shader"
+        kind: "nimbus/shader"
+        color: "#e85d63"
+      }
+
+      node qstd::drag_source {
+        text: "Hero_Character.glb"
+        badge: "Mesh"
+        kind: "nimbus/mesh"
+        color: "#47c770"
+      }
+
+      node qstd::drag_source {
+        text: "Ambient_Loop.ogg"
+        badge: "Audio"
+        kind: "nimbus/audio"
+        color: "#5299f5"
+      }
+
+      node qstd::drag_source {
+        text: "Studio_HDRI.exr"
+        badge: "Texture"
+        kind: "nimbus/texture"
+        color: "#b875f2"
+      }
+
+      node qstd::button {
+        text: "Clear Drop Zones"
+        variant: "outlined"
+        on_click: "DndClearZones"
+      }
+    }
+
+    node qstd::vbox {
+      anchor: "fill"
+      spacing: 12
+      paddings: 16
+      color: "monet(SurfaceContainer)"
+      corner_radius: 16
+      scrollable: true
+
+      node qstd::text {
+        text: "Drop Targets"
+        color: "monet(Primary)"
+        font_size: 18
+      }
+
+      node qstd::drop_zone "dnd_zone_shader" {
+        title: "Shader Slot"
+        hint: "Only accepts Shader items"
+        accept: "nimbus/shader"
+        effect: "copy"
+        on_drop: "OnDndDrop"
+      }
+
+      node qstd::drop_zone "dnd_zone_any" {
+        title: "Scene Asset Bin"
+        hint: "Accepts any asset or external OS file"
+        accept: "*"
+        effect: "move"
+        on_drop: "OnDndDrop"
+      }
+
+      node qstd::drop_zone "dnd_zone_files" {
+        title: "OS File Drop"
+        hint: "Drag files from your desktop / file manager here"
+        accept: "os/files"
+        effect: "copy"
+        on_drop: "OnDndDrop"
       }
     }
   }

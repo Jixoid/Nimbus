@@ -332,6 +332,33 @@ impl Window {
 				self.sync_cursor();
 			}
 
+			WindowEvent::HoveredFile(path) => {
+				if self
+					.tree
+					.dispatch_os_file_hover(path.clone(), self.last_cursor)
+				{
+					redraw_needed = true;
+				}
+				self.sync_cursor();
+			}
+
+			WindowEvent::DroppedFile(path) => {
+				if self
+					.tree
+					.dispatch_os_file_drop(path.clone(), self.last_cursor)
+				{
+					redraw_needed = true;
+				}
+				self.sync_cursor();
+			}
+
+			WindowEvent::HoveredFileCancelled => {
+				if self.tree.dispatch_os_file_cancel() {
+					redraw_needed = true;
+				}
+				self.sync_cursor();
+			}
+
 			_ => {}
 		}
 

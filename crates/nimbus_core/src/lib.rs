@@ -12,6 +12,7 @@
 
 pub mod anim;
 pub mod app;
+pub mod dnd;
 pub mod draw;
 pub mod event;
 pub mod id;
@@ -27,6 +28,7 @@ pub mod window;
 
 pub use anim::{Animated, Easing, Interpolate, Spring};
 pub use app::Application;
+pub use dnd::{DRAG_THRESHOLD_PX, DragPayload, DragPreview, DragSession, DropEffect};
 pub use draw::DrawCtx;
 pub use event::{
 	ButtonState, Cursor, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
