@@ -133,6 +133,7 @@ impl Drop for AppRunner {
 		if let Some(device) = &self.device {
 			device.wait_idle();
 		}
+		self.on_pre_render = None;
 		self.windows.clear();
 		self.winit_map.clear();
 		self.cmd_manager = None;
