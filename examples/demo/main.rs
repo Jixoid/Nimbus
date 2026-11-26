@@ -11,10 +11,10 @@
 
 
 use std::{cell::Cell, rc::Rc};
-use nimbus_core::{Application, MethodTable, WidgetRegistry, Window};
-use nimbus_math::Color;
-use nimbus_theme::{ElevationTokens, Monet, RadiusTokens, StrokeTokens, Theme};
-use nimbus_except::*;
+use nimbus::core::{Application, MethodTable, WidgetRegistry, Window};
+use nimbus::math::Color;
+use nimbus::theme::{ElevationTokens, Monet, RadiusTokens, StrokeTokens, Theme};
+use nimbus::except::*;
 
 
 fn make_monet(palette: i32, is_dark: bool) -> Monet {
@@ -48,15 +48,15 @@ fn make_monet(palette: i32, is_dark: bool) -> Monet {
 
 
 fn main() {
-	nimbus_except::start();
+	nimbus::except::start();
 	{
 		let mut registry = WidgetRegistry::global().write().unwrap();
-		nimbus_ui::register_widgets(&mut registry);
-		nimbus_ui_purple_print::register_widgets(&mut registry);
-		nimbus_ui_gizmo::register_widgets(&mut registry);
-		nimbus_ui_dock::register_widgets(&mut registry);
-		nimbus_ui_timeline::register_widgets(&mut registry);
-		nimbus_ui_inspector::register_widgets(&mut registry);
+		nimbus::ui::register_widgets(&mut registry);
+		nimbus::ext::purple_print::register_widgets(&mut registry);
+		nimbus::ext::gizmo::register_widgets(&mut registry);
+		nimbus::ext::dock::register_widgets(&mut registry);
+		nimbus::ext::timeline::register_widgets(&mut registry);
+		nimbus::ext::inspector::register_widgets(&mut registry);
 	}
 
 	//let monet = Monet::from_system().unwrap();
@@ -128,51 +128,51 @@ fn main() {
 			match action.as_str() {
 				"ViewComponents" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(0, true, true);
 					}
 				}
 				"ViewPurplePrint" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(1, true, true);
 					}
 				}
 				"ViewGizmo" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(2, true, true);
 					}
 				}
 				"ViewDock" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(3, true, true);
 					}
 				}
 				"ViewTimeline" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(4, true, true);
 					}
 				}
 				"ViewInspector" => {
 					if let Some(id) = tabs_id
-						&& let Some(tabs) = tree.get_widget_mut::<nimbus_ui::Tabs>(id)
+						&& let Some(tabs) = tree.get_widget_mut::<nimbus::ui::Tabs>(id)
 					{
 						tabs.set_tab(5, true, true);
 					}
 				}
 				_ => {
-					nimbus_ui::Toast::builder()
+					nimbus::ui::Toast::builder()
 						.title(format!("Menu: {}", menu))
 						.message(format!("Action triggered: {}", action))
-						.kind(nimbus_ui::ToastKind::Info)
+						.kind(nimbus::ui::ToastKind::Info)
 						.show(tree);
 				}
 			}
@@ -210,7 +210,7 @@ fn main() {
 		if let Some(target) = target_id_cb.get() {
 			let tasks_for_worker = tasks_dialog.clone();
 			tasks_dialog.push_tree(move |tree| {
-				let dlg_id = nimbus_ui::Dialog::attach_wait_overlay(
+				let dlg_id = nimbus::ui::Dialog::attach_wait_overlay(
 					tree,
 					target,
 					"Please Wait",
@@ -220,7 +220,7 @@ fn main() {
 				std::thread::spawn(move || {
 					std::thread::sleep(std::time::Duration::from_secs(3));
 					tasks_for_worker.push_tree(move |tree| {
-						if let Some(dlg) = tree.get_widget_mut::<nimbus_ui::Dialog>(dlg_id) {
+						if let Some(dlg) = tree.get_widget_mut::<nimbus::ui::Dialog>(dlg_id) {
 							dlg.set_open(false, true);
 						}
 					});
@@ -234,13 +234,13 @@ fn main() {
 		let idx = toast_counter.get();
 		toast_counter.set(idx + 1);
 		let (title, msg, kind) = match idx % 4 {
-			0 => ("Bilgi", "Yeni bir bildirim oluşturuldu.", nimbus_ui::ToastKind::Info),
-			1 => ("Başarılı", "Değişiklikler kaydedildi.", nimbus_ui::ToastKind::Success),
-			2 => ("Uyarı", "Bazı alanlar varsayılan değerle kaldı.", nimbus_ui::ToastKind::Warning),
-			_ => ("Hata", "Sunucuya bağlanılamadı.", nimbus_ui::ToastKind::Error),
+			0 => ("Bilgi", "Yeni bir bildirim oluşturuldu.", nimbus::ui::ToastKind::Info),
+			1 => ("Başarılı", "Değişiklikler kaydedildi.", nimbus::ui::ToastKind::Success),
+			2 => ("Uyarı", "Bazı alanlar varsayılan değerle kaldı.", nimbus::ui::ToastKind::Warning),
+			_ => ("Hata", "Sunucuya bağlanılamadı.", nimbus::ui::ToastKind::Error),
 		};
 		tasks_toast.push_tree(move |tree| {
-			nimbus_ui::Toast::builder()
+			nimbus::ui::Toast::builder()
 				.title(title)
 				.message(msg)
 				.kind(kind)
@@ -253,13 +253,13 @@ fn main() {
 	events.register("GizmoMode", move |idx: i32, _label: String| {
 		let tg = tg_mode.get();
 		let mode = match idx {
-			1 => nimbus_ui_gizmo::GizmoMode::Rotate,
-			2 => nimbus_ui_gizmo::GizmoMode::Scale,
-			_ => nimbus_ui_gizmo::GizmoMode::Translate,
+			1 => nimbus::ext::gizmo::GizmoMode::Rotate,
+			2 => nimbus::ext::gizmo::GizmoMode::Scale,
+			_ => nimbus::ext::gizmo::GizmoMode::Translate,
 		};
 		tasks_gizmo_mode.push_tree(move |tree| {
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
 				gizmo.mode = mode;
 			}
@@ -271,12 +271,12 @@ fn main() {
 	events.register("GizmoSpace", move |idx: i32, _label: String| {
 		let tg = tg_space.get();
 		let space = match idx {
-			1 => nimbus_ui_gizmo::GizmoSpace::Local,
-			_ => nimbus_ui_gizmo::GizmoSpace::World,
+			1 => nimbus::ext::gizmo::GizmoSpace::Local,
+			_ => nimbus::ext::gizmo::GizmoSpace::World,
 		};
 		tasks_gizmo_space.push_tree(move |tree| {
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
 				gizmo.space = space;
 			}
@@ -289,7 +289,7 @@ fn main() {
 		let tg = tg_snap.get();
 		tasks_gizmo_snap.push_tree(move |tree| {
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
 				gizmo.snap.enabled = enabled;
 			}
@@ -315,27 +315,27 @@ fn main() {
 					if b.height() > 1.0 { b.width() / b.height() } else { 16.0 / 9.0 }
 				})
 				.unwrap_or(16.0 / 9.0);
-			let cam = nimbus_ui_gizmo::GizmoCamera::from_orbit(
-				nimbus_ui_gizmo::Vec3::ZERO,
+			let cam = nimbus::ext::gizmo::GizmoCamera::from_orbit(
+				nimbus::ext::gizmo::Vec3::ZERO,
 				5.0,
 				0.65,
 				0.45,
-				nimbus_ui_gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
+				nimbus::ext::gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
 				aspect,
 			);
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
-				gizmo.transform = nimbus_ui_gizmo::Transform::IDENTITY;
+				gizmo.transform = nimbus::ext::gizmo::Transform::IDENTITY;
 				gizmo.animate_camera(cam);
 			}
 			if let Some(id) = og
-				&& let Some(orient) = tree.get_widget_mut::<nimbus_ui_gizmo::OrientationGizmo>(id)
+				&& let Some(orient) = tree.get_widget_mut::<nimbus::ext::gizmo::OrientationGizmo>(id)
 			{
 				orient.animate_camera(cam);
 			}
 			if let Some(id) = info
-				&& let Some(text) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+				&& let Some(text) = tree.get_widget_mut::<nimbus::ui::Text>(id)
 			{
 				text.text = "Pos: (0.00, 0.00, 0.00)  |  Scale: (1.00, 1.00, 1.00)".to_string();
 			}
@@ -350,7 +350,7 @@ fn main() {
 		let info = info_changed.get();
 		tasks_gizmo_changed.push_tree(move |tree| {
 			let label = tg
-				.and_then(|id| tree.get_widget::<nimbus_ui_gizmo::TransformGizmo>(id))
+				.and_then(|id| tree.get_widget::<nimbus::ext::gizmo::TransformGizmo>(id))
 				.map(|gizmo| {
 					let p = gizmo.transform.translation;
 					let s = gizmo.transform.scale;
@@ -360,7 +360,7 @@ fn main() {
 					)
 				});
 			if let (Some(id), Some(label)) = (info, label)
-				&& let Some(text) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+				&& let Some(text) = tree.get_widget_mut::<nimbus::ui::Text>(id)
 			{
 				text.text = label;
 			}
@@ -374,12 +374,12 @@ fn main() {
 	let pitch_snap = cam_pitch.clone();
 	events.register("GizmoCameraSnap", move |preset: String| {
 		let (yaw, pitch) = match preset.as_str() {
-			"Right" => nimbus_ui_gizmo::CameraViewPreset::Right.orbit_angles(),
-			"Left" => nimbus_ui_gizmo::CameraViewPreset::Left.orbit_angles(),
-			"Top" => nimbus_ui_gizmo::CameraViewPreset::Top.orbit_angles(),
-			"Bottom" => nimbus_ui_gizmo::CameraViewPreset::Bottom.orbit_angles(),
-			"Back" => nimbus_ui_gizmo::CameraViewPreset::Back.orbit_angles(),
-			_ => nimbus_ui_gizmo::CameraViewPreset::Front.orbit_angles(),
+			"Right" => nimbus::ext::gizmo::CameraViewPreset::Right.orbit_angles(),
+			"Left" => nimbus::ext::gizmo::CameraViewPreset::Left.orbit_angles(),
+			"Top" => nimbus::ext::gizmo::CameraViewPreset::Top.orbit_angles(),
+			"Bottom" => nimbus::ext::gizmo::CameraViewPreset::Bottom.orbit_angles(),
+			"Back" => nimbus::ext::gizmo::CameraViewPreset::Back.orbit_angles(),
+			_ => nimbus::ext::gizmo::CameraViewPreset::Front.orbit_angles(),
 		};
 		yaw_snap.set(yaw);
 		pitch_snap.set(pitch);
@@ -392,21 +392,21 @@ fn main() {
 					if b.height() > 1.0 { b.width() / b.height() } else { 16.0 / 9.0 }
 				})
 				.unwrap_or(16.0 / 9.0);
-			let cam = nimbus_ui_gizmo::GizmoCamera::from_orbit(
-				nimbus_ui_gizmo::Vec3::ZERO,
+			let cam = nimbus::ext::gizmo::GizmoCamera::from_orbit(
+				nimbus::ext::gizmo::Vec3::ZERO,
 				5.0,
 				yaw,
 				pitch,
-				nimbus_ui_gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
+				nimbus::ext::gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
 				aspect,
 			);
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
 				gizmo.animate_camera(cam);
 			}
 			if let Some(id) = og
-				&& let Some(orient) = tree.get_widget_mut::<nimbus_ui_gizmo::OrientationGizmo>(id)
+				&& let Some(orient) = tree.get_widget_mut::<nimbus::ext::gizmo::OrientationGizmo>(id)
 			{
 				orient.animate_camera(cam);
 			}
@@ -432,21 +432,21 @@ fn main() {
 					if b.height() > 1.0 { b.width() / b.height() } else { 16.0 / 9.0 }
 				})
 				.unwrap_or(16.0 / 9.0);
-			let cam = nimbus_ui_gizmo::GizmoCamera::from_orbit(
-				nimbus_ui_gizmo::Vec3::ZERO,
+			let cam = nimbus::ext::gizmo::GizmoCamera::from_orbit(
+				nimbus::ext::gizmo::Vec3::ZERO,
 				5.0,
 				yaw,
 				pitch,
-				nimbus_ui_gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
+				nimbus::ext::gizmo::Rad::new(std::f32::consts::FRAC_PI_4),
 				aspect,
 			);
 			if let Some(id) = tg
-				&& let Some(gizmo) = tree.get_widget_mut::<nimbus_ui_gizmo::TransformGizmo>(id)
+				&& let Some(gizmo) = tree.get_widget_mut::<nimbus::ext::gizmo::TransformGizmo>(id)
 			{
 				gizmo.set_camera(cam);
 			}
 			if let Some(id) = og
-				&& let Some(orient) = tree.get_widget_mut::<nimbus_ui_gizmo::OrientationGizmo>(id)
+				&& let Some(orient) = tree.get_widget_mut::<nimbus::ext::gizmo::OrientationGizmo>(id)
 			{
 				orient.set_camera(cam);
 			}
@@ -539,10 +539,10 @@ fn main() {
 	let tasks_dock_close = tasks.clone();
 	events.register("OnDockPaneClosed", move |title: String| {
 		tasks_dock_close.push_tree(move |tree| {
-			nimbus_ui::Toast::builder()
+			nimbus::ui::Toast::builder()
 				.title("Panel Kapatıldı")
 				.message(format!("'{}' paneli kapatıldı.", title))
-				.kind(nimbus_ui::ToastKind::Info)
+				.kind(nimbus::ui::ToastKind::Info)
 				.show(tree);
 		});
 	});
@@ -556,13 +556,13 @@ fn main() {
 		tasks_tl_play.push_tree(move |tree| {
 			let mut now_playing = false;
 			if let Some(id) = vid
-				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+				&& let Some(tl) = tree.get_widget_mut::<nimbus::ext::timeline::TimelineView>(id)
 			{
 				now_playing = !tl.playing;
 				tl.set_playing(now_playing);
 			}
 			if let Some(id) = bid
-				&& let Some(btn) = tree.get_widget_mut::<nimbus_ui::Button>(id)
+				&& let Some(btn) = tree.get_widget_mut::<nimbus::ui::Button>(id)
 			{
 				btn.label = if now_playing { "Pause" } else { "Play" }.to_string();
 			}
@@ -582,7 +582,7 @@ fn main() {
 		tasks_tl_stop.push_tree(move |tree| {
 			let mut summary = None;
 			if let Some(id) = vid
-				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+				&& let Some(tl) = tree.get_widget_mut::<nimbus::ext::timeline::TimelineView>(id)
 			{
 				tl.set_playing(false);
 				tl.set_playhead(0.0);
@@ -591,17 +591,17 @@ fn main() {
 				summary = Some(format!("t = 0.00s  |  Pos X: {:.2}  |  Pos Y: {:.2}", x, y));
 			}
 			if let Some(id) = cid
-				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+				&& let Some(curve) = tree.get_widget_mut::<nimbus::ext::timeline::CurveEditor>(id)
 			{
 				curve.playhead = 0.0;
 			}
 			if let Some(id) = bid
-				&& let Some(btn) = tree.get_widget_mut::<nimbus_ui::Button>(id)
+				&& let Some(btn) = tree.get_widget_mut::<nimbus::ui::Button>(id)
 			{
 				btn.label = "Play".to_string();
 			}
 			if let (Some(id), Some(txt)) = (rid, summary)
-				&& let Some(label) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+				&& let Some(label) = tree.get_widget_mut::<nimbus::ui::Text>(id)
 			{
 				label.text = txt;
 			}
@@ -616,12 +616,12 @@ fn main() {
 		let cid = tl_curve_snap.get();
 		tasks_tl_snap.push_tree(move |tree| {
 			if let Some(id) = vid
-				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+				&& let Some(tl) = tree.get_widget_mut::<nimbus::ext::timeline::TimelineView>(id)
 			{
 				tl.snap = enabled;
 			}
 			if let Some(id) = cid
-				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+				&& let Some(curve) = tree.get_widget_mut::<nimbus::ext::timeline::CurveEditor>(id)
 			{
 				curve.snap = enabled;
 			}
@@ -638,19 +638,19 @@ fn main() {
 		let rid = tl_ro_time.get();
 		tasks_tl_time.push_tree(move |tree| {
 			let summary = vid
-				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::TimelineView>(id))
+				.and_then(|id| tree.get_widget::<nimbus::ext::timeline::TimelineView>(id))
 				.map(|tl| {
 					let x = tl.tracks.first().map(|tr| tr.sample(t)).unwrap_or(0.0);
 					let y = tl.tracks.get(1).map(|tr| tr.sample(t)).unwrap_or(0.0);
 					format!("t = {:.2}s  |  Pos X: {:.2}  |  Pos Y: {:.2}", t, x, y)
 				});
 			if let Some(id) = cid
-				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+				&& let Some(curve) = tree.get_widget_mut::<nimbus::ext::timeline::CurveEditor>(id)
 			{
 				curve.playhead = t;
 			}
 			if let (Some(id), Some(txt)) = (rid, summary)
-				&& let Some(label) = tree.get_widget_mut::<nimbus_ui::Text>(id)
+				&& let Some(label) = tree.get_widget_mut::<nimbus::ui::Text>(id)
 			{
 				label.text = txt;
 			}
@@ -665,10 +665,10 @@ fn main() {
 		let cid = tl_curve_kf.get();
 		tasks_tl_kf.push_tree(move |tree| {
 			let tracks = vid
-				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::TimelineView>(id))
+				.and_then(|id| tree.get_widget::<nimbus::ext::timeline::TimelineView>(id))
 				.map(|tl| tl.tracks.clone());
 			if let (Some(id), Some(tracks)) = (cid, tracks)
-				&& let Some(curve) = tree.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+				&& let Some(curve) = tree.get_widget_mut::<nimbus::ext::timeline::CurveEditor>(id)
 			{
 				curve.tracks = tracks;
 			}
@@ -683,17 +683,17 @@ fn main() {
 		let cid = tl_curve_curve.get();
 		tasks_tl_curve.push_tree(move |tree| {
 			let tracks = cid
-				.and_then(|id| tree.get_widget::<nimbus_ui_timeline::CurveEditor>(id))
+				.and_then(|id| tree.get_widget::<nimbus::ext::timeline::CurveEditor>(id))
 				.map(|c| c.tracks.clone());
 			if let (Some(id), Some(tracks)) = (vid, tracks)
-				&& let Some(tl) = tree.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+				&& let Some(tl) = tree.get_widget_mut::<nimbus::ext::timeline::TimelineView>(id)
 			{
 				tl.tracks = tracks;
 			}
 		});
 	});
 
-	let scene = nimbus_qdl::load_into_tree(
+	let scene = nimbus::qdl::load_into_tree(
 		include_str!("main.qdl"),
 		main_window.tree_mut(),
 		&theme,
@@ -716,40 +716,40 @@ fn main() {
 
 	// Seed example tracks for the Timeline + CurveEditor demo
 	let demo_tracks = vec![
-		nimbus_ui_timeline::TimelineTrack::new("Position X")
+		nimbus::ext::timeline::TimelineTrack::new("Position X")
 			.with_keyframes(vec![
-				nimbus_ui_timeline::Keyframe::new(0.0, -0.8)
-					.with_tangents(nimbus_math::Vec2::new(-0.3, 0.0), nimbus_math::Vec2::new(0.6, 0.2)),
-				nimbus_ui_timeline::Keyframe::new(2.0, 1.0)
-					.with_tangents(nimbus_math::Vec2::new(-0.5, 0.1), nimbus_math::Vec2::new(0.5, -0.1)),
-				nimbus_ui_timeline::Keyframe::new(4.2, -0.4)
-					.with_tangents(nimbus_math::Vec2::new(-0.4, -0.2), nimbus_math::Vec2::new(0.5, 0.2)),
-				nimbus_ui_timeline::Keyframe::new(6.0, 0.6),
+				nimbus::ext::timeline::Keyframe::new(0.0, -0.8)
+					.with_tangents(nimbus::math::Vec2::new(-0.3, 0.0), nimbus::math::Vec2::new(0.6, 0.2)),
+				nimbus::ext::timeline::Keyframe::new(2.0, 1.0)
+					.with_tangents(nimbus::math::Vec2::new(-0.5, 0.1), nimbus::math::Vec2::new(0.5, -0.1)),
+				nimbus::ext::timeline::Keyframe::new(4.2, -0.4)
+					.with_tangents(nimbus::math::Vec2::new(-0.4, -0.2), nimbus::math::Vec2::new(0.5, 0.2)),
+				nimbus::ext::timeline::Keyframe::new(6.0, 0.6),
 			]),
-		nimbus_ui_timeline::TimelineTrack::new("Position Y")
+		nimbus::ext::timeline::TimelineTrack::new("Position Y")
 			.with_keyframes(vec![
-				nimbus_ui_timeline::Keyframe::new(0.0, 0.2).with_interp(nimbus_ui_timeline::KeyframeInterp::Linear),
-				nimbus_ui_timeline::Keyframe::new(1.5, -0.9).with_interp(nimbus_ui_timeline::KeyframeInterp::Bezier),
-				nimbus_ui_timeline::Keyframe::new(3.5, 0.85).with_interp(nimbus_ui_timeline::KeyframeInterp::Linear),
-				nimbus_ui_timeline::Keyframe::new(5.5, 0.0),
+				nimbus::ext::timeline::Keyframe::new(0.0, 0.2).with_interp(nimbus::ext::timeline::KeyframeInterp::Linear),
+				nimbus::ext::timeline::Keyframe::new(1.5, -0.9).with_interp(nimbus::ext::timeline::KeyframeInterp::Bezier),
+				nimbus::ext::timeline::Keyframe::new(3.5, 0.85).with_interp(nimbus::ext::timeline::KeyframeInterp::Linear),
+				nimbus::ext::timeline::Keyframe::new(5.5, 0.0),
 			]),
-		nimbus_ui_timeline::TimelineTrack::new("Camera Cut")
+		nimbus::ext::timeline::TimelineTrack::new("Camera Cut")
 			.with_clips(vec![
-				nimbus_ui_timeline::TimelineClip::new(0.2, 2.2, "Intro Shot"),
-				nimbus_ui_timeline::TimelineClip::new(2.7, 2.8, "Hero Orbit"),
+				nimbus::ext::timeline::TimelineClip::new(0.2, 2.2, "Intro Shot"),
+				nimbus::ext::timeline::TimelineClip::new(2.7, 2.8, "Hero Orbit"),
 			]),
 	];
 	if let Some(id) = tl_view_id.get()
 		&& let Some(tl) = main_window
 			.tree_mut()
-			.get_widget_mut::<nimbus_ui_timeline::TimelineView>(id)
+			.get_widget_mut::<nimbus::ext::timeline::TimelineView>(id)
 	{
 		tl.tracks = demo_tracks.clone();
 	}
 	if let Some(id) = tl_curve_id.get()
 		&& let Some(curve) = main_window
 			.tree_mut()
-			.get_widget_mut::<nimbus_ui_timeline::CurveEditor>(id)
+			.get_widget_mut::<nimbus::ext::timeline::CurveEditor>(id)
 	{
 		curve.tracks = demo_tracks;
 	}
@@ -765,7 +765,7 @@ fn main() {
 		scene.named_nodes.get("pp_add"),
 	) && let Some(pp) = main_window
 		.tree_mut()
-		.get_widget_mut::<nimbus_ui_purple_print::PurplePrintView>(pp_id)
+		.get_widget_mut::<nimbus::ext::purple_print::PurplePrintView>(pp_id)
 	{
 		pp.connect(ev, 0, add, 0);
 		pp.connect(var_a, 0, add, 1);

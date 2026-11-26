@@ -19,3 +19,11 @@ pub use nimbus_render2d as render2d;
 pub use nimbus_rhi_ash as rhi_ash;
 pub use nimbus_qdl as qdl;
 pub use nimbus_theme as theme;
+
+pub mod ext {
+	pub use nimbus_ui_purple_print as purple_print;
+	pub use nimbus_ui_gizmo        as gizmo;
+	pub use nimbus_ui_dock         as dock;
+	pub use nimbus_ui_timeline     as timeline;
+	pub use nimbus_ui_inspector    as inspector;
+}
