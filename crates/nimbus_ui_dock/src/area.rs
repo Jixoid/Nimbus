@@ -13,7 +13,7 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, ObjectID, PropertyCtx, PropertyError, PropertyValue,
 	Widget,
 };
@@ -861,6 +861,27 @@ impl Widget for DockArea {
 
 			_ => EventResponse::Ignored,
 		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if let Some(drag) = &self.splitter_drag {
+			return match drag.axis {
+				DockSplitAxis::Horizontal => Cursor::EwResize,
+				DockSplitAxis::Vertical => Cursor::NsResize,
+			};
+		}
+		if self.tab_drag.as_ref().is_some_and(|d| d.active) {
+			return Cursor::Grabbing;
+		}
+		if let Some(path) = &self.hovered_splitter
+			&& let Some(splitter) = self.splitters.iter().find(|s| s.path == *path)
+		{
+			return match splitter.axis {
+				DockSplitAxis::Horizontal => Cursor::EwResize,
+				DockSplitAxis::Vertical => Cursor::NsResize,
+			};
+		}
+		Cursor::Default
 	}
 
 	fn set_property(

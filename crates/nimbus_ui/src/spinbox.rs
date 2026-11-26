@@ -13,7 +13,7 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -891,6 +891,16 @@ impl Widget for SpinBox {
 			_ => false,
 		}
 	}
+
+	fn cursor(&self) -> Cursor {
+		if self.scrub_active {
+			Cursor::EwResize
+		} else if self.editing {
+			Cursor::Text
+		} else {
+			Cursor::Default
+		}
+	}
 }
 
 
@@ -1575,6 +1585,16 @@ impl Widget for FloatSpinBox {
 				true
 			}
 			_ => false,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.scrub_active {
+			Cursor::EwResize
+		} else if self.editing {
+			Cursor::Text
+		} else {
+			Cursor::Default
 		}
 	}
 }

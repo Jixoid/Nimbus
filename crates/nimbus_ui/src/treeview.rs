@@ -14,7 +14,7 @@ use std::cell::Cell;
 use std::time::Instant;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -694,6 +694,14 @@ impl Widget for TreeView {
 			}
 
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.drag.as_ref().is_some_and(|d| d.active) {
+			Cursor::Grabbing
+		} else {
+			Cursor::Default
 		}
 	}
 

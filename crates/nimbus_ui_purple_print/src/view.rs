@@ -14,7 +14,7 @@ use std::cell::Cell;
 use std::collections::{HashSet, VecDeque};
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, ObjectID, PropertyCtx, PropertyError, PropertyValue,
 	UiTree, Widget,
 };
@@ -774,6 +774,16 @@ impl Widget for PurplePrintView {
 				true
 			}
 			_ => false,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.panning.is_some() || self.dragging_node.is_some() {
+			Cursor::Grabbing
+		} else if self.wiring.is_some() {
+			Cursor::Crosshair
+		} else {
+			Cursor::Default
 		}
 	}
 }

@@ -29,7 +29,7 @@ pub use anim::{Animated, Easing, Interpolate, Spring};
 pub use app::Application;
 pub use draw::DrawCtx;
 pub use event::{
-	ButtonState, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
+	ButtonState, Cursor, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
 };
 pub use id::{ObjectID, WindowHandle};
 pub use layout::{BoxConstraints, LayoutCtx};

@@ -17,7 +17,7 @@ use nimbus_render2d::Canvas2D;
 
 use crate::draw::DrawCtx;
 use crate::event::{
-	ButtonState, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
+	ButtonState, Cursor, EventCtx, EventResponse, InputEvent, Message, MessageTarget, MouseButton,
 };
 use crate::id::ObjectID;
 use crate::layout::{BoxConstraints, LayoutCtx};
@@ -578,6 +578,30 @@ impl UiTree {
 
 
 	// Event & Hit-Testing Pass
+
+	pub fn active_cursor(&self) -> Cursor {
+		if let Some(pressed_id) = self.pressed_node
+			&& let Some(Some(widget)) = self.widgets.get(pressed_id)
+		{
+			let c = widget.cursor();
+			if c != Cursor::Default {
+				return c;
+			}
+		}
+
+		let mut current = self.hovered_node;
+		while let Some(id) = current {
+			if let Some(Some(widget)) = self.widgets.get(id) {
+				let c = widget.cursor();
+				if c != Cursor::Default {
+					return c;
+				}
+			}
+			current = self.nodes.get(id).and_then(|n| n.parent);
+		}
+
+		Cursor::Default
+	}
 
 	pub fn hit_test(&self, pos: Vec2<f32>) -> Option<ObjectID> {
 		for &root_id in self.roots.iter().rev() {

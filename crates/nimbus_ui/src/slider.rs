@@ -14,7 +14,7 @@ use std::cell::Cell;
 
 use nimbus_core::event::{ButtonState, MouseButton};
 use nimbus_core::{
-	BoxConstraints, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod, LayoutCtx,
+	BoxConstraints, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod, LayoutCtx,
 	MethodCallback, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Rect, Vec2};
@@ -187,6 +187,14 @@ impl Widget for Slider {
 				EventResponse::Handled
 			}
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.is_dragging {
+			Cursor::EwResize
+		} else {
+			Cursor::Default
 		}
 	}
 

@@ -22,7 +22,7 @@ use nimbus_render2d::Canvas2D;
 use nimbus_rhi::manager::allocator::Allocator;
 use nimbus_rhi_ash::{AshVulkanBackend, Command, CommandManager, Device, Synchronizer};
 
-use crate::event::{ButtonState, InputEvent, MouseButton};
+use crate::event::{ButtonState, Cursor, InputEvent, MouseButton};
 use crate::id::WindowHandle;
 use crate::task::{IntoTask, Task, TaskQueue};
 use crate::tree::UiTree;
@@ -43,6 +43,7 @@ pub struct Window {
 	pub(crate) synchronizer: Option<Synchronizer>,
 	pub(crate) cmd_buffers: Vec<Command>,
 	pub(crate) last_cursor: Vec2<f32>,
+	pub(crate) last_cursor_icon: Cursor,
 	pub(crate) should_close: bool,
 }
 
@@ -61,6 +62,7 @@ impl Window {
 			synchronizer: None,
 			cmd_buffers: Vec::new(),
 			last_cursor: Vec2::ZERO,
+			last_cursor_icon: Cursor::Default,
 			should_close: false,
 		}
 	}
@@ -211,6 +213,16 @@ impl Window {
 		Ok(winit_id)
 	}
 
+	fn sync_cursor(&mut self) {
+		let next = self.tree.active_cursor();
+		if next != self.last_cursor_icon {
+			self.last_cursor_icon = next;
+			if let Some(display) = &self.display {
+				display.set_cursor_icon(next.to_winit());
+			}
+		}
+	}
+
 	pub(crate) fn handle_event(&mut self, event: &WindowEvent, device: &Device) -> bool {
 		let mut redraw_needed = false;
 
@@ -246,6 +258,7 @@ impl Window {
 				if self.tree.dispatch_pointer_move(pos) {
 					redraw_needed = true;
 				}
+				self.sync_cursor();
 			}
 
 			WindowEvent::MouseInput { state, button, .. } => {
@@ -268,6 +281,7 @@ impl Window {
 				{
 					redraw_needed = true;
 				}
+				self.sync_cursor();
 			}
 
 			WindowEvent::MouseWheel { delta, .. } => {
@@ -302,6 +316,7 @@ impl Window {
 				if self.tree.dispatch_key(&input_event) {
 					redraw_needed = true;
 				}
+				self.sync_cursor();
 			}
 
 			WindowEvent::Ime(winit::event::Ime::Commit(text)) => {
@@ -314,6 +329,7 @@ impl Window {
 				if self.tree.dispatch_key(&input_event) {
 					redraw_needed = true;
 				}
+				self.sync_cursor();
 			}
 
 			_ => {}

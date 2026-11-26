@@ -13,7 +13,7 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -444,6 +444,10 @@ impl Widget for Edit {
 
 			_ => EventResponse::Ignored,
 		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		Cursor::Text
 	}
 
 	fn set_property(&mut self, name: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {

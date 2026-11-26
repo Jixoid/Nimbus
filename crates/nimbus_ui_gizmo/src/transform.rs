@@ -15,9 +15,9 @@ use std::f32::consts::TAU;
 use std::time::Duration;
 
 use nimbus_core::{
-	Animated, BoxConstraints, ButtonState, DrawCtx, Easing, EventCtx, EventResponse, InputEvent,
-	IntoMethod, LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue,
-	Widget,
+	Animated, BoxConstraints, ButtonState, Cursor, DrawCtx, Easing, EventCtx, EventResponse,
+	InputEvent, IntoMethod, LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError,
+	PropertyValue, Widget,
 };
 use nimbus_math::{Color, Plane, Quat, Rad, Rect, Transform, Vec2, Vec3};
 use nimbus_render2d::{Canvas2D, CurveShape, Font, FontId, FontManager, RectShape, TextShape};
@@ -774,6 +774,18 @@ impl Widget for TransformGizmo {
 			}
 
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.drag.is_some() {
+			match self.mode {
+				GizmoMode::Translate => Cursor::Move,
+				GizmoMode::Rotate => Cursor::Grabbing,
+				GizmoMode::Scale => Cursor::EwResize,
+			}
+		} else {
+			Cursor::Default
 		}
 	}
 

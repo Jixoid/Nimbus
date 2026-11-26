@@ -13,7 +13,7 @@
 use std::cell::Cell;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Rect, Vec2};
@@ -585,6 +585,18 @@ impl Widget for CurveEditor {
 			}
 
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		match self.drag {
+			Some(CurveDrag::Pan { .. }) => Cursor::Grabbing,
+			Some(
+				CurveDrag::Keyframe { .. }
+				| CurveDrag::InTangent { .. }
+				| CurveDrag::OutTangent { .. },
+			) => Cursor::Move,
+			None => Cursor::Default,
 		}
 	}
 

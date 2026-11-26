@@ -14,7 +14,7 @@ use std::cell::Cell;
 use std::time::Instant;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2, Vec3, Vec4};
@@ -663,6 +663,16 @@ impl<const N: usize> Widget for VecEdit<N> {
 			}
 
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		if self.scrub.as_ref().is_some_and(|s| s.dragging) {
+			Cursor::EwResize
+		} else if self.editing_axis.is_some() {
+			Cursor::Text
+		} else {
+			Cursor::Default
 		}
 	}
 

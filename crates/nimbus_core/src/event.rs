@@ -33,6 +33,44 @@ pub struct Message {
 }
 
 
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Cursor {
+	#[default]
+	Default,
+	Pointer,
+	Text,
+	EwResize,
+	NsResize,
+	NeswResize,
+	NwseResize,
+	Move,
+	Grab,
+	Grabbing,
+	Crosshair,
+	NotAllowed,
+}
+
+impl Cursor {
+	pub fn to_winit(self) -> winit::window::CursorIcon {
+		use winit::window::CursorIcon;
+		match self {
+			Self::Default => CursorIcon::Default,
+			Self::Pointer => CursorIcon::Pointer,
+			Self::Text => CursorIcon::Text,
+			Self::EwResize => CursorIcon::EwResize,
+			Self::NsResize => CursorIcon::NsResize,
+			Self::NeswResize => CursorIcon::NeswResize,
+			Self::NwseResize => CursorIcon::NwseResize,
+			Self::Move => CursorIcon::Move,
+			Self::Grab => CursorIcon::Grab,
+			Self::Grabbing => CursorIcon::Grabbing,
+			Self::Crosshair => CursorIcon::Crosshair,
+			Self::NotAllowed => CursorIcon::NotAllowed,
+		}
+	}
+}
+
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MouseButton {
 	Left,

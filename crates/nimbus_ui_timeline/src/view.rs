@@ -14,7 +14,7 @@ use std::cell::Cell;
 use std::time::Instant;
 
 use nimbus_core::{
-	BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
+	BoxConstraints, ButtonState, Cursor, DrawCtx, EventCtx, EventResponse, InputEvent, IntoMethod,
 	LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue, Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -906,6 +906,20 @@ impl Widget for TimelineView {
 			}
 
 			_ => EventResponse::Ignored,
+		}
+	}
+
+	fn cursor(&self) -> Cursor {
+		match self.drag {
+			Some(DragAction::Pan { .. }) => Cursor::Grabbing,
+			Some(
+				DragAction::ScrubPlayhead
+				| DragAction::MoveKeyframe { .. }
+				| DragAction::MoveClip { .. }
+				| DragAction::ResizeClipLeft { .. }
+				| DragAction::ResizeClipRight { .. },
+			) => Cursor::EwResize,
+			None => Cursor::Default,
 		}
 	}
 

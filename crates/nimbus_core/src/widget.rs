@@ -15,7 +15,7 @@ use nimbus_math::Vec2;
 use nimbus_render2d::Canvas2D;
 
 use crate::draw::DrawCtx;
-use crate::event::{EventCtx, EventResponse, InputEvent};
+use crate::event::{Cursor, EventCtx, EventResponse, InputEvent};
 use crate::layout::{BoxConstraints, LayoutCtx};
 use crate::method::MethodCallback;
 use crate::property::{PropertyCtx, PropertyError, PropertyValue};
@@ -49,6 +49,10 @@ pub trait Widget: AsAny + 'static {
 
 	fn should_draw_children(&self) -> bool {
 		true
+	}
+
+	fn cursor(&self) -> Cursor {
+		Cursor::Default
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
@@ -96,6 +100,10 @@ impl Widget for Box<dyn Widget> {
 
 	fn should_draw_children(&self) -> bool {
 		(**self).should_draw_children()
+	}
+
+	fn cursor(&self) -> Cursor {
+		(**self).cursor()
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
