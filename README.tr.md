@@ -1,8 +1,6 @@
 # Nimbus
 
-Saf Rust ile geliştirilmiş GPU hızlandırmalı bir kullanıcı arayüzü (UI) motoru ve iskeleti.
-
-QAOS çatısı altında geliştirilen Nimbus; bildirimsel bir arayüz dili (**QDL**), Vulkan tabanlı 2D render hattı, Material Design 3 / Monet dinamik renk paleti ve fizik tabanlı interaktif yay animasyonlarını bir araya getirir.
+QAOS çatısı altında Rust ile geliştirilen bir kullanıcı arayüzü (UI) iskeleti ve 2D motoru. Bildirimsel bir arayüz dili (**QDL**), Vulkan tabanlı 2D çizim motoru, dinamik Material 3 / Monet tema sistemi ve yay animasyonlarını masaüstü ile Android için bir araya getirir.
 
 Diğer diller: [en](README.md)
 
@@ -10,28 +8,50 @@ Diğer diller: [en](README.md)
 
 ## Özellikler
 
-- **GPU Hızlandırmalı 2D Render Motoru:** Vulkan (`nimbus_rhi_ash`) üzerinde çalışan, GPU prosedürel noise gölgelendiricileri (shaders) ve yüksek kaliteli font atlası (`fontdue`) içeren 2D çizim motoru.
-- **Bildirimsel QDL Biçimlendirmesi:** Arayüz hiyerarşisini, stilleri ve olay bağlamalarını kolayca tanımlayan insan dostu arayüz işaretleme dili.
-- **Dinamik Tema (Material 3 / Monet):** OKLCH tabanlı dinamik ton paletleri, yükseklik (elevation) belirteçleri, yarıçap ve çizgi stilleri ile tam açık/koyu tema desteği.
-- **Yay Animasyonları:** Hızlı ve tepkisel yay fiziği (`Spring::INTERACTIVE`, `BOUNCY`, `SMOOTH`) ve yumuşak geçiş eğrileri (`EmphasizedDecelerate` vb.).
-- **Bileşen Kütüphanesi (`nimbus_ui`):**
-  - **Girdi & Kontroller:** Düğmeler (`Button` - Filled, Tonal, Elevated, Outlined), Onay Kutusu (`Check`), Radyo Düğmesi (`Radio`), Anahtar (`Switch`), Kaydırıcı (`Slider`), Aralık Kaydırıcı (`Interval`), Metin Girişi (`Edit`).
-  - **Gezinme & Seçim:** Sekmeler (`Tabs`), Seçenek Çipleri (`Choice`), Açılır Menüler (`Popup` - animasyonlu alt menüler ve özel yön okları ile).
-  - **Geribildirim & Göstergeler:** İlerleme Çubuğu (`ProgressBar`), Çoklu İlerleme Çubuğu (`MultiProgressBar`), İpucu Kutusu (`Tooltip` / `ToolTip` - yön konumlandırması ve yumuşak kayma animasyonları ile).
-  - **Düzen & Konteynerler:** Yatay Kutu (`HBox`), Dikey Kutu (`VBox`), Akış Düzeni (`Flow`), Kart (`Card`), Kaydırılabilir Alan (`ScrollView`).
+- **2D Çizim Motoru:** Masaüstü ve Android için Vulkan 1.1+ desteği, HiDPI ölçekleme ve font atlası ile metin çizimi.
+- **Bildirimsel Arayüz (QDL):** Yerleşim, stil ve olay bağlamalarını tanımlamak için sade bir işaretleme dili.
+- **Dinamik Tema:** Açık ve koyu mod destekli Material 3 / Monet renk paletleri.
+- **Animasyon & Girdi:** Yay ve geçiş eğrisi animasyonları, esneyen overscroll ile dokunmatik kaydırma, sürükle-bırak ve işletim sistemi imleç desteği.
+- **Bileşenler (`nimbus_ui`):**
+  - **Girdi & Kontroller:** `Button`, `Check`, `Radio`, `Switch`, `Slider`, `Interval`, `SpinBox`, `FloatSpinBox`, `Edit`, `ComboBox`, `DragSource`, `DropZone`.
+  - **Gezinme & Veri:** `Tabs`, `Choice`, `MenuBar`, `Popup`, `TreeView`, `Collapsible`.
+  - **Geribildirim & Gösterim:** `Text`, `ProgressBar`, `MultiProgressBar`, `Spinner`, `Tooltip`, `Dialog`, `Toast`.
+  - **Düzen & Konteynerler:** `HBox`, `VBox`, `Flow`, `Stack`, `Card`, `ScrollView`, `Spacer`, `Viewport`.
+- **Eklentiler:** Yerleşim pencereleri (`nimbus_ui_dock`), özellik denetçisi (`nimbus_ui_inspector`), zaman çizelgesi (`nimbus_ui_timeline`), 3D gizmo (`nimbus_ui_gizmo`) ve düğüm grafiği (`nimbus_ui_purple_print`) için isteğe bağlı paketler.
+
+---
+
+## Demoyu Çalıştırma
+
+Masaüstü:
+
+```bash
+cargo run --example demo
+```
+
+Android (Android SDK/NDK ve `cargo-ndk` gerektirir):
+
+```bash
+cd examples/demo_android && ./build_apk.sh
+```
 
 ---
 
 ## Görseller
 
-![Nimbus Arayüz Testi](/images/test.png)
-*Arayüz testi.*
+![Genel arayüz demosu](/images/test.png)
+*Genel arayüz demosu.*
 
-![Nimbus Arayüz Testi](/images/test_pp.png)
-*Arayüz testi.*
+![PurplePrint düğüm grafiği](/images/test_pp.png)
+*PurplePrint düğüm grafiği.*
 
-![Nimbus Arayüz Testi](/images/test_gizmo.png)
-*Arayüz testi.*
+![3D gizmo](/images/test_gizmo.png)
+*3D gizmo.*
+
+### Android üzerinde test
+
+![Android demosu](/images/test_on_android.png)
+*Android demosu.*
 
 ---
 
