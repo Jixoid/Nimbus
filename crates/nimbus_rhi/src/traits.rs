@@ -225,6 +225,7 @@ pub trait RhiSwapchain<B: RhiBackend>: Send + Sync {
 	fn render_target(&self, index: u32) -> Option<&B::RenderTarget>;
 	fn render_finished_semaphore(&self, index: u32) -> &B::Semaphore;
 	fn vsync(&self) -> bool;
+	fn extent(&self) -> (u32, u32);
 }
 
 

@@ -30,6 +30,7 @@ pub struct Tabs {
 
 	indicator: RefCell<Animated<Rect<f32>>>,
 	hovered_tab: Option<usize>,
+	pressed_tab: Option<usize>,
 	last_bounds: Cell<Rect<f32>>,
 }
 
@@ -43,6 +44,7 @@ impl Default for Tabs {
 			on_changed: None,
 			indicator: RefCell::new(Animated::new(Rect::ZERO)),
 			hovered_tab: None,
+			pressed_tab: None,
 			last_bounds: Cell::new(Rect::ZERO),
 		}
 	}
@@ -222,11 +224,27 @@ impl Widget for Tabs {
 				position,
 			} => {
 				let bounds = self.last_bounds.get();
-				if let Some(tab_idx) = self.tab_at_x(bounds, position.x) {
-					if self.tab_id != tab_idx as i32 {
-						self.tab_id = tab_idx as i32;
+				self.pressed_tab = self.tab_at_x(bounds, position.x);
+				if self.pressed_tab.is_some() {
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+			}
+
+			InputEvent::PointerButton {
+				button: MouseButton::Left,
+				state: ButtonState::Released,
+				position,
+			} => {
+				if let Some(pressed) = self.pressed_tab.take() {
+					let bounds = self.last_bounds.get();
+					if bounds.contains_point(*position)
+						&& self.tab_at_x(bounds, position.x) == Some(pressed)
+						&& self.tab_id != pressed as i32
+					{
+						self.tab_id = pressed as i32;
 						let h = if bounds != Rect::ZERO { bounds.height() } else { 32.0 };
-						if let Some(target_local) = self.local_tab_rect(h, tab_idx) {
+						if let Some(target_local) = self.local_tab_rect(h, pressed) {
 							let mut ind = self.indicator.borrow_mut();
 							if *ind.target() == Rect::ZERO {
 								ind.snap_to(target_local);
@@ -238,12 +256,19 @@ impl Widget for Tabs {
 							}
 						}
 						if let Some(cb) = &mut self.on_changed {
-							let tab_text = self.tabs.get(tab_idx).cloned().unwrap_or_default();
+							let tab_text = self.tabs.get(pressed).cloned().unwrap_or_default();
 							cb.call2(self.tab_id, tab_text);
 						}
-						ctx.request_redraw();
-						return EventResponse::Handled;
 					}
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+			}
+
+			InputEvent::PointerCancel => {
+				if self.pressed_tab.take().is_some() {
+					ctx.request_redraw();
+					return EventResponse::Handled;
 				}
 			}
 
@@ -256,12 +281,11 @@ impl Widget for Tabs {
 				}
 			}
 
-			InputEvent::PointerLeft => {
-				if self.hovered_tab.is_some() {
+			InputEvent::PointerLeft
+				if self.hovered_tab.is_some() => {
 					self.hovered_tab = None;
 					ctx.request_redraw();
 				}
-			}
 
 			_ => {}
 		}
@@ -390,8 +414,9 @@ mod tests {
 
 	#[test]
 	fn test_tabs_local_tab_rect_and_scroll() {
-		let mut tabs = Tabs::default();
-		tabs.tabs = vec!["Home".to_string(), "Settings".to_string(), "Profile".to_string()];
+		let tabs = Tabs::builder()
+			.tabs(vec!["Home".to_string(), "Settings".to_string(), "Profile".to_string()])
+			.build();
 
 		let local_0 = tabs.local_tab_rect(32.0, 0).expect("Tab 0 exists");
 		let local_1 = tabs.local_tab_rect(32.0, 1).expect("Tab 1 exists");

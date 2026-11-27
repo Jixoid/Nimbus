@@ -354,8 +354,8 @@ impl<const N: usize> Widget for VecEdit<N> {
 			let (_, th) = canvas.measure_text(&display, self.font_size);
 			let text_pos = Vec2::new(text_area.x(), text_area.center().y - th * 0.5);
 
-			if seg_editing {
-				if let Some((s0, s1)) = self.selection_range() {
+			if seg_editing
+				&& let Some((s0, s1)) = self.selection_range() {
 					let b0 = Self::char_to_byte(&self.edit_buffer, s0);
 					let b1 = Self::char_to_byte(&self.edit_buffer, s1);
 					let (x0_off, _) = canvas.measure_text(&self.edit_buffer[..b0], self.font_size);
@@ -372,7 +372,6 @@ impl<const N: usize> Widget for VecEdit<N> {
 							.radius(theme.radius.xsmall.min(3.0)),
 					);
 				}
-			}
 
 			canvas.draw(TextShape::new(
 				&display,

@@ -54,14 +54,15 @@ impl Display {
 
 		let surface = device.create_surface(&*window)?;
 		let swapchain = Swapchain::new(device, &surface, phys_width, phys_height, vsync);
+		let (actual_width, actual_height) = swapchain.extent();
 
 		nimbus_disp!(
 			"Platform window created: \"{}\" (logical: {}x{}, physical: {}x{}, scale: {:.2}) with swapchain ({} images)",
 			title,
 			width,
 			height,
-			phys_width,
-			phys_height,
+			actual_width,
+			actual_height,
 			scale_factor,
 			swapchain.image_count()
 		);
@@ -70,8 +71,8 @@ impl Display {
 			swapchain,
 			surface,
 			window,
-			width: phys_width,
-			height: phys_height,
+			width: actual_width,
+			height: actual_height,
 			scale_factor,
 		})
 	}
@@ -81,9 +82,10 @@ impl Display {
 			return;
 		}
 
-		self.width = width;
-		self.height = height;
 		self.swapchain.resize(width, height);
+		let (actual_width, actual_height) = self.swapchain.extent();
+		self.width = actual_width;
+		self.height = actual_height;
 	}
 
 	pub fn update_scale_factor(&mut self, scale_factor: f64) {
@@ -98,6 +100,15 @@ impl Display {
 		self
 			.swapchain
 			.acquire_next_image_with_semaphore(Some(signal_semaphore))
+	}
+
+	pub fn try_acquire_next_image_with_semaphore(
+		&mut self,
+		signal_semaphore: &rhi::Semaphore,
+	) -> rhi::RhiResult<u32> {
+		self
+			.swapchain
+			.try_acquire_next_image_with_semaphore(Some(signal_semaphore))
 	}
 
 	pub fn present(&mut self, image_index: u32) {

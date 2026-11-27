@@ -17,6 +17,7 @@ pub mod device;
 pub mod external;
 pub mod image;
 pub mod pipeline;
+pub mod render_pass_cache;
 pub mod sampler;
 pub mod shader;
 pub mod swapchain;
@@ -30,6 +31,7 @@ pub use device::*;
 pub use external::*;
 pub use image::*;
 pub use pipeline::*;
+pub use render_pass_cache::*;
 pub use sampler::*;
 pub use shader::*;
 pub use swapchain::*;
@@ -87,6 +89,7 @@ impl RhiBackend for AshVulkanBackend {
 		Ok(AshAllocator::new(
 			device.device(),
 			device.allocator().clone(),
+			device.compat().clone(),
 		))
 	}
 

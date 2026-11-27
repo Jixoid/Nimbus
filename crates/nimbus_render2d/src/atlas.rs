@@ -22,7 +22,7 @@ use nimbus_rhi_ash::{Allocator, AshCommandQueue, Device, Image2, ImageView2, Sam
 use nimbus_except::*;
 
 
-const ATLAS_SIZE: u32 = 1024;
+const ATLAS_SIZE: u32 = 2048;
 
 #[derive(Copy, Clone, Debug)]
 pub struct CachedGlyph {

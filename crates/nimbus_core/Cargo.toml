@@ -14,3 +14,6 @@ nimbus_rhi = { path = "../nimbus_rhi" }
 nimbus_rhi_ash = { path = "../nimbus_rhi_ash" }
 nimbus_render2d = { path = "../nimbus_render2d" }
 nimbus_platform = { path = "../nimbus_platform" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { version = "0.30", features = ["android-native-activity"] }

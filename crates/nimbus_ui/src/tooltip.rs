@@ -10,7 +10,7 @@
 */
 
 
-use std::any;
+use std::{any, str::FromStr};
 use std::time::Duration;
 
 use nimbus_core::{
@@ -31,14 +31,16 @@ pub enum TooltipPosition {
 	Right,
 }
 
-impl TooltipPosition {
-	pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for TooltipPosition {
+	type Err = ();
+
+	fn from_str(s: &str) -> Result<Self, ()> {
 		match s.to_ascii_lowercase().as_str() {
-			"top" => Some(Self::Top),
-			"bottom" => Some(Self::Bottom),
-			"left" => Some(Self::Left),
-			"right" => Some(Self::Right),
-			_ => None,
+			"top" => Ok(Self::Top),
+			"bottom" => Ok(Self::Bottom),
+			"left" => Ok(Self::Left),
+			"right" => Ok(Self::Right),
+			_ => Err(()),
 		}
 	}
 }
@@ -328,8 +330,8 @@ impl Widget for Tooltip {
 				}
 			}
 
-			InputEvent::PointerLeft => {
-				if self.hovered {
+			InputEvent::PointerLeft
+				if self.hovered => {
 					self.hovered = false;
 					self.progress.set_target(
 						0.0,
@@ -338,7 +340,6 @@ impl Widget for Tooltip {
 					);
 					ctx.request_redraw();
 				}
-			}
 
 			_ => {}
 		}
@@ -351,10 +352,10 @@ impl Widget for Tooltip {
 			"text" => self.text = value.expect_str()?.to_string(),
 			"position" => {
 				let s = value.expect_str()?;
-				self.position = TooltipPosition::from_str(s).ok_or(
+				self.position = TooltipPosition::from_str(s).map_err(|_|
 					nimbus_core::PropertyError::InvalidValue {
 						expected: "top | bottom | left | right",
-					},
+					}
 				)?;
 			}
 			"font_size" => self.font_size = value.expect_f32()?,

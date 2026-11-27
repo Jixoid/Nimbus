@@ -26,12 +26,14 @@ use nimbus_theme::{MonetRole, Theme};
 pub struct ScrollState {
 	pub offset: f32,
 	pub anim: Animated<f32>,
+	pub overscroll: Animated<f32>,
 	pub content_size: f32,
 	pub viewport_size: f32,
 	pub is_dragging: bool,
 	pub drag_start_pos: f32,
 	pub drag_start_offset: f32,
 	pub hovered: bool,
+	pub touch_scrolling: bool,
 }
 
 impl Default for ScrollState {
@@ -39,12 +41,14 @@ impl Default for ScrollState {
 		Self {
 			offset: 0.0,
 			anim: Animated::new(0.0),
+			overscroll: Animated::new(0.0),
 			content_size: 0.0,
 			viewport_size: 0.0,
 			is_dragging: false,
 			drag_start_pos: 0.0,
 			drag_start_offset: 0.0,
 			hovered: false,
+			touch_scrolling: false,
 		}
 	}
 }
@@ -63,7 +67,7 @@ impl ScrollState {
 	}
 
 	pub fn is_animating(&self) -> bool {
-		self.anim.is_animating()
+		self.anim.is_animating() || self.overscroll.is_animating()
 	}
 
 	pub fn target_offset(&self) -> f32 {
@@ -106,6 +110,80 @@ impl ScrollState {
 		);
 		self.offset = self.anim.value();
 		true
+	}
+
+	pub fn apply_touch_scroll(&mut self, delta: f32) -> bool {
+		if !self.is_scrollable() {
+			return false;
+		}
+
+		let mut remaining = delta;
+		let cur_over = self.overscroll.value();
+		if cur_over.abs() > 0.01 && (cur_over * remaining) < 0.0 {
+			let next_over = cur_over + remaining;
+			if (cur_over > 0.0 && next_over <= 0.0) || (cur_over < 0.0 && next_over >= 0.0) {
+				remaining = next_over;
+				self.overscroll.snap_to(0.0);
+			} else {
+				self.overscroll.snap_to(next_over);
+				return true;
+			}
+		}
+
+		let max_off = self.max_offset();
+		let cur_off = self.anim.value();
+		let raw_next = cur_off - remaining;
+		let clamped = raw_next.clamp(0.0, max_off);
+		self.snap_to(clamped);
+
+		let excess = clamped - raw_next;
+		if excess.abs() > 0.001 {
+			let next_over = (self.overscroll.value() + excess).clamp(-400.0, 400.0);
+			self.overscroll.snap_to(next_over);
+		}
+		true
+	}
+
+	pub fn end_touch_scroll(&mut self) -> bool {
+		self.touch_scrolling = false;
+		if self.overscroll.value().abs() > 0.01 {
+			self.overscroll.set_target(
+				0.0,
+				Duration::from_millis(260),
+				Easing::Decelerate,
+			);
+			true
+		} else {
+			false
+		}
+	}
+
+	pub fn stretch_transform(
+		&self,
+		bounds: Rect<f32>,
+		is_vertical: bool,
+	) -> Option<([f32; 2], [f32; 2])> {
+		let v = self.overscroll.value();
+		if v.abs() < 0.5 {
+			return None;
+		}
+		let extent = self.viewport_size.max(200.0);
+		let s = 1.0 + 0.14 * (1.0 - (-v.abs() / (extent * 0.65)).exp());
+		if is_vertical {
+			let origin_y = if v > 0.0 {
+				bounds.y()
+			} else {
+				bounds.y() + bounds.height()
+			};
+			Some(([bounds.x(), origin_y], [1.0, s]))
+		} else {
+			let origin_x = if v > 0.0 {
+				bounds.x()
+			} else {
+				bounds.x() + bounds.width()
+			};
+			Some(([origin_x, bounds.y()], [s, 1.0]))
+		}
 	}
 
 	pub fn thumb_rect(&self, bounds: Rect<f32>, is_vertical: bool) -> Option<Rect<f32>> {
@@ -185,21 +263,44 @@ impl ScrollState {
 				}
 			}
 
+			InputEvent::TouchScroll { delta } => {
+				if !self.touch_scrolling {
+					let primary = if is_vertical { delta.y.abs() } else { delta.x.abs() };
+					let cross = if is_vertical { delta.x.abs() } else { delta.y.abs() };
+					if primary <= cross || primary < 0.001 {
+						return EventResponse::Ignored;
+					}
+					self.touch_scrolling = true;
+				}
+				let scroll_amount = if is_vertical { delta.y } else { delta.x };
+				if self.apply_touch_scroll(scroll_amount) {
+					ctx.request_redraw();
+					ctx.request_layout();
+					return EventResponse::Handled;
+				}
+			}
+
+			InputEvent::TouchScrollEnd => {
+				if self.end_touch_scroll() {
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+			}
+
 			InputEvent::PointerButton {
 				button: MouseButton::Left,
 				state,
 				position,
 			} => match state {
 				ButtonState::Pressed => {
-					if let Some(thumb) = self.thumb_rect(bounds, is_vertical) {
-						if thumb.contains_point(*position) {
+					if let Some(thumb) = self.thumb_rect(bounds, is_vertical)
+						&& thumb.contains_point(*position) {
 							self.is_dragging = true;
 							self.drag_start_pos = if is_vertical { position.y } else { position.x };
 							self.drag_start_offset = self.anim.value();
 							ctx.request_redraw();
 							return EventResponse::Handled;
 						}
-					}
 				}
 				ButtonState::Released => {
 					if self.is_dragging {
@@ -380,6 +481,25 @@ impl Widget for ScrollView {
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		let bounds = self.last_bounds.get();
+		if matches!(event, InputEvent::TouchScrollEnd) {
+			let mut handled = false;
+			if self.scrollable_y
+				&& self.scroll_y.handle_event(ctx, event, bounds, true) == EventResponse::Handled
+			{
+				handled = true;
+			}
+			if self.scrollable_x
+				&& self.scroll_x.handle_event(ctx, event, bounds, false) == EventResponse::Handled
+			{
+				handled = true;
+			}
+			return if handled {
+				EventResponse::Handled
+			} else {
+				EventResponse::Ignored
+			};
+		}
+
 		let mut resp = EventResponse::Ignored;
 
 		if self.scrollable_y {
@@ -390,6 +510,26 @@ impl Widget for ScrollView {
 		}
 
 		resp
+	}
+
+	fn children_stretch(&self) -> Option<([f32; 2], [f32; 2])> {
+		let bounds = self.last_bounds.get();
+		let sy = if self.scrollable_y {
+			self.scroll_y.stretch_transform(bounds, true)
+		} else {
+			None
+		};
+		let sx = if self.scrollable_x {
+			self.scroll_x.stretch_transform(bounds, false)
+		} else {
+			None
+		};
+		match (sx, sy) {
+			(Some((ox, sx_v)), Some((oy, sy_v))) => Some(([ox[0], oy[1]], [sx_v[0], sy_v[1]])),
+			(Some(x), None) => Some(x),
+			(None, Some(y)) => Some(y),
+			(None, None) => None,
+		}
 	}
 
 	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {

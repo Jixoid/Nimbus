@@ -213,6 +213,14 @@ impl Widget for VBox {
 		}
 	}
 
+	fn children_stretch(&self) -> Option<([f32; 2], [f32; 2])> {
+		if self.scrollable {
+			self.scroll.stretch_transform(self.last_bounds.get(), true)
+		} else {
+			None
+		}
+	}
+
 	fn set_property(&mut self, key: &str, value: &PropertyValue, _ctx: &PropertyCtx) -> Result<(), nimbus_core::PropertyError> {
 		match key {
 			"scrollable" => self.scrollable = value.expect_bool()?,
@@ -497,6 +505,14 @@ impl Widget for HBox {
 			self.scroll.handle_event(ctx, event, self.last_bounds.get(), false)
 		} else {
 			EventResponse::Ignored
+		}
+	}
+
+	fn children_stretch(&self) -> Option<([f32; 2], [f32; 2])> {
+		if self.scrollable {
+			self.scroll.stretch_transform(self.last_bounds.get(), false)
+		} else {
+			None
 		}
 	}
 

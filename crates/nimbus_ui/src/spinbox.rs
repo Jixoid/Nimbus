@@ -547,6 +547,10 @@ impl Widget for SpinBox {
 		);
 	}
 
+	fn blocks_touch_scroll(&self, delta: Vec2<f32>) -> bool {
+		!self.editing && self.scrub_candidate && delta.x.abs() > delta.y.abs()
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		let bounds = self.last_bounds.get();
 		let box_bounds = box_bounds_for(bounds, !self.title.is_empty());
@@ -655,13 +659,11 @@ impl Widget for SpinBox {
 					match part {
 						StepperPart::Up => {
 							self.pressed_part = StepperPart::Up;
-							self.apply_step(1);
 							ctx.request_redraw();
 							EventResponse::Handled
 						}
 						StepperPart::Down => {
 							self.pressed_part = StepperPart::Down;
-							self.apply_step(-1);
 							ctx.request_redraw();
 							EventResponse::Handled
 						}
@@ -689,7 +691,19 @@ impl Widget for SpinBox {
 				ButtonState::Released => {
 					let mut handled = false;
 					if self.pressed_part != StepperPart::None {
+						let part = self.pressed_part;
 						self.pressed_part = StepperPart::None;
+						if hit_stepper(box_bounds, *position) == part {
+							match part {
+								StepperPart::Up => {
+									self.apply_step(1);
+								}
+								StepperPart::Down => {
+									self.apply_step(-1);
+								}
+								StepperPart::None => {}
+							}
+						}
 						handled = true;
 					}
 					if self.scrub_candidate {
@@ -726,6 +740,15 @@ impl Widget for SpinBox {
 					}
 				}
 			},
+
+			InputEvent::PointerCancel => {
+				self.pressed_part = StepperPart::None;
+				self.scrub_candidate = false;
+				self.scrub_active = false;
+				self.is_dragging_text = false;
+				ctx.request_redraw();
+				EventResponse::Handled
+			}
 
 			InputEvent::Key {
 				key_name,
@@ -1224,6 +1247,10 @@ impl Widget for FloatSpinBox {
 		);
 	}
 
+	fn blocks_touch_scroll(&self, delta: Vec2<f32>) -> bool {
+		!self.editing && self.scrub_candidate && delta.x.abs() > delta.y.abs()
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		let bounds = self.last_bounds.get();
 		let box_bounds = box_bounds_for(bounds, !self.title.is_empty());
@@ -1334,13 +1361,11 @@ impl Widget for FloatSpinBox {
 					match part {
 						StepperPart::Up => {
 							self.pressed_part = StepperPart::Up;
-							self.apply_step(1.0);
 							ctx.request_redraw();
 							EventResponse::Handled
 						}
 						StepperPart::Down => {
 							self.pressed_part = StepperPart::Down;
-							self.apply_step(-1.0);
 							ctx.request_redraw();
 							EventResponse::Handled
 						}
@@ -1368,7 +1393,19 @@ impl Widget for FloatSpinBox {
 				ButtonState::Released => {
 					let mut handled = false;
 					if self.pressed_part != StepperPart::None {
+						let part = self.pressed_part;
 						self.pressed_part = StepperPart::None;
+						if hit_stepper(box_bounds, *position) == part {
+							match part {
+								StepperPart::Up => {
+									self.apply_step(1.0);
+								}
+								StepperPart::Down => {
+									self.apply_step(-1.0);
+								}
+								StepperPart::None => {}
+							}
+						}
 						handled = true;
 					}
 					if self.scrub_candidate {
@@ -1405,6 +1442,15 @@ impl Widget for FloatSpinBox {
 					}
 				}
 			},
+
+			InputEvent::PointerCancel => {
+				self.pressed_part = StepperPart::None;
+				self.scrub_candidate = false;
+				self.scrub_active = false;
+				self.is_dragging_text = false;
+				ctx.request_redraw();
+				EventResponse::Handled
+			}
 
 			InputEvent::Key {
 				key_name,

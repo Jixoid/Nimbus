@@ -176,13 +176,12 @@ impl PurplePrintView {
 				direction: PinDirection::Input,
 				index: to_pin,
 			}),
-		) {
-			if src.kind != dst.kind
-				|| !NodePin::is_compatible_types(src.data_type.as_deref(), dst.data_type.as_deref())
+		)
+			&& (src.kind != dst.kind
+				|| !NodePin::is_compatible_types(src.data_type.as_deref(), dst.data_type.as_deref()))
 			{
 				return false;
 			}
-		}
 
 		// One incoming wire per input pin
 		self.connections

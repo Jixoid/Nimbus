@@ -15,6 +15,7 @@ use ash::vk;
 use gpu_allocator::vulkan::{AllocationCreateDesc, AllocationScheme, Allocator};
 
 use crate::buffer::AshBuffer;
+use crate::device::DeviceCompat;
 use crate::image::AshImage2;
 use crate::sampler::AshSampler;
 use crate::types::{
@@ -34,16 +35,22 @@ use nimbus_rhi::{BufferUsage, ImageTiling, ImageUsage};
 pub struct AshAllocator {
 	device: ash::Device,
 	allocator: Arc<Mutex<Allocator>>,
+	compat: Arc<DeviceCompat>,
 }
 
 unsafe impl Send for AshAllocator {}
 unsafe impl Sync for AshAllocator {}
 
 impl AshAllocator {
-	pub fn new(device: &ash::Device, allocator: Arc<Mutex<Allocator>>) -> Self {
+	pub fn new(
+		device: &ash::Device,
+		allocator: Arc<Mutex<Allocator>>,
+		compat: Arc<DeviceCompat>,
+	) -> Self {
 		Self {
 			device: device.clone(),
 			allocator,
+			compat,
 		}
 	}
 
@@ -114,7 +121,13 @@ impl RhiAllocator<AshVulkanBackend> for AshAllocator {
 
 		let device_address = if usage.contains(BufferUsage::DeviceAddress) {
 			let addr_info = vk::BufferDeviceAddressInfo::default().buffer(buffer);
-			unsafe { self.device.get_buffer_device_address(&addr_info) }
+			if self.compat.caps.has_buffer_device_address_core {
+				unsafe { self.device.get_buffer_device_address(&addr_info) }
+			} else if let Some(bda_khr) = &self.compat.buffer_device_address_khr {
+				unsafe { bda_khr.get_buffer_device_address(&addr_info) }
+			} else {
+				0
+			}
 		} else {
 			0
 		};

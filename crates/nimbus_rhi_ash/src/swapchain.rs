@@ -257,14 +257,8 @@ impl AshSwapchain {
 			.cloned()
 			.unwrap_or(formats[0]);
 
-		let extent = if caps.current_extent.width != u32::MAX {
-			caps.current_extent
-		} else {
-			vk::Extent2D {
-				width: width.clamp(caps.min_image_extent.width, caps.max_image_extent.width),
-				height: height.clamp(caps.min_image_extent.height, caps.max_image_extent.height),
-			}
-		};
+		let pre_transform = select_pre_transform(&caps);
+		let extent = select_swapchain_extent(&caps, pre_transform, width, height);
 
 		let mut image_count = caps.min_image_count.max(4);
 		if caps.max_image_count > 0 && image_count > caps.max_image_count {
@@ -304,6 +298,7 @@ impl AshSwapchain {
 			}
 		}
 
+		let composite_alpha = select_composite_alpha(caps.supported_composite_alpha);
 		let create_info = vk::SwapchainCreateInfoKHR::default()
 			.surface(surface)
 			.min_image_count(image_count)
@@ -313,8 +308,8 @@ impl AshSwapchain {
 			.image_array_layers(1)
 			.image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
 			.image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-			.pre_transform(caps.current_transform)
-			.composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+			.pre_transform(pre_transform)
+			.composite_alpha(composite_alpha)
 			.present_mode(present_mode)
 			.clipped(true);
 
@@ -619,14 +614,8 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 				.map_err(|e| RhiError::BackendError(format!("{e}")))?
 		};
 
-		let extent = if caps.current_extent.width != u32::MAX {
-			caps.current_extent
-		} else {
-			vk::Extent2D {
-				width: width.clamp(caps.min_image_extent.width, caps.max_image_extent.width),
-				height: height.clamp(caps.min_image_extent.height, caps.max_image_extent.height),
-			}
-		};
+		let pre_transform = select_pre_transform(&caps);
+		let extent = select_swapchain_extent(&caps, pre_transform, width, height);
 		inner.extent = extent;
 
 		let mut image_count = caps.min_image_count.max(4);
@@ -634,6 +623,7 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 			image_count = caps.max_image_count;
 		}
 
+		let composite_alpha = select_composite_alpha(caps.supported_composite_alpha);
 		let create_info = vk::SwapchainCreateInfoKHR::default()
 			.surface(inner.surface)
 			.min_image_count(image_count)
@@ -643,8 +633,8 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 			.image_array_layers(1)
 			.image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
 			.image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-			.pre_transform(caps.current_transform)
-			.composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+			.pre_transform(pre_transform)
+			.composite_alpha(composite_alpha)
 			.present_mode(inner.present_mode)
 			.clipped(true)
 			.old_swapchain(old_swapchain);
@@ -673,6 +663,18 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 		let (targets, semaphores) = Self::build_targets(&mut inner)?;
 		self.targets = targets;
 		self.render_finished_semaphores = semaphores;
+
+		nimbus_disp!(
+			"Swapchain resized: {}x{} (requested: {}x{}, current_extent: {}x{}, current_transform: {:?}, pre_transform: {:?})",
+			extent.width,
+			extent.height,
+			width,
+			height,
+			caps.current_extent.width,
+			caps.current_extent.height,
+			caps.current_transform,
+			pre_transform
+		);
 
 		Ok(())
 	}
@@ -757,4 +759,75 @@ impl RhiSwapchain<AshVulkanBackend> for AshSwapchain {
 	fn vsync(&self) -> bool {
 		self.inner.lock().unwrap().vsync
 	}
+
+	fn extent(&self) -> (u32, u32) {
+		let ext = self.inner.lock().unwrap().extent;
+		(ext.width, ext.height)
+	}
+}
+
+fn select_pre_transform(caps: &vk::SurfaceCapabilitiesKHR) -> vk::SurfaceTransformFlagsKHR {
+	if caps
+		.supported_transforms
+		.contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
+	{
+		vk::SurfaceTransformFlagsKHR::IDENTITY
+	} else {
+		caps.current_transform
+	}
+}
+
+fn select_swapchain_extent(
+	caps: &vk::SurfaceCapabilitiesKHR,
+	pre_transform: vk::SurfaceTransformFlagsKHR,
+	req_width: u32,
+	req_height: u32,
+) -> vk::Extent2D {
+	if caps.current_extent.width != u32::MAX {
+		let rotated_90_or_270 = caps
+			.current_transform
+			.contains(vk::SurfaceTransformFlagsKHR::ROTATE_90)
+			|| caps
+				.current_transform
+				.contains(vk::SurfaceTransformFlagsKHR::ROTATE_270);
+		let swap_needed = pre_transform == vk::SurfaceTransformFlagsKHR::IDENTITY
+			&& rotated_90_or_270
+			&& req_width > 0
+			&& req_height > 0
+			&& ((req_width > req_height)
+				!= (caps.current_extent.width > caps.current_extent.height));
+		if swap_needed {
+			vk::Extent2D {
+				width: caps
+					.current_extent
+					.height
+					.clamp(caps.min_image_extent.width, caps.max_image_extent.width),
+				height: caps
+					.current_extent
+					.width
+					.clamp(caps.min_image_extent.height, caps.max_image_extent.height),
+			}
+		} else {
+			caps.current_extent
+		}
+	} else {
+		vk::Extent2D {
+			width: req_width.clamp(caps.min_image_extent.width, caps.max_image_extent.width),
+			height: req_height.clamp(caps.min_image_extent.height, caps.max_image_extent.height),
+		}
+	}
+}
+
+fn select_composite_alpha(supported: vk::CompositeAlphaFlagsKHR) -> vk::CompositeAlphaFlagsKHR {
+	for flag in [
+		vk::CompositeAlphaFlagsKHR::OPAQUE,
+		vk::CompositeAlphaFlagsKHR::INHERIT,
+		vk::CompositeAlphaFlagsKHR::PRE_MULTIPLIED,
+		vk::CompositeAlphaFlagsKHR::POST_MULTIPLIED,
+	] {
+		if supported.contains(flag) {
+			return flag;
+		}
+	}
+	vk::CompositeAlphaFlagsKHR::OPAQUE
 }

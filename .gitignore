@@ -3,17 +3,4 @@
 .vscode*
 .stfolder*
 .directory
-.clangd
-/build
-/.cache
 /target
-
-
-# Compiled files and Not applyed plans
-**@*
-**!*
-
-
-# Configs
-.config*
-config.*

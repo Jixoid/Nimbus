@@ -99,11 +99,19 @@ impl<B: RhiBackend> Swapchain<B> {
 		signal_semaphore: Option<&B::Semaphore>,
 	) -> u32 {
 		self
-			.inner
-			.lock()
-			.unwrap()
-			.acquire_next_image(signal_semaphore)
+			.try_acquire_next_image_with_semaphore(signal_semaphore)
 			.expect("Failed to acquire next swapchain image")
+	}
+
+	pub fn try_acquire_next_image_with_semaphore(
+		&mut self,
+		signal_semaphore: Option<&B::Semaphore>,
+	) -> crate::RhiResult<u32> {
+		self.inner.lock().unwrap().acquire_next_image(signal_semaphore)
+	}
+
+	pub fn extent(&self) -> (u32, u32) {
+		self.inner.lock().unwrap().extent()
 	}
 
 	pub fn present(&mut self, image_index: u32) {

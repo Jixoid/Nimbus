@@ -30,6 +30,8 @@ pub struct Interval {
 	pub step: Option<f32>,
 	pub active_handle: Option<u8>,
 	pub on_changed: Option<MethodCallback>,
+	drag_start_pos1: f32,
+	drag_start_pos2: f32,
 	last_bounds: Cell<Rect<f32>>,
 }
 
@@ -43,11 +45,10 @@ impl Interval {
 		let ratio = ((pos_x - bounds.x()) / bounds.width()).clamp(0.0, 1.0);
 		let mut raw = self.min + ratio * (self.max - self.min);
 
-		if let Some(s) = self.step {
-			if s > 0.0 {
+		if let Some(s) = self.step
+			&& s > 0.0 {
 				raw = (raw / s).round() * s;
 			}
-		}
 
 		raw.clamp(self.min, self.max)
 	}
@@ -63,6 +64,8 @@ impl Default for Interval {
 			step: None,
 			active_handle: None,
 			on_changed: None,
+			drag_start_pos1: 30.0,
+			drag_start_pos2: 70.0,
 			last_bounds: Cell::new(Rect::ZERO),
 		}
 	}
@@ -161,6 +164,10 @@ impl Widget for Interval {
 		canvas.draw(RectShape::new(h2_rect, h2_color).radius(handle_r));
 	}
 
+	fn blocks_touch_scroll(&self, delta: Vec2<f32>) -> bool {
+		delta.x.abs() >= delta.y.abs()
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		match event {
 			InputEvent::PointerButton {
@@ -169,6 +176,8 @@ impl Widget for Interval {
 				position,
 			} => match state {
 				ButtonState::Pressed => {
+					self.drag_start_pos1 = self.pos1;
+					self.drag_start_pos2 = self.pos2;
 					let val = self.calculate_value_from_pos(position.x);
 					let dist1 = (val - self.pos1).abs();
 					let dist2 = (val - self.pos2).abs();
@@ -197,6 +206,24 @@ impl Widget for Interval {
 					}
 				}
 			},
+			InputEvent::PointerCancel => {
+				if self.active_handle.is_some() {
+					self.active_handle = None;
+					if (self.pos1 - self.drag_start_pos1).abs() > f32::EPSILON
+						|| (self.pos2 - self.drag_start_pos2).abs() > f32::EPSILON
+					{
+						self.pos1 = self.drag_start_pos1;
+						self.pos2 = self.drag_start_pos2;
+						if let Some(cb) = &mut self.on_changed {
+							cb.call2(self.pos1, self.pos2);
+						}
+					}
+					ctx.request_redraw();
+					EventResponse::Handled
+				} else {
+					EventResponse::Ignored
+				}
+			}
 			InputEvent::PointerMoved { position } => {
 				if let Some(handle) = self.active_handle {
 					let val = self.calculate_value_from_pos(position.x);

@@ -79,7 +79,9 @@ pub enum MouseButton {
 	Left,
 	Right,
 	Middle,
-	Other(u16),
+	Back,
+	Forward,
+	//Other(u16),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -101,8 +103,13 @@ pub enum InputEvent {
 	PointerScroll {
 		delta: Vec2<f32>,
 	},
+	TouchScroll {
+		delta: Vec2<f32>,
+	},
+	TouchScrollEnd,
 	PointerEntered,
 	PointerLeft,
+	PointerCancel,
 	FocusGained,
 	FocusLost,
 	Click {

@@ -14,6 +14,8 @@ use std::ffi::CString;
 use std::sync::Arc;
 use ash::vk;
 
+use crate::device::DeviceCompat;
+use crate::render_pass_cache::RenderPassKey;
 use crate::shader::AshShader;
 use crate::types::{
 	to_vk_format, to_vk_polygon_mode, to_vk_primitive_topology, to_vk_sample_count,
@@ -156,6 +158,7 @@ impl AshPipeline {
 	#[allow(clippy::too_many_arguments)]
 	pub fn create_graphics(
 		device: &ash::Device,
+		compat: &DeviceCompat,
 		meta: &AshPipelineMeta,
 		shaders: &[&AshShader],
 		polymode: PolygonMode,
@@ -213,7 +216,7 @@ impl AshPipeline {
 		};
 
 		let rasterizer = vk::PipelineRasterizationStateCreateInfo::default()
-			.depth_clamp_enable(is_depth_only)
+			.depth_clamp_enable(is_depth_only && compat.caps.has_depth_clamp)
 			.rasterizer_discard_enable(false)
 			.polygon_mode(to_vk_polygon_mode(polymode))
 			.cull_mode(cull_mode)
@@ -271,13 +274,15 @@ impl AshPipeline {
 			.logic_op_enable(false)
 			.attachments(&color_attachments);
 
+		let vk_color_fmt = to_vk_format(color_format);
 		let vk_depth_fmt = to_vk_format(depth_format);
+		let vk_samples = to_vk_sample_count(samples);
 
 		let mut rendering_info = vk::PipelineRenderingCreateInfo::default()
 			.color_attachment_formats(&color_formats)
 			.depth_attachment_format(vk_depth_fmt);
 
-		let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
+		let mut pipeline_info = vk::GraphicsPipelineCreateInfo::default()
 			.stages(&shader_stages)
 			.vertex_input_state(&vertex_input)
 			.input_assembly_state(&input_assembly)
@@ -287,8 +292,17 @@ impl AshPipeline {
 			.depth_stencil_state(&depth_stencil)
 			.color_blend_state(&color_blending)
 			.dynamic_state(&dynamic_state)
-			.layout(meta.layout())
-			.push_next(&mut rendering_info);
+			.layout(meta.layout());
+
+		if compat.caps.use_dynamic_rendering() {
+			pipeline_info = pipeline_info.push_next(&mut rendering_info);
+		} else {
+			let rp_key = RenderPassKey::for_pipeline(vk_color_fmt, vk_depth_fmt, vk_samples);
+			let render_pass = compat
+				.render_pass_cache
+				.get_or_create_render_pass(device, rp_key)?;
+			pipeline_info = pipeline_info.render_pass(render_pass).subpass(0);
+		}
 
 		let pipelines = unsafe {
 			device

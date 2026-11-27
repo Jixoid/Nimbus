@@ -285,7 +285,7 @@ pub(crate) fn draw_bezier_wire(
 	color: Color,
 ) {
 	let dx = (end.x - start.x).abs();
-	let tangent = (dx * 0.5).max(40.0).min(240.0);
+	let tangent = (dx * 0.5).clamp(40.0, 240.0);
 
 	let p0 = start;
 	let p1 = Vec2::new(start.x + tangent, start.y);

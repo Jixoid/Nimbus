@@ -556,6 +556,7 @@ struct ComboDropdown {
 	items: Vec<String>,
 	selected: Option<usize>,
 	hovered_index: Option<usize>,
+	pressed_index: Option<usize>,
 	font: Option<FontId>,
 	font_size: f32,
 	max_height: f32,
@@ -583,6 +584,7 @@ impl ComboDropdown {
 			items,
 			selected,
 			hovered_index: selected,
+			pressed_index: None,
 			font,
 			font_size,
 			max_height,
@@ -760,8 +762,6 @@ impl Widget for ComboDropdown {
 
 			let mut text_col = if is_hovered {
 				monet[MonetRole::OnPrimary]
-			} else if is_selected {
-				monet[MonetRole::OnSurface]
 			} else {
 				monet[MonetRole::OnSurface]
 			};
@@ -806,16 +806,54 @@ impl Widget for ComboDropdown {
 				EventResponse::Handled
 			}
 
+			InputEvent::TouchScroll { delta } => {
+				if delta.y.abs() > delta.x.abs() {
+					let max_s = self.max_scroll(menu);
+					if max_s > 0.0 {
+						let next = (self.scroll_y - delta.y).clamp(0.0, max_s);
+						if (next - self.scroll_y).abs() > 0.1 {
+							self.scroll_y = next;
+							ctx.request_redraw();
+						}
+						return EventResponse::Handled;
+					}
+				}
+				EventResponse::Ignored
+			}
+
 			InputEvent::PointerButton {
 				button: MouseButton::Left,
 				state: ButtonState::Pressed,
 				position,
 			} => {
-				if let Some(idx) = self.item_at_pos(menu, *position) {
-					self.dismiss(ctx, Some(idx));
-				} else {
+				if !menu.contains_point(*position) {
 					self.dismiss(ctx, None);
+				} else {
+					self.pressed_index = self.item_at_pos(menu, *position);
+					self.hovered_index = self.pressed_index;
+					ctx.request_redraw();
 				}
+				EventResponse::Handled
+			}
+
+			InputEvent::PointerButton {
+				button: MouseButton::Left,
+				state: ButtonState::Released,
+				position,
+			} => {
+				if let Some(pressed_idx) = self.pressed_index.take()
+					&& self.item_at_pos(menu, *position) == Some(pressed_idx)
+				{
+					self.dismiss(ctx, Some(pressed_idx));
+				} else {
+					ctx.request_redraw();
+				}
+				EventResponse::Handled
+			}
+
+			InputEvent::PointerCancel => {
+				self.pressed_index = None;
+				ctx.request_redraw();
 				EventResponse::Handled
 			}
 

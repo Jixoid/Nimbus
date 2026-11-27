@@ -130,8 +130,8 @@ impl Widget for Radio {
 	}
 
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
-		if let InputEvent::Click { .. } = event {
-			if !self.checked {
+		if let InputEvent::Click { .. } = event
+			&& !self.checked {
 				self.checked = true;
 				self.progress.set_target(
 					1.0,
@@ -149,7 +149,6 @@ impl Widget for Radio {
 				ctx.request_redraw();
 				return EventResponse::Handled;
 			}
-		}
 		EventResponse::Ignored
 	}
 

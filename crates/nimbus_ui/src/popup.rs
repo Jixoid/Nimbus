@@ -167,8 +167,8 @@ impl Popup {
 
 	pub fn navigate_to(&mut self, index: usize, ctx: &mut EventCtx) {
 		let curr = self.current_items();
-		if let Some(item) = curr.get(index) {
-			if item.has_submenu() {
+		if let Some(item) = curr.get(index)
+			&& item.has_submenu() {
 				self.prev_stack = self.nav_stack.clone();
 				self.nav_stack.push(index);
 				self.hovered_index = None;
@@ -183,7 +183,6 @@ impl Popup {
 				ctx.request_redraw();
 				ctx.request_layout();
 			}
-		}
 	}
 
 	pub fn navigate_back(&mut self, ctx: &mut EventCtx) {
@@ -650,8 +649,8 @@ impl Widget for Popup {
 				// Item clicked
 				if let Some(idx) = self.item_at_pos(*position) {
 					let curr = self.current_items();
-					if let Some(item) = curr.get(idx) {
-						if !item.disabled && item.text != "-" {
+					if let Some(item) = curr.get(idx)
+						&& !item.disabled && item.text != "-" {
 							if item.has_submenu() {
 								// Drill down into submenu with animation
 								self.navigate_to(idx, ctx);
@@ -666,7 +665,6 @@ impl Widget for Popup {
 								return EventResponse::Handled;
 							}
 						}
-					}
 				}
 			}
 

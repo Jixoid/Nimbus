@@ -29,6 +29,7 @@ pub struct Slider {
 	pub step: Option<f32>,
 	pub is_dragging: bool,
 	pub on_changed: Option<MethodCallback>,
+	drag_start_value: f32,
 	last_bounds: Cell<Rect<f32>>,
 }
 
@@ -42,11 +43,10 @@ impl Slider {
 		let ratio = ((pos_x - bounds.x()) / bounds.width()).clamp(0.0, 1.0);
 		let mut raw = self.min + ratio * (self.max - self.min);
 
-		if let Some(s) = self.step {
-			if s > 0.0 {
+		if let Some(s) = self.step
+			&& s > 0.0 {
 				raw = (raw / s).round() * s;
 			}
-		}
 
 		raw.clamp(self.min, self.max)
 	}
@@ -61,6 +61,7 @@ impl Default for Slider {
 			step: None,
 			is_dragging: false,
 			on_changed: None,
+			drag_start_value: 30.0,
 			last_bounds: Cell::new(Rect::ZERO),
 		}
 	}
@@ -140,6 +141,10 @@ impl Widget for Slider {
 		}
 	}
 
+	fn blocks_touch_scroll(&self, delta: Vec2<f32>) -> bool {
+		delta.x.abs() >= delta.y.abs()
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		match event {
 			InputEvent::PointerButton {
@@ -149,6 +154,7 @@ impl Widget for Slider {
 			} => match state {
 				ButtonState::Pressed => {
 					self.is_dragging = true;
+					self.drag_start_value = self.value;
 					self.value = self.calculate_value_from_pos(position.x);
 					if let Some(cb) = &mut self.on_changed {
 						cb.call1(self.value);
@@ -166,6 +172,21 @@ impl Widget for Slider {
 					}
 				}
 			},
+			InputEvent::PointerCancel => {
+				if self.is_dragging {
+					self.is_dragging = false;
+					if (self.value - self.drag_start_value).abs() > f32::EPSILON {
+						self.value = self.drag_start_value;
+						if let Some(cb) = &mut self.on_changed {
+							cb.call1(self.value);
+						}
+					}
+					ctx.request_redraw();
+					EventResponse::Handled
+				} else {
+					EventResponse::Ignored
+				}
+			}
 			InputEvent::PointerMoved { position } => {
 				if self.is_dragging {
 					self.value = self.calculate_value_from_pos(position.x);

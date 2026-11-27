@@ -554,11 +554,22 @@ impl UiTree {
 			if node.clip_children {
 				canvas.push_clip(node.bounds);
 			}
+			let stretch = self
+				.widgets
+				.get(id)
+				.and_then(|w| w.as_ref())
+				.and_then(|w| w.children_stretch());
+			if let Some((origin, scale)) = stretch {
+				canvas.push_stretch(origin, scale);
+			}
 
 			for &child_id in &node.children {
 				self.draw_node(child_id, canvas, theme, redraw_requested, layout_requested);
 			}
 
+			if stretch.is_some() {
+				canvas.pop_stretch();
+			}
 			if node.clip_children {
 				canvas.pop_clip();
 			}
@@ -734,8 +745,8 @@ impl UiTree {
 			);
 		}
 
-		if let Some(pressed) = self.pressed_node {
-			if Some(pressed) != self.hovered_node {
+		if let Some(pressed) = self.pressed_node
+			&& Some(pressed) != self.hovered_node {
 				self.send_event(
 					pressed,
 					&InputEvent::PointerMoved { position: pos },
@@ -743,7 +754,6 @@ impl UiTree {
 					&mut layout_requested,
 				);
 			}
-		}
 
 		if !self.task_queue.is_empty() && self.process_tasks() {
 			redraw_requested = true;
@@ -759,6 +769,7 @@ impl UiTree {
 		redraw_requested || layout_requested
 	}
 
+
 	pub fn dispatch_pointer_button(
 		&mut self,
 		button: MouseButton,
@@ -771,23 +782,44 @@ impl UiTree {
 		match state {
 			ButtonState::Pressed => {
 				let hit = self.hit_test(pos);
-				let prev_focused = self.focused_node;
-				if let Some(prev) = prev_focused {
-					if hit != Some(prev) {
-						if let Some(node) = self.nodes.get_mut(prev) {
-							node.focused = false;
-						}
-						self.focused_node = None;
-						self.send_event(
-							prev,
-							&InputEvent::FocusLost,
-							&mut redraw_requested,
-							&mut layout_requested,
-						);
-						redraw_requested = true;
+				let mut handled_target = None;
+				let mut curr = hit;
+				while let Some(id) = curr {
+					let resp = self.send_event(
+						id,
+						&InputEvent::PointerButton {
+							button,
+							state,
+							position: pos,
+						},
+						&mut redraw_requested,
+						&mut layout_requested,
+					);
+					if resp == EventResponse::Handled {
+						handled_target = Some(id);
+						break;
 					}
+					curr = self.nodes.get(id).and_then(|n| n.parent);
 				}
-				if let Some(target) = hit {
+
+				let target_opt = handled_target.or(hit);
+				let prev_focused = self.focused_node;
+				if let Some(prev) = prev_focused
+					&& target_opt != Some(prev)
+				{
+					if let Some(node) = self.nodes.get_mut(prev) {
+						node.focused = false;
+					}
+					self.focused_node = None;
+					self.send_event(
+						prev,
+						&InputEvent::FocusLost,
+						&mut redraw_requested,
+						&mut layout_requested,
+					);
+					redraw_requested = true;
+				}
+				if let Some(target) = target_opt {
 					if let Some(node) = self.nodes.get_mut(target) {
 						node.pressed = true;
 						node.focused = true;
@@ -803,17 +835,6 @@ impl UiTree {
 							&mut layout_requested,
 						);
 					}
-
-					self.send_event(
-						target,
-						&InputEvent::PointerButton {
-							button,
-							state,
-							position: pos,
-						},
-						&mut redraw_requested,
-						&mut layout_requested,
-					);
 					redraw_requested = true;
 				}
 			}
@@ -821,8 +842,7 @@ impl UiTree {
 			ButtonState::Released => {
 				if button == MouseButton::Left
 					&& let Some(session) = self.drag_session.take()
-				{
-					if session.active {
+					&& session.active {
 						let mut accepted = false;
 						if let Some(target) = session.current_target {
 							if session.effect != DropEffect::None {
@@ -878,7 +898,6 @@ impl UiTree {
 						}
 						return true;
 					}
-				}
 
 				if let Some(target) = self.pressed_node.take() {
 					if let Some(node) = self.nodes.get_mut(target) {
@@ -924,6 +943,7 @@ impl UiTree {
 		redraw_requested || layout_requested
 	}
 
+
 	pub fn dispatch_key(&mut self, event: &InputEvent) -> bool {
 		let mut redraw_requested = false;
 		let mut layout_requested = false;
@@ -967,6 +987,7 @@ impl UiTree {
 		redraw_requested || layout_requested
 	}
 
+
 	pub fn dispatch_pointer_scroll(&mut self, pos: Vec2<f32>, delta: Vec2<f32>) -> bool {
 		let mut redraw_requested = false;
 		let mut layout_requested = false;
@@ -1003,6 +1024,130 @@ impl UiTree {
 
 		redraw_requested || layout_requested
 	}
+
+	pub fn cancel_pressed(&mut self) {
+		if let Some(pressed) = self.pressed_node.take() {
+			if let Some(node) = self.nodes.get_mut(pressed) {
+				node.pressed = false;
+			}
+			let mut redraw = false;
+			let mut layout = false;
+			self.send_event(pressed, &InputEvent::PointerCancel, &mut redraw, &mut layout);
+			if !self.task_queue.is_empty() {
+				let _ = self.process_tasks();
+			}
+			if layout {
+				self.needs_layout = true;
+			}
+			self.needs_redraw = true;
+		}
+	}
+
+	pub fn dispatch_touch_scroll(&mut self, pos: Vec2<f32>, delta: Vec2<f32>) -> Option<ObjectID> {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+		let mut handled_target = None;
+
+		let mut curr = self.hit_test(pos);
+		while let Some(target) = curr {
+			if self
+				.widgets
+				.get(target)
+				.and_then(|w| w.as_ref())
+				.is_some_and(|w| w.blocks_touch_scroll(delta))
+			{
+				break;
+			}
+			let resp = self.send_event(
+				target,
+				&InputEvent::TouchScroll { delta },
+				&mut redraw_requested,
+				&mut layout_requested,
+			);
+			if resp == EventResponse::Handled {
+				redraw_requested = true;
+				handled_target = Some(target);
+				break;
+			}
+			curr = self.nodes.get(target).and_then(|n| n.parent);
+		}
+
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+
+		handled_target
+	}
+
+	pub fn dispatch_touch_scroll_to(&mut self, target: ObjectID, delta: Vec2<f32>) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+		let resp = self.send_event(
+			target,
+			&InputEvent::TouchScroll { delta },
+			&mut redraw_requested,
+			&mut layout_requested,
+		);
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		resp == EventResponse::Handled
+	}
+
+	pub fn dispatch_touch_scroll_end(&mut self, target: ObjectID) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+		let resp = self.send_event(
+			target,
+			&InputEvent::TouchScrollEnd,
+			&mut redraw_requested,
+			&mut layout_requested,
+		);
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		resp == EventResponse::Handled
+	}
+
+	pub fn dispatch_pointer_scroll_to(&mut self, target: ObjectID, delta: Vec2<f32>) -> bool {
+		let mut redraw_requested = false;
+		let mut layout_requested = false;
+		let resp = self.send_event(
+			target,
+			&InputEvent::PointerScroll { delta },
+			&mut redraw_requested,
+			&mut layout_requested,
+		);
+		if !self.task_queue.is_empty() && self.process_tasks() {
+			redraw_requested = true;
+		}
+		if layout_requested {
+			self.needs_layout = true;
+		}
+		if redraw_requested {
+			self.needs_redraw = true;
+		}
+		resp == EventResponse::Handled
+	}
+
 
 	fn update_drag_hover(
 		&mut self,
@@ -1547,8 +1692,8 @@ mod tests {
 			}
 			fn draw(&self, _ctx: &DrawCtx, _canvas: &mut Canvas2D) {}
 			fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
-				if let InputEvent::Click { .. } = event {
-					if !self.active {
+				if let InputEvent::Click { .. } = event
+					&& !self.active {
 						self.active = true;
 						ctx.dispatch_message(
 							MessageTarget::Siblings,
@@ -1558,7 +1703,6 @@ mod tests {
 						ctx.request_redraw();
 						return EventResponse::Handled;
 					}
-				}
 				EventResponse::Ignored
 			}
 			fn handle_message(

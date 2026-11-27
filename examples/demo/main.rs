@@ -76,7 +76,7 @@ fn main() {
 
 	// Application
 	let mut app = Application::new(theme);
-	let theme = app.theme.clone();
+	let theme = app.theme;
 	let app_tasks = app.task_queue();
 
 	// Window
@@ -549,6 +549,21 @@ fn main() {
 		};
 		app_tasks_stroke.push_theme(move |theme| {
 			theme.stroke = stroke;
+		});
+	});
+
+	let tasks_dpi = tasks.clone();
+	events.register("ChangeDpi", move |idx: i32, _label: String| {
+		let scale = match idx {
+			1 => Some(1.0),
+			2 => Some(1.5),
+			3 => Some(2.0),
+			4 => Some(2.5),
+			5 => Some(3.0),
+			_ => None,
+		};
+		tasks_dpi.push_window(move |win| {
+			win.set_scale_override(scale);
 		});
 	});
 

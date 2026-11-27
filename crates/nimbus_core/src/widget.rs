@@ -51,6 +51,14 @@ pub trait Widget: AsAny + 'static {
 		true
 	}
 
+	fn children_stretch(&self) -> Option<([f32; 2], [f32; 2])> {
+		None
+	}
+
+	fn blocks_touch_scroll(&self, _delta: Vec2<f32>) -> bool {
+		false
+	}
+
 	fn cursor(&self) -> Cursor {
 		Cursor::Default
 	}
@@ -100,6 +108,14 @@ impl Widget for Box<dyn Widget> {
 
 	fn should_draw_children(&self) -> bool {
 		(**self).should_draw_children()
+	}
+
+	fn children_stretch(&self) -> Option<([f32; 2], [f32; 2])> {
+		(**self).children_stretch()
+	}
+
+	fn blocks_touch_scroll(&self, delta: Vec2<f32>) -> bool {
+		(**self).blocks_touch_scroll(delta)
 	}
 
 	fn cursor(&self) -> Cursor {

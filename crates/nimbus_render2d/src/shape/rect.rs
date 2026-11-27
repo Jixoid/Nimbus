@@ -24,7 +24,7 @@ pub static RECT_FRAG_SPV: &[u8] = include_bytes!("../../shaders/rect.frag.spv");
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct RectInstance {
-	rect: [f32; 4],
+	pub(crate) rect: [f32; 4],
 	radii: [f32; 4],
 	fill_color: [f32; 4],
 	border_color: [f32; 4],

@@ -1,7 +1,7 @@
 #version 450
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
-#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_buffer_reference_uvec2 : require
 
 struct CurveInstance {
     vec2 p0;
@@ -17,7 +17,7 @@ layout(buffer_reference, scalar) readonly buffer CurveBuffer {
 };
 
 layout(push_constant) uniform PushConstants {
-    uint64_t instance_addr;
+    uvec2 instance_addr;
     vec2 screen_size;
 } pc;
 

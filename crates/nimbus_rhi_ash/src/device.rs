@@ -21,6 +21,7 @@ use crate::buffer::AshBuffer;
 use crate::command::AshCommandQueue;
 use crate::image::{AshImage2, AshImageView2};
 use crate::pipeline::{AshPipeline, AshPipelineMeta};
+use crate::render_pass_cache::RenderPassCache;
 use crate::sampler::AshSampler;
 use crate::shader::AshShader;
 use crate::swapchain::AshRenderTarget;
@@ -43,6 +44,40 @@ pub struct AshBindlessHeap {
 	pub next_id: Mutex<u32>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct DeviceCapabilities {
+	pub api_version: u32,
+	pub has_dynamic_rendering_core: bool,
+	pub has_dynamic_rendering_khr: bool,
+	pub has_synchronization2_core: bool,
+	pub has_synchronization2_khr: bool,
+	pub has_buffer_device_address_core: bool,
+	pub has_buffer_device_address_khr: bool,
+	pub has_descriptor_indexing: bool,
+	pub has_scalar_block_layout: bool,
+	pub has_shader_int64: bool,
+	pub has_depth_clamp: bool,
+	pub has_sampler_anisotropy: bool,
+}
+
+impl DeviceCapabilities {
+	pub fn use_dynamic_rendering(&self) -> bool {
+		self.has_dynamic_rendering_core || self.has_dynamic_rendering_khr
+	}
+
+	pub fn use_synchronization2(&self) -> bool {
+		self.has_synchronization2_core || self.has_synchronization2_khr
+	}
+}
+
+pub struct DeviceCompat {
+	pub caps: DeviceCapabilities,
+	pub dynamic_rendering_khr: Option<ash::khr::dynamic_rendering::Device>,
+	pub synchronization2_khr: Option<ash::khr::synchronization2::Device>,
+	pub buffer_device_address_khr: Option<ash::khr::buffer_device_address::Device>,
+	pub render_pass_cache: RenderPassCache,
+}
+
 pub struct DeviceInner {
 	entry: ash::Entry,
 	surface_loader: Option<ash::khr::surface::Instance>,
@@ -55,6 +90,7 @@ pub struct DeviceInner {
 	queue: vk::Queue,
 	queue_family: u32,
 	bindless_heap: Option<AshBindlessHeap>,
+	compat: Arc<DeviceCompat>,
 }
 
 unsafe impl Send for DeviceInner {}
@@ -103,6 +139,7 @@ impl Drop for DeviceInner {
 		unsafe {
 			if let Some(device) = &self.device {
 				let _ = device.device_wait_idle();
+				self.compat.render_pass_cache.destroy_all(device);
 				if let Some(heap) = &self.bindless_heap {
 					device.destroy_descriptor_pool(heap.pool, None);
 					device.destroy_descriptor_set_layout(heap.layout, None);
@@ -180,6 +217,11 @@ impl AshDevice {
 		let entry =
 			unsafe { ash::Entry::load().map_err(|e| RhiError::InitializationFailed(format!("{e}")))? };
 
+		let instance_api_version = unsafe { entry.try_enumerate_instance_version() }
+			.unwrap_or(None)
+			.unwrap_or(vk::API_VERSION_1_1)
+			.clamp(vk::API_VERSION_1_1, vk::API_VERSION_1_3);
+
 		let app_cname =
 			CString::new(app_name).map_err(|e| RhiError::InitializationFailed(e.to_string()))?;
 		let app_info = vk::ApplicationInfo::default()
@@ -190,9 +232,9 @@ impl AshDevice {
 				minor as u32,
 				patch as u32,
 			))
-			.engine_name(c"Mochi")
+			.engine_name(c"Nimbus")
 			.engine_version(vk::make_api_version(0, 0, 1, 0))
-			.api_version(vk::API_VERSION_1_3);
+			.api_version(instance_api_version);
 
 		let mut extension_names = vec![ash::khr::surface::NAME.as_ptr()];
 
@@ -206,6 +248,11 @@ impl AshDevice {
 		#[cfg(windows)]
 		{
 			extension_names.push(ash::khr::win32_surface::NAME.as_ptr());
+		}
+
+		#[cfg(target_os = "android")]
+		{
+			extension_names.push(ash::khr::android_surface::NAME.as_ptr());
 		}
 
 		let supported_inst_exts = unsafe {
@@ -363,60 +410,222 @@ impl AshDevice {
 
 		let queue_create_infos = [queue_create_info];
 
-		#[allow(unused_mut)]
-		let mut desired_device_extensions = vec![
-			ash::khr::swapchain::NAME.as_ptr(),
-			ash::khr::dynamic_rendering::NAME.as_ptr(),
-			ash::khr::synchronization2::NAME.as_ptr(),
-		];
-		#[cfg(unix)]
-		{
-			desired_device_extensions.push(ash::khr::external_memory_fd::NAME.as_ptr());
-		}
+		let props = unsafe { instance.get_physical_device_properties(physical_device) };
+		let device_api_version = props.api_version.min(instance_api_version);
+		let force_legacy =
+			std::env::var("MOCHI_FORCE_VK11_FALLBACK").ok().as_deref() == Some("1");
 
 		let supported_dev_exts = unsafe {
 			instance
 				.enumerate_device_extension_properties(physical_device)
 				.unwrap_or_default()
 		};
-		let mut enabled_dev_extensions = Vec::new();
-		for req in &desired_device_extensions {
-			let req_cstr = unsafe { std::ffi::CStr::from_ptr(*req) };
-			if supported_dev_exts.iter().any(|ext| {
+		let has_ext = |target: &std::ffi::CStr| {
+			supported_dev_exts.iter().any(|ext| {
 				let name = unsafe { std::ffi::CStr::from_ptr(ext.extension_name.as_ptr()) };
-				name == req_cstr
-			}) {
-				enabled_dev_extensions.push(*req);
+				name == target
+			})
+		};
+
+		let mut enabled_dev_extensions = Vec::new();
+		if has_ext(ash::khr::swapchain::NAME) {
+			enabled_dev_extensions.push(ash::khr::swapchain::NAME.as_ptr());
+		}
+		#[cfg(unix)]
+		if has_ext(ash::khr::external_memory_fd::NAME) {
+			enabled_dev_extensions.push(ash::khr::external_memory_fd::NAME.as_ptr());
+		}
+
+		let has_dyn_khr_ext = !force_legacy && has_ext(ash::khr::dynamic_rendering::NAME);
+		let has_sync2_khr_ext = !force_legacy && has_ext(ash::khr::synchronization2::NAME);
+		let has_bda_khr_ext = has_ext(ash::khr::buffer_device_address::NAME);
+		let has_di_ext = has_ext(ash::ext::descriptor_indexing::NAME);
+		let has_sbl_ext = has_ext(ash::ext::scalar_block_layout::NAME);
+
+		let mut sup_f12 = vk::PhysicalDeviceVulkan12Features::default();
+		let mut sup_f13 = vk::PhysicalDeviceVulkan13Features::default();
+		let mut sup_dyn_khr = vk::PhysicalDeviceDynamicRenderingFeaturesKHR::default();
+		let mut sup_sync2_khr = vk::PhysicalDeviceSynchronization2FeaturesKHR::default();
+		let mut sup_bda_khr = vk::PhysicalDeviceBufferDeviceAddressFeaturesKHR::default();
+		let mut sup_di_ext = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT::default();
+		let mut sup_sbl_ext = vk::PhysicalDeviceScalarBlockLayoutFeaturesEXT::default();
+
+		{
+			let mut sup_f2 = vk::PhysicalDeviceFeatures2::default();
+			if device_api_version >= vk::API_VERSION_1_3 {
+				sup_f2 = sup_f2.push_next(&mut sup_f12).push_next(&mut sup_f13);
+			} else if device_api_version >= vk::API_VERSION_1_2 {
+				sup_f2 = sup_f2.push_next(&mut sup_f12);
+				if has_dyn_khr_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_dyn_khr);
+				}
+				if has_sync2_khr_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_sync2_khr);
+				}
+			} else {
+				if has_bda_khr_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_bda_khr);
+				}
+				if has_di_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_di_ext);
+				}
+				if has_sbl_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_sbl_ext);
+				}
+				if has_dyn_khr_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_dyn_khr);
+				}
+				if has_sync2_khr_ext {
+					sup_f2 = sup_f2.push_next(&mut sup_sync2_khr);
+				}
+			}
+			unsafe {
+				instance.get_physical_device_features2(physical_device, &mut sup_f2);
 			}
 		}
 
-		let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
-			.buffer_device_address(true)
-			.descriptor_indexing(true)
-			.shader_sampled_image_array_non_uniform_indexing(true)
-			.descriptor_binding_partially_bound(true)
-			.descriptor_binding_variable_descriptor_count(true)
-			.descriptor_binding_sampled_image_update_after_bind(true)
-			.runtime_descriptor_array(true)
-			.scalar_block_layout(true);
+		let sup_f10 = {
+			let mut f2 = vk::PhysicalDeviceFeatures2::default();
+			unsafe {
+				instance.get_physical_device_features2(physical_device, &mut f2);
+			}
+			f2.features
+		};
 
-		let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
-			.dynamic_rendering(true)
-			.synchronization2(true)
-			.shader_demote_to_helper_invocation(true);
+		let mut caps = DeviceCapabilities {
+			api_version: device_api_version,
+			has_dynamic_rendering_core: false,
+			has_dynamic_rendering_khr: false,
+			has_synchronization2_core: false,
+			has_synchronization2_khr: false,
+			has_buffer_device_address_core: false,
+			has_buffer_device_address_khr: false,
+			has_descriptor_indexing: false,
+			has_scalar_block_layout: false,
+			has_shader_int64: sup_f10.shader_int64 == vk::TRUE,
+			has_depth_clamp: sup_f10.depth_clamp == vk::TRUE,
+			has_sampler_anisotropy: sup_f10.sampler_anisotropy == vk::TRUE,
+		};
+
+		let mut features12 = vk::PhysicalDeviceVulkan12Features::default();
+		let mut features13 = vk::PhysicalDeviceVulkan13Features::default();
+		let mut features_dyn_khr = vk::PhysicalDeviceDynamicRenderingFeaturesKHR::default();
+		let mut features_sync2_khr = vk::PhysicalDeviceSynchronization2FeaturesKHR::default();
+		let mut features_bda_khr = vk::PhysicalDeviceBufferDeviceAddressFeaturesKHR::default();
+		let mut features_di_ext = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT::default();
+		let mut features_sbl_ext = vk::PhysicalDeviceScalarBlockLayoutFeaturesEXT::default();
+
+		if device_api_version >= vk::API_VERSION_1_2 {
+			caps.has_buffer_device_address_core = sup_f12.buffer_device_address == vk::TRUE;
+			caps.has_descriptor_indexing = sup_f12.descriptor_indexing == vk::TRUE;
+			caps.has_scalar_block_layout = sup_f12.scalar_block_layout == vk::TRUE;
+
+			features12 = features12
+				.buffer_device_address(caps.has_buffer_device_address_core)
+				.descriptor_indexing(caps.has_descriptor_indexing)
+				.shader_sampled_image_array_non_uniform_indexing(
+					sup_f12.shader_sampled_image_array_non_uniform_indexing == vk::TRUE,
+				)
+				.descriptor_binding_partially_bound(
+					sup_f12.descriptor_binding_partially_bound == vk::TRUE,
+				)
+				.descriptor_binding_sampled_image_update_after_bind(
+					sup_f12.descriptor_binding_sampled_image_update_after_bind == vk::TRUE,
+				)
+				.runtime_descriptor_array(sup_f12.runtime_descriptor_array == vk::TRUE)
+				.scalar_block_layout(caps.has_scalar_block_layout);
+		} else {
+			if has_bda_khr_ext && sup_bda_khr.buffer_device_address == vk::TRUE {
+				caps.has_buffer_device_address_khr = true;
+				enabled_dev_extensions.push(ash::khr::buffer_device_address::NAME.as_ptr());
+				features_bda_khr = features_bda_khr.buffer_device_address(true);
+			}
+			if has_di_ext && sup_di_ext.descriptor_binding_partially_bound == vk::TRUE {
+				caps.has_descriptor_indexing = true;
+				enabled_dev_extensions.push(ash::ext::descriptor_indexing::NAME.as_ptr());
+				features_di_ext = features_di_ext
+					.shader_sampled_image_array_non_uniform_indexing(
+						sup_di_ext.shader_sampled_image_array_non_uniform_indexing == vk::TRUE,
+					)
+					.descriptor_binding_partially_bound(
+						sup_di_ext.descriptor_binding_partially_bound == vk::TRUE,
+					)
+					.descriptor_binding_sampled_image_update_after_bind(
+						sup_di_ext.descriptor_binding_sampled_image_update_after_bind == vk::TRUE,
+					)
+					.runtime_descriptor_array(sup_di_ext.runtime_descriptor_array == vk::TRUE);
+			}
+			if has_sbl_ext && sup_sbl_ext.scalar_block_layout == vk::TRUE {
+				caps.has_scalar_block_layout = true;
+				enabled_dev_extensions.push(ash::ext::scalar_block_layout::NAME.as_ptr());
+				features_sbl_ext = features_sbl_ext.scalar_block_layout(true);
+			}
+		}
+
+		if device_api_version >= vk::API_VERSION_1_3 && !force_legacy {
+			caps.has_dynamic_rendering_core = sup_f13.dynamic_rendering == vk::TRUE;
+			caps.has_synchronization2_core = sup_f13.synchronization2 == vk::TRUE;
+			features13 = features13
+				.dynamic_rendering(caps.has_dynamic_rendering_core)
+				.synchronization2(caps.has_synchronization2_core);
+		} else if !force_legacy {
+			if has_dyn_khr_ext && sup_dyn_khr.dynamic_rendering == vk::TRUE {
+				caps.has_dynamic_rendering_khr = true;
+				enabled_dev_extensions.push(ash::khr::dynamic_rendering::NAME.as_ptr());
+				if has_ext(ash::khr::create_renderpass2::NAME) {
+					enabled_dev_extensions.push(ash::khr::create_renderpass2::NAME.as_ptr());
+				}
+				if has_ext(ash::khr::depth_stencil_resolve::NAME) {
+					enabled_dev_extensions.push(ash::khr::depth_stencil_resolve::NAME.as_ptr());
+				}
+				features_dyn_khr = features_dyn_khr.dynamic_rendering(true);
+			}
+			if has_sync2_khr_ext && sup_sync2_khr.synchronization2 == vk::TRUE {
+				caps.has_synchronization2_khr = true;
+				enabled_dev_extensions.push(ash::khr::synchronization2::NAME.as_ptr());
+				features_sync2_khr = features_sync2_khr.synchronization2(true);
+			}
+		}
 
 		let features = vk::PhysicalDeviceFeatures::default()
-			.sampler_anisotropy(true)
-			.fill_mode_non_solid(true)
-			.shader_int64(true)
-			.depth_clamp(true);
+			.sampler_anisotropy(caps.has_sampler_anisotropy)
+			.shader_int64(caps.has_shader_int64)
+			.depth_clamp(caps.has_depth_clamp);
 
-		let device_create_info = vk::DeviceCreateInfo::default()
+		let mut device_create_info = vk::DeviceCreateInfo::default()
 			.queue_create_infos(&queue_create_infos)
 			.enabled_extension_names(&enabled_dev_extensions)
-			.enabled_features(&features)
-			.push_next(&mut features12)
-			.push_next(&mut features13);
+			.enabled_features(&features);
+
+		if device_api_version >= vk::API_VERSION_1_3 {
+			device_create_info = device_create_info
+				.push_next(&mut features12)
+				.push_next(&mut features13);
+		} else if device_api_version >= vk::API_VERSION_1_2 {
+			device_create_info = device_create_info.push_next(&mut features12);
+			if caps.has_dynamic_rendering_khr {
+				device_create_info = device_create_info.push_next(&mut features_dyn_khr);
+			}
+			if caps.has_synchronization2_khr {
+				device_create_info = device_create_info.push_next(&mut features_sync2_khr);
+			}
+		} else {
+			if caps.has_buffer_device_address_khr {
+				device_create_info = device_create_info.push_next(&mut features_bda_khr);
+			}
+			if caps.has_descriptor_indexing {
+				device_create_info = device_create_info.push_next(&mut features_di_ext);
+			}
+			if caps.has_scalar_block_layout {
+				device_create_info = device_create_info.push_next(&mut features_sbl_ext);
+			}
+			if caps.has_dynamic_rendering_khr {
+				device_create_info = device_create_info.push_next(&mut features_dyn_khr);
+			}
+			if caps.has_synchronization2_khr {
+				device_create_info = device_create_info.push_next(&mut features_sync2_khr);
+			}
+		}
 
 		let device = unsafe {
 			instance
@@ -428,12 +637,41 @@ impl AshDevice {
 
 		let queue = unsafe { device.get_device_queue(queue_family, 0) };
 
+		let dynamic_rendering_khr = if caps.has_dynamic_rendering_khr && !caps.has_dynamic_rendering_core
+		{
+			Some(ash::khr::dynamic_rendering::Device::new(&instance, &device))
+		} else {
+			None
+		};
+		let synchronization2_khr = if caps.has_synchronization2_khr && !caps.has_synchronization2_core {
+			Some(ash::khr::synchronization2::Device::new(&instance, &device))
+		} else {
+			None
+		};
+		let buffer_device_address_khr =
+			if caps.has_buffer_device_address_khr && !caps.has_buffer_device_address_core {
+				Some(ash::khr::buffer_device_address::Device::new(
+					&instance, &device,
+				))
+			} else {
+				None
+			};
+
+		let compat = Arc::new(DeviceCompat {
+			caps,
+			dynamic_rendering_khr,
+			synchronization2_khr,
+			buffer_device_address_khr,
+			render_pass_cache: RenderPassCache::new(),
+		});
+
 		let allocator_desc = AllocatorCreateDesc {
 			instance: instance.clone(),
 			device: device.clone(),
 			physical_device,
 			debug_settings: Default::default(),
-			buffer_device_address: true,
+			buffer_device_address: caps.has_buffer_device_address_core
+				|| caps.has_buffer_device_address_khr,
 			allocation_sizes: Default::default(),
 		};
 
@@ -528,11 +766,20 @@ impl AshDevice {
 			debug_utils_loader,
 			debug_messenger,
 			bindless_heap: Some(bindless_heap),
+			compat,
 		};
 
 		Ok(Self {
 			inner: Arc::new(inner),
 		})
+	}
+
+	pub fn capabilities(&self) -> DeviceCapabilities {
+		self.inner.compat.caps
+	}
+
+	pub fn compat(&self) -> &Arc<DeviceCompat> {
+		&self.inner.compat
 	}
 
 	pub fn bindless_layout(&self) -> Option<vk::DescriptorSetLayout> {
@@ -630,6 +877,7 @@ impl AshDevice {
 	) -> RhiResult<AshPipeline> {
 		AshPipeline::create_graphics(
 			self.inner.device(),
+			&self.inner.compat,
 			meta,
 			shaders,
 			polymode,

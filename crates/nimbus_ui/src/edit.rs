@@ -149,9 +149,7 @@ impl Widget for Edit {
 		let theme = ctx.theme;
 		let monet = &theme.monet;
 
-		let border_color = if ctx.focused {
-			monet[MonetRole::Primary]
-		} else if ctx.hovered {
+		let border_color = if ctx.focused || ctx.hovered {
 			monet[MonetRole::Primary]
 		} else {
 			monet[MonetRole::PrimaryOutline]

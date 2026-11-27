@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "nimbus_demo_android"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nimbus = { path = "../.." }
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { version = "0.30", features = ["android-native-activity"] }

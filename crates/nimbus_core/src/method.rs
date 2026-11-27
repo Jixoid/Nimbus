@@ -353,6 +353,10 @@ impl MethodCallback {
 	pub fn call2(&self, arg1: impl Into<PropertyValue>, arg2: impl Into<PropertyValue>) {
 		self.call(&[arg1.into(), arg2.into()]);
 	}
+	
+	pub fn call3(&self, arg1: impl Into<PropertyValue>, arg2: impl Into<PropertyValue>, arg3: impl Into<PropertyValue>) {
+		self.call(&[arg1.into(), arg2.into(), arg3.into()]);
+	}
 }
 
 pub type ActionCallback = MethodCallback;

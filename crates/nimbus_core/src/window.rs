@@ -45,6 +45,42 @@ pub struct Window {
 	pub(crate) last_cursor: Vec2<f32>,
 	pub(crate) last_cursor_icon: Cursor,
 	pub(crate) should_close: bool,
+	pub(crate) scale_override: Option<f32>,
+	pub(crate) touch: TouchGestureState,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum TouchGesture {
+	Undecided,
+	Scrolling(crate::ObjectID),
+	DirectDrag,
+}
+
+pub(crate) struct TouchGestureState {
+	pub finger_id: Option<u64>,
+	pub start_pos: Vec2<f32>,
+	pub last_pos: Vec2<f32>,
+	pub last_time: std::time::Instant,
+	pub gesture: TouchGesture,
+	pub velocity: Vec2<f32>,
+	pub fling_target: Option<crate::ObjectID>,
+	pub last_fling_time: std::time::Instant,
+}
+
+impl Default for TouchGestureState {
+	fn default() -> Self {
+		let now = std::time::Instant::now();
+		Self {
+			finger_id: None,
+			start_pos: Vec2::ZERO,
+			last_pos: Vec2::ZERO,
+			last_time: now,
+			gesture: TouchGesture::Undecided,
+			velocity: Vec2::ZERO,
+			fling_target: None,
+			last_fling_time: now,
+		}
+	}
 }
 
 impl Window {
@@ -64,6 +100,8 @@ impl Window {
 			last_cursor: Vec2::ZERO,
 			last_cursor_icon: Cursor::Default,
 			should_close: false,
+			scale_override: None,
+			touch: TouchGestureState::default(),
 		}
 	}
 
@@ -149,6 +187,17 @@ impl Window {
 		self.display.is_some() && !self.should_close
 	}
 
+	pub(crate) fn check_size_changed(&self) -> bool {
+		if let Some(display) = &self.display {
+			let inner_sz = display.window().inner_size();
+			inner_sz.width > 0
+				&& inner_sz.height > 0
+				&& (inner_sz.width != display.width() || inner_sz.height != display.height())
+		} else {
+			false
+		}
+	}
+
 	pub fn width(&self) -> u32 {
 		self
 			.display
@@ -163,6 +212,40 @@ impl Window {
 			.as_ref()
 			.map(|d| d.height())
 			.unwrap_or(self.height)
+	}
+
+	fn scale_factor(&self) -> f32 {
+		self
+			.scale_override
+			.unwrap_or_else(|| {
+				self
+					.display
+					.as_ref()
+					.map(|d| d.scale_factor() as f32)
+					.unwrap_or(1.0)
+			})
+			.max(0.5)
+	}
+
+	pub fn set_scale_override(&mut self, scale: Option<f32>) {
+		self.scale_override = scale.map(|s| s.clamp(0.5, 4.0));
+		let effective = self.scale_factor();
+		if let Some(canvas) = &mut self.canvas {
+			canvas.set_scale_factor(effective);
+		}
+		if let Some(display) = &self.display {
+			self
+				.tree
+				.layout_all(Self::logical_size(display.width(), display.height(), effective));
+			self.tree.needs_layout = false;
+			self.tree.needs_redraw = true;
+			display.request_redraw();
+		}
+	}
+
+	fn logical_size(phys_w: u32, phys_h: u32, scale: f32) -> Vec2<f32> {
+		let s = scale.max(0.5);
+		Vec2::new(phys_w as f32 / s, phys_h as f32 / s)
 	}
 
 	pub(crate) fn init_graphics(
@@ -182,7 +265,12 @@ impl Window {
 		)?;
 
 		let winit_id = display.window().id();
-		let canvas = Canvas2D::new(device, allocator, display.swapchain().color_format());
+		let scale = self
+			.scale_override
+			.unwrap_or(display.scale_factor() as f32)
+			.max(0.5);
+		let mut canvas = Canvas2D::new(device, allocator, display.swapchain().color_format());
+		canvas.set_scale_factor(scale);
 		let synchronizer = Synchronizer::new(device, FRAMES_IN_FLIGHT);
 
 		let mut cmd_buffers = Vec::with_capacity(FRAMES_IN_FLIGHT as usize);
@@ -196,7 +284,7 @@ impl Window {
 
 		self
 			.tree
-			.layout_all(Vec2::new(display.width() as f32, display.height() as f32));
+			.layout_all(Self::logical_size(display.width(), display.height(), scale));
 
 		self.winit_id = Some(winit_id);
 		self.display = Some(display);
@@ -234,13 +322,27 @@ impl Window {
 			WindowEvent::Resized(size) => {
 				if size.width > 0 && size.height > 0 {
 					device.wait_idle();
+					device
+						.raw()
+						.compat()
+						.render_pass_cache
+						.clear_framebuffers(device.raw().device());
 					if let Some(display) = &mut self.display {
 						display.resize(size.width, size.height);
-						self.width = size.width;
-						self.height = size.height;
+						self.width = display.width();
+						self.height = display.height();
+						let scale = self
+							.scale_override
+							.unwrap_or(display.scale_factor() as f32)
+							.max(0.5);
+						if let Some(canvas) = &mut self.canvas {
+							canvas.set_scale_factor(scale);
+						}
 						self
 							.tree
-							.layout_all(Vec2::new(size.width as f32, size.height as f32));
+							.layout_all(Self::logical_size(self.width, self.height, scale));
+						self.tree.needs_layout = false;
+						self.tree.needs_redraw = true;
 						redraw_needed = true;
 					}
 				}
@@ -249,11 +351,22 @@ impl Window {
 			WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
 				if let Some(display) = &mut self.display {
 					display.update_scale_factor(*scale_factor);
+					let scale = self.scale_override.unwrap_or(*scale_factor as f32).max(0.5);
+					if let Some(canvas) = &mut self.canvas {
+						canvas.set_scale_factor(scale);
+					}
+					self
+						.tree
+						.layout_all(Self::logical_size(display.width(), display.height(), scale));
+					self.tree.needs_layout = false;
+					self.tree.needs_redraw = true;
+					redraw_needed = true;
 				}
 			}
 
 			WindowEvent::CursorMoved { position, .. } => {
-				let pos = Vec2::new(position.x as f32, position.y as f32);
+				let scale = self.scale_factor();
+				let pos = Vec2::new(position.x as f32 / scale, position.y as f32 / scale);
 				self.last_cursor = pos;
 				if self.tree.dispatch_pointer_move(pos) {
 					redraw_needed = true;
@@ -266,9 +379,9 @@ impl Window {
 					WinitMouseButton::Left => MouseButton::Left,
 					WinitMouseButton::Right => MouseButton::Right,
 					WinitMouseButton::Middle => MouseButton::Middle,
-					WinitMouseButton::Back => MouseButton::Other(1),
-					WinitMouseButton::Forward => MouseButton::Other(2),
-					WinitMouseButton::Other(c) => MouseButton::Other(*c),
+					WinitMouseButton::Back => MouseButton::Back,
+					WinitMouseButton::Forward => MouseButton::Forward,
+					WinitMouseButton::Other(_) => return false, // MouseButton::Other(*c),
 				};
 				let btn_state = match state {
 					ElementState::Pressed => ButtonState::Pressed,
@@ -285,9 +398,12 @@ impl Window {
 			}
 
 			WindowEvent::MouseWheel { delta, .. } => {
+				let scale = self.scale_factor();
 				let scroll_delta = match delta {
 					MouseScrollDelta::LineDelta(x, y) => Vec2::new(*x * 32.0, *y * 32.0),
-					MouseScrollDelta::PixelDelta(p) => Vec2::new(p.x as f32, p.y as f32),
+					MouseScrollDelta::PixelDelta(p) => {
+						Vec2::new(p.x as f32 / scale, p.y as f32 / scale)
+					}
 				};
 
 				if self.tree.dispatch_pointer_scroll(self.last_cursor, scroll_delta) {
@@ -359,6 +475,118 @@ impl Window {
 				self.sync_cursor();
 			}
 
+			WindowEvent::Touch(touch) => {
+				use winit::event::TouchPhase;
+				let scale = self.scale_factor();
+				let pos = Vec2::new(
+					touch.location.x as f32 / scale,
+					touch.location.y as f32 / scale,
+				);
+				let now = std::time::Instant::now();
+				self.last_cursor = pos;
+				match touch.phase {
+					TouchPhase::Started => {
+						self.touch.fling_target = None;
+						if self.touch.finger_id.is_none() {
+							self.touch.finger_id = Some(touch.id);
+							self.touch.start_pos = pos;
+							self.touch.last_pos = pos;
+							self.touch.last_time = now;
+							self.touch.gesture = TouchGesture::Undecided;
+							self.touch.velocity = Vec2::ZERO;
+						}
+						if self.tree.dispatch_pointer_move(pos) {
+							redraw_needed = true;
+						}
+						if self
+							.tree
+							.dispatch_pointer_button(MouseButton::Left, ButtonState::Pressed, pos)
+						{
+							redraw_needed = true;
+						}
+					}
+					TouchPhase::Moved => {
+						if self.touch.finger_id == Some(touch.id) {
+							let delta = pos - self.touch.last_pos;
+							let dt = now
+								.duration_since(self.touch.last_time)
+								.as_secs_f32()
+								.max(0.001);
+							if dt < 0.15 {
+								let inst_vel = Vec2::new(delta.x / dt, delta.y / dt);
+								self.touch.velocity = Vec2::new(
+									self.touch.velocity.x * 0.6 + inst_vel.x * 0.4,
+									self.touch.velocity.y * 0.6 + inst_vel.y * 0.4,
+								);
+							}
+							self.touch.last_pos = pos;
+							self.touch.last_time = now;
+
+							match self.touch.gesture {
+								TouchGesture::Scrolling(target) => {
+									if self.tree.dispatch_touch_scroll_to(target, delta) {
+										redraw_needed = true;
+									}
+								}
+								TouchGesture::DirectDrag => {
+									if self.tree.dispatch_pointer_move(pos) {
+										redraw_needed = true;
+									}
+								}
+								TouchGesture::Undecided => {
+									let total = pos - self.touch.start_pos;
+									let dist = (total.x * total.x + total.y * total.y).sqrt();
+									if dist >= 8.0 {
+										if let Some(target) =
+											self.tree.dispatch_touch_scroll(self.touch.start_pos, total)
+										{
+											self.touch.gesture = TouchGesture::Scrolling(target);
+											self.tree.cancel_pressed();
+											redraw_needed = true;
+										} else {
+											self.touch.gesture = TouchGesture::DirectDrag;
+											if self.tree.dispatch_pointer_move(pos) {
+												redraw_needed = true;
+											}
+										}
+									} else if self.tree.dispatch_pointer_move(pos) {
+										redraw_needed = true;
+									}
+								}
+							}
+						}
+					}
+					TouchPhase::Ended | TouchPhase::Cancelled => {
+						if self.touch.finger_id == Some(touch.id) {
+							self.touch.finger_id = None;
+							let prev = std::mem::replace(&mut self.touch.gesture, TouchGesture::Undecided);
+							if let TouchGesture::Scrolling(target) = prev {
+								if self.tree.dispatch_touch_scroll_end(target) {
+									redraw_needed = true;
+								}
+								let speed = (self.touch.velocity.x * self.touch.velocity.x
+									+ self.touch.velocity.y * self.touch.velocity.y)
+									.sqrt();
+								if touch.phase == TouchPhase::Ended && speed > 80.0 {
+									self.touch.fling_target = Some(target);
+									self.touch.last_fling_time = now;
+									redraw_needed = true;
+								}
+							} else if touch.phase == TouchPhase::Cancelled {
+								self.tree.cancel_pressed();
+								redraw_needed = true;
+							} else if self.tree.dispatch_pointer_button(
+								MouseButton::Left,
+								ButtonState::Released,
+								pos,
+							) {
+								redraw_needed = true;
+							}
+						}
+					}
+				}
+			}
+
 			_ => {}
 		}
 
@@ -382,17 +610,86 @@ impl Window {
 	) {
 		self.process_tasks();
 
+		if let Some(target) = self.touch.fling_target {
+			let now = std::time::Instant::now();
+			let dt = now
+				.duration_since(self.touch.last_fling_time)
+				.as_secs_f32()
+				.clamp(0.001, 0.05);
+			self.touch.last_fling_time = now;
+			let delta = Vec2::new(self.touch.velocity.x * dt, self.touch.velocity.y * dt);
+			let handled = self.tree.dispatch_pointer_scroll_to(target, delta);
+			let decay = (-5.5 * dt).exp();
+			self.touch.velocity.x *= decay;
+			self.touch.velocity.y *= decay;
+			let speed = (self.touch.velocity.x * self.touch.velocity.x
+				+ self.touch.velocity.y * self.touch.velocity.y)
+				.sqrt();
+			if !handled || speed < 20.0 {
+				self.touch.fling_target = None;
+			} else {
+				self.tree.needs_redraw = true;
+			}
+		}
+
 		let (display, canvas, sync) =
 			match (&mut self.display, &mut self.canvas, &mut self.synchronizer) {
 				(Some(d), Some(c), Some(s)) => (d, c, s),
 				_ => return,
 			};
 
+		let scale = self
+			.scale_override
+			.unwrap_or(display.scale_factor() as f32)
+			.max(0.5);
+		canvas.set_scale_factor(scale);
+
+		let inner_sz = display.window().inner_size();
+		if inner_sz.width > 0
+			&& inner_sz.height > 0
+			&& (inner_sz.width != display.width() || inner_sz.height != display.height())
+		{
+			device.wait_idle();
+			device
+				.raw()
+				.compat()
+				.render_pass_cache
+				.clear_framebuffers(device.raw().device());
+			display.resize(inner_sz.width, inner_sz.height);
+			self.width = display.width();
+			self.height = display.height();
+			self
+				.tree
+				.layout_all(Self::logical_size(self.width, self.height, scale));
+			self.tree.needs_layout = false;
+		}
+
 		sync.begin_frame();
 		let frame = sync.current_frame() as usize;
 		let wait_semaphore = sync.image_available_semaphore();
 
-		let image_index = display.acquire_next_image_with_semaphore(&wait_semaphore);
+		let image_index = match display.try_acquire_next_image_with_semaphore(&wait_semaphore) {
+			Ok(idx) => idx,
+			Err(_) => {
+				sync.end_frame();
+				device.wait_idle();
+				device
+					.raw()
+					.compat()
+					.render_pass_cache
+					.clear_framebuffers(device.raw().device());
+				let inner_sz = display.window().inner_size();
+				if inner_sz.width > 0 && inner_sz.height > 0 {
+					display.resize(inner_sz.width, inner_sz.height);
+					self.width = display.width();
+					self.height = display.height();
+				}
+				self.tree.needs_layout = true;
+				self.tree.needs_redraw = true;
+				display.request_redraw();
+				return;
+			}
+		};
 		let raw_target = match display.render_target(image_index) {
 			Some(t) => t,
 			None => {
@@ -404,10 +701,17 @@ impl Window {
 		let target = raw_target.without_depth();
 		let width = display.width();
 		let height = display.height();
+		if width != self.width || height != self.height {
+			self.width = width;
+			self.height = height;
+			self.tree.needs_layout = true;
+		}
 
 		// Layout pass if tree layout was invalidated
 		if self.tree.needs_layout {
-			self.tree.layout_all(Vec2::new(width as f32, height as f32));
+			self
+				.tree
+				.layout_all(Self::logical_size(width, height, scale));
 			self.tree.needs_layout = false;
 		}
 

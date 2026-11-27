@@ -54,6 +54,13 @@ impl DrawBatch {
 }
 
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct CanvasTransform {
+	pub origin: [f32; 2],
+	pub scale: [f32; 2],
+}
+
+
 pub struct Canvas2D {
 	rect_pipeline: RectPipeline,
 	text_pipeline: TextPipeline,
@@ -64,10 +71,12 @@ pub struct Canvas2D {
 	curve_instances: Vec<CurveInstance>,
 	batches: Vec<DrawBatch>,
 	clip_stack: Vec<Rect<f32>>,
+	transform_stack: Vec<CanvasTransform>,
 	rect_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
 	glyph_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
 	curve_buffers: [Option<Buffer>; FRAME_BUFFER_SLOTS],
 	frame_slot: usize,
+	scale_factor: f32,
 }
 
 impl Canvas2D {
@@ -87,11 +96,21 @@ impl Canvas2D {
 			curve_instances: Vec::with_capacity(256),
 			batches: Vec::with_capacity(INITIAL_BUFFER_CAPACITY),
 			clip_stack: Vec::new(),
+			transform_stack: Vec::new(),
 			rect_buffers: std::array::from_fn(|_| None),
 			glyph_buffers: std::array::from_fn(|_| None),
 			curve_buffers: std::array::from_fn(|_| None),
 			frame_slot: 0,
+			scale_factor: 1.0,
 		}
+	}
+
+	pub fn set_scale_factor(&mut self, scale: f32) {
+		self.scale_factor = scale.max(0.5);
+	}
+
+	pub fn scale_factor(&self) -> f32 {
+		self.scale_factor
 	}
 
 	pub fn clear_batches(&mut self) {
@@ -100,12 +119,44 @@ impl Canvas2D {
 		self.curve_instances.clear();
 		self.batches.clear();
 		self.clip_stack.clear();
+		self.transform_stack.clear();
+	}
+
+	pub fn push_stretch(&mut self, origin: [f32; 2], scale: [f32; 2]) {
+		let next = match self.transform_stack.last() {
+			Some(prev) => CanvasTransform {
+				origin: [
+					prev.origin[0] + (origin[0] - prev.origin[0]) * prev.scale[0],
+					prev.origin[1] + (origin[1] - prev.origin[1]) * prev.scale[1],
+				],
+				scale: [prev.scale[0] * scale[0], prev.scale[1] * scale[1]],
+			},
+			None => CanvasTransform { origin, scale },
+		};
+		self.transform_stack.push(next);
+	}
+
+	pub fn pop_stretch(&mut self) {
+		self.transform_stack.pop();
+	}
+
+	pub fn current_transform(&self) -> Option<CanvasTransform> {
+		self.transform_stack.last().copied()
 	}
 
 	pub fn push_clip(&mut self, clip: Rect<f32>) {
-		let effective = match self.clip_stack.last() {
-			Some(parent) => parent.intersection(&clip).unwrap_or(Rect::ZERO),
+		let transformed = match self.transform_stack.last() {
+			Some(t) => Rect::new(
+				t.origin[0] + (clip.x() - t.origin[0]) * t.scale[0],
+				t.origin[1] + (clip.y() - t.origin[1]) * t.scale[1],
+				clip.width() * t.scale[0],
+				clip.height() * t.scale[1],
+			),
 			None => clip,
+		};
+		let effective = match self.clip_stack.last() {
+			Some(parent) => parent.intersection(&transformed).unwrap_or(Rect::ZERO),
+			None => transformed,
 		};
 		self.clip_stack.push(effective);
 	}
@@ -152,7 +203,8 @@ impl Canvas2D {
 		// Flush any new glyphs to the GPU atlas texture
 		self.atlas.update_gpu(device, allocator, queue);
 
-		let screen_size = [width as f32, height as f32];
+		let scale = self.scale_factor.max(0.5);
+		let screen_size = [width as f32 / scale, height as f32 / scale];
 		cmd.set_viewport_and_scissor(width, height);
 
 		let slot = self.frame_slot;
@@ -273,10 +325,10 @@ impl Canvas2D {
 		for batch in &self.batches {
 			let desired_scissor = match batch.clip() {
 				Some(c) => {
-					let x0 = (c.x().max(0.0).min(width as f32) as i32).max(0);
-					let y0 = (c.y().max(0.0).min(height as f32) as i32).max(0);
-					let x1 = (c.max.x.max(0.0).min(width as f32) as i32).max(x0);
-					let y1 = (c.max.y.max(0.0).min(height as f32) as i32).max(y0);
+					let x0 = ((c.x() * scale).floor().max(0.0).min(width as f32) as i32).max(0);
+					let y0 = ((c.y() * scale).floor().max(0.0).min(height as f32) as i32).max(0);
+					let x1 = ((c.max.x * scale).ceil().max(0.0).min(width as f32) as i32).max(x0);
+					let y1 = ((c.max.y * scale).ceil().max(0.0).min(height as f32) as i32).max(y0);
 					let w = (x1 - x0) as u32;
 					let h = (y1 - y0) as u32;
 					Rect2D::new(x0, y0, w, h)
@@ -350,7 +402,16 @@ pub trait DrawShape {
 }
 
 impl DrawShape for RectShape {
-	fn draw(canvas: &mut Canvas2D, shape: Self) {
+	fn draw(canvas: &mut Canvas2D, mut shape: Self) {
+		if let Some(t) = canvas.current_transform() {
+			let [x, y, w, h] = shape.inst.rect;
+			shape.inst.rect = [
+				t.origin[0] + (x - t.origin[0]) * t.scale[0],
+				t.origin[1] + (y - t.origin[1]) * t.scale[1],
+				w * t.scale[0],
+				h * t.scale[1],
+			];
+		}
 		let clip = canvas.current_clip();
 		let idx = canvas.rect_instances.len() as u32;
 		canvas.rect_instances.push(shape.inst);
@@ -382,8 +443,23 @@ impl DrawShape for CurveShape {
 		let clip = canvas.current_clip();
 		let start = canvas.curve_instances.len() as u32;
 		let added = shape.count as u32;
-		for inst in &shape.instances[..shape.count] {
-			canvas.curve_instances.push(*inst);
+		let tf = canvas.current_transform();
+		for mut inst in shape.instances[..shape.count].iter().copied() {
+			if let Some(t) = tf {
+				inst.p0 = [
+					t.origin[0] + (inst.p0[0] - t.origin[0]) * t.scale[0],
+					t.origin[1] + (inst.p0[1] - t.origin[1]) * t.scale[1],
+				];
+				inst.p1 = [
+					t.origin[0] + (inst.p1[0] - t.origin[0]) * t.scale[0],
+					t.origin[1] + (inst.p1[1] - t.origin[1]) * t.scale[1],
+				];
+				inst.p2 = [
+					t.origin[0] + (inst.p2[0] - t.origin[0]) * t.scale[0],
+					t.origin[1] + (inst.p2[1] - t.origin[1]) * t.scale[1],
+				];
+			}
+			canvas.curve_instances.push(inst);
 		}
 
 		if let Some(DrawBatch::Curves {
@@ -415,6 +491,8 @@ impl<'a, 'fface> DrawShape for TextShape<'a, 'fface> {
 			.map(|m| m.new_line_size)
 			.unwrap_or(shape.size * 1.2);
 
+		let scale = canvas.scale_factor.max(0.5);
+		let phys_px = (shape.size * scale).round().max(1.0) as u32;
 		let mut pen_x = shape.pos[0];
 		let mut pen_y = shape.pos[1] + line_height * 0.8;
 		let clip = canvas.current_clip();
@@ -430,20 +508,28 @@ impl<'a, 'fface> DrawShape for TextShape<'a, 'fface> {
 			if let Some(glyph) = canvas.atlas.get_or_cache(
 				shape.font.id(),
 				ch,
-				shape.size as u32,
+				phys_px,
 				&shape.font.face().inner,
 			) {
 				if glyph.size[0] > 0.0 && glyph.size[1] > 0.0 {
-					let gx = pen_x + glyph.offset[0];
-					let gy = pen_y - glyph.offset[1] - glyph.size[1];
+					let mut gw = glyph.size[0] / scale;
+					let mut gh = glyph.size[1] / scale;
+					let mut gx = pen_x + glyph.offset[0] / scale;
+					let mut gy = pen_y - glyph.offset[1] / scale - gh;
+					if let Some(t) = canvas.current_transform() {
+						gx = t.origin[0] + (gx - t.origin[0]) * t.scale[0];
+						gy = t.origin[1] + (gy - t.origin[1]) * t.scale[1];
+						gw *= t.scale[0];
+						gh *= t.scale[1];
+					}
 
 					canvas.glyph_instances.push(GlyphInstance {
-						rect: [gx, gy, glyph.size[0], glyph.size[1]],
+						rect: [gx, gy, gw, gh],
 						uv_rect: glyph.uv_rect,
 						color: shape.color.to_array(),
 					});
 				}
-				pen_x += glyph.advance;
+				pen_x += glyph.advance / scale;
 			}
 		}
 

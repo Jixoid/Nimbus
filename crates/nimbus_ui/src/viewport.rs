@@ -14,7 +14,7 @@ use std::cell::Cell;
 
 use nimbus_core::{
 	Anchor, BoxConstraints, ButtonState, DrawCtx, EventCtx, EventResponse, InputEvent,
-	IntoMethod, LayoutCtx, MethodCallback, MouseButton, PropertyCtx, PropertyError, PropertyValue,
+	IntoMethod, LayoutCtx, MethodCallback, PropertyCtx, PropertyError, PropertyValue,
 	Widget,
 };
 use nimbus_math::{Color, Rect, Vec2};
@@ -36,10 +36,12 @@ pub struct Viewport {
 
 	pub on_resize: Option<MethodCallback>,
 	pub on_click: Option<MethodCallback>,
-	pub on_pointer_move: Option<MethodCallback>,
-	pub on_pointer_down: Option<MethodCallback>,
-	pub on_pointer_up: Option<MethodCallback>,
+	pub on_mouse_move: Option<MethodCallback>,
+	pub on_mouse_down: Option<MethodCallback>,
+	pub on_mouse_up: Option<MethodCallback>,
 	pub on_scroll: Option<MethodCallback>,
+	pub on_key: Option<MethodCallback>,
+	pub on_focus_lost: Option<MethodCallback>,
 
 	last_size: Vec2<f32>,
 	last_bounds: Cell<Rect<f32>>,
@@ -60,10 +62,12 @@ impl Default for Viewport {
 			clip_children: true,
 			on_resize: None,
 			on_click: None,
-			on_pointer_move: None,
-			on_pointer_down: None,
-			on_pointer_up: None,
+			on_mouse_move: None,
+			on_mouse_down: None,
+			on_mouse_up: None,
 			on_scroll: None,
+			on_key: None,
+			on_focus_lost: None,
 			last_size: Vec2::ZERO,
 			last_bounds: Cell::new(Rect::ZERO),
 		}
@@ -186,33 +190,33 @@ impl Widget for Viewport {
 		}
 	}
 
+	fn blocks_touch_scroll(&self, _delta: Vec2<f32>) -> bool {
+		true
+	}
+
 	fn handle_event(&mut self, ctx: &mut EventCtx, event: &InputEvent) -> EventResponse {
 		match event {
 			InputEvent::PointerMoved { position } => {
 				let local = self.local_position(*position);
-				if let Some(cb) = &self.on_pointer_move {
+				if let Some(cb) = &self.on_mouse_move {
 					cb.call2(local.x, local.y);
 					ctx.request_redraw();
 					return EventResponse::Handled;
 				}
 			}
-			InputEvent::PointerButton {
-				button: MouseButton::Left,
-				state,
-				position,
-			} => {
+			InputEvent::PointerButton { button, state, position } => {
 				let local = self.local_position(*position);
 				match state {
 					ButtonState::Pressed => {
-						if let Some(cb) = &self.on_pointer_down {
-							cb.call2(local.x, local.y);
+						if let Some(cb) = &self.on_mouse_down {
+							cb.call3(local.x, local.y, *button as u32);
 							ctx.request_redraw();
 							return EventResponse::Handled;
 						}
 					}
 					ButtonState::Released => {
-						if let Some(cb) = &self.on_pointer_up {
-							cb.call2(local.x, local.y);
+						if let Some(cb) = &self.on_mouse_up {
+							cb.call3(local.x, local.y, *button as u32);
 							ctx.request_redraw();
 							return EventResponse::Handled;
 						}
@@ -232,6 +236,22 @@ impl Widget for Viewport {
 					cb.call2(delta.x, delta.y);
 					ctx.request_redraw();
 					return EventResponse::Handled;
+				}
+			}
+			InputEvent::Key {
+				key_name,
+				pressed,
+				..
+			} => {
+				if let Some(cb) = &self.on_key {
+					cb.call2(key_name.clone(), *pressed);
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+			}
+			InputEvent::FocusLost => {
+				if let Some(cb) = &self.on_focus_lost {
+					cb.call0();
 				}
 			}
 			_ => {}
@@ -280,10 +300,12 @@ impl Widget for Viewport {
 			name,
 			"on_resize"
 				| "on_click"
-				| "on_pointer_move"
-				| "on_pointer_down"
-				| "on_pointer_up"
+				| "on_mouse_move"
+				| "on_mouse_down"
+				| "on_mouse_up"
 				| "on_scroll"
+				| "on_key"
+				| "on_focus_lost"
 		)
 	}
 
@@ -297,20 +319,28 @@ impl Widget for Viewport {
 				self.on_click = Some(callback);
 				true
 			}
-			"on_pointer_move" => {
-				self.on_pointer_move = Some(callback);
+			"on_mouse_move" => {
+				self.on_mouse_move = Some(callback);
 				true
 			}
-			"on_pointer_down" => {
-				self.on_pointer_down = Some(callback);
+			"on_mouse_down" => {
+				self.on_mouse_down = Some(callback);
 				true
 			}
-			"on_pointer_up" => {
-				self.on_pointer_up = Some(callback);
+			"on_mouse_up" => {
+				self.on_mouse_up = Some(callback);
 				true
 			}
 			"on_scroll" => {
 				self.on_scroll = Some(callback);
+				true
+			}
+			"on_key" => {
+				self.on_key = Some(callback);
+				true
+			}
+			"on_focus_lost" => {
+				self.on_focus_lost = Some(callback);
 				true
 			}
 			_ => false,
@@ -402,18 +432,18 @@ impl ViewportBuilder {
 		self
 	}
 
-	pub fn on_pointer_move<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
-		self.inner.on_pointer_move = Some(MethodCallback::new(callback));
+	pub fn on_mouse_move<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_mouse_move = Some(MethodCallback::new(callback));
 		self
 	}
 
-	pub fn on_pointer_down<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
-		self.inner.on_pointer_down = Some(MethodCallback::new(callback));
+	pub fn on_mouse_down<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_mouse_down = Some(MethodCallback::new(callback));
 		self
 	}
 
-	pub fn on_pointer_up<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
-		self.inner.on_pointer_up = Some(MethodCallback::new(callback));
+	pub fn on_mouse_up<M, F: IntoMethod<M>>(mut self, callback: F) -> Self {
+		self.inner.on_mouse_up = Some(MethodCallback::new(callback));
 		self
 	}
 
@@ -438,7 +468,7 @@ impl From<ViewportBuilder> for Viewport {
 mod tests {
 	use super::*;
 	use std::sync::{Arc, Mutex};
-	use nimbus_core::UiTree;
+	use nimbus_core::{MouseButton, UiTree};
 
 	#[test]
 	fn test_viewport_builder_layout_resize_and_events() {

@@ -42,6 +42,7 @@ pub struct MenuBar {
 	pub on_action: Option<MethodCallback>,
 
 	hovered_index: Option<usize>,
+	pressed_index: Option<usize>,
 	active_index: Option<usize>,
 	overlay_id: Option<ObjectID>,
 	last_bounds: Cell<Rect<f32>>,
@@ -57,6 +58,7 @@ impl Default for MenuBar {
 			font_size: 14.0,
 			on_action: None,
 			hovered_index: None,
+			pressed_index: None,
 			active_index: None,
 			overlay_id: None,
 			last_bounds: Cell::new(Rect::ZERO),
@@ -287,12 +289,37 @@ impl Widget for MenuBar {
 				state: ButtonState::Pressed,
 				position,
 			} => {
-				if let Some(idx) = self.item_at_pos(bounds, *position) {
-					if self.active_index == Some(idx) {
-						self.close_menu(ctx);
-					} else {
-						self.open_menu(ctx, idx);
+				self.pressed_index = self.item_at_pos(bounds, *position);
+				if self.pressed_index.is_some() {
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+				EventResponse::Ignored
+			}
+
+			InputEvent::PointerButton {
+				button: MouseButton::Left,
+				state: ButtonState::Released,
+				position,
+			} => {
+				if let Some(pressed) = self.pressed_index.take() {
+					if bounds.contains_point(*position)
+						&& self.item_at_pos(bounds, *position) == Some(pressed)
+					{
+						if self.active_index == Some(pressed) {
+							self.close_menu(ctx);
+						} else {
+							self.open_menu(ctx, pressed);
+						}
 					}
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
+				EventResponse::Ignored
+			}
+
+			InputEvent::PointerCancel => {
+				if self.pressed_index.take().is_some() {
 					ctx.request_redraw();
 					return EventResponse::Handled;
 				}
@@ -418,6 +445,7 @@ struct MenuPopupOverlay {
 	active_index: usize,
 	popup: Popup,
 	popup_size: Vec2<f32>,
+	pressed_bar_index: Option<usize>,
 	selected_leaf: Rc<RefCell<Option<(usize, String)>>>,
 	last_window_bounds: Cell<Rect<f32>>,
 }
@@ -448,6 +476,7 @@ impl MenuPopupOverlay {
 			active_index,
 			popup,
 			popup_size: Vec2::new(180.0, 120.0),
+			pressed_bar_index: None,
 			selected_leaf,
 			last_window_bounds: Cell::new(Rect::ZERO),
 		}
@@ -594,11 +623,9 @@ impl Widget for MenuPopupOverlay {
 						.enumerate()
 						.find(|(_, r)| r.contains_point(*position))
 						.map(|(i, _)| i)
-					{
-						if idx != self.active_index {
+						&& idx != self.active_index {
 							self.switch_menu(ctx, idx);
 						}
-					}
 					return EventResponse::Handled;
 				}
 
@@ -615,8 +642,8 @@ impl Widget for MenuPopupOverlay {
 					self.popup.handle_event(ctx, event);
 					return EventResponse::Handled;
 				}
-				if self.bar_bounds.contains_point(*position) {
-					if let Some(idx) = self
+				if self.bar_bounds.contains_point(*position)
+					&& let Some(idx) = self
 						.item_rects
 						.iter()
 						.enumerate()
@@ -628,14 +655,43 @@ impl Widget for MenuPopupOverlay {
 						} else if self.menus[idx].has_submenu() {
 							self.switch_menu(ctx, idx);
 						} else {
-							let item = &self.menus[idx];
-							let act = item.action.clone().unwrap_or_else(|| item.text.clone());
-							self.dismiss(ctx, Some((act, item.text.clone())));
+							self.pressed_bar_index = Some(idx);
 						}
 						return EventResponse::Handled;
 					}
-				}
 				self.dismiss(ctx, None);
+				EventResponse::Handled
+			}
+
+			InputEvent::PointerButton {
+				button: MouseButton::Left,
+				state: ButtonState::Released,
+				position,
+			} => {
+				if let Some(pressed) = self.pressed_bar_index.take() {
+					if self.bar_bounds.contains_point(*position)
+						&& self
+							.item_rects
+							.iter()
+							.enumerate()
+							.find(|(_, r)| r.contains_point(*position))
+							.map(|(i, _)| i)
+							== Some(pressed)
+						&& !self.menus[pressed].has_submenu()
+					{
+						let item = &self.menus[pressed];
+						let act = item.action.clone().unwrap_or_else(|| item.text.clone());
+						self.dismiss(ctx, Some((act, item.text.clone())));
+					}
+					return EventResponse::Handled;
+				}
+				self.popup.handle_event(ctx, event);
+				EventResponse::Handled
+			}
+
+			InputEvent::PointerCancel => {
+				self.pressed_bar_index = None;
+				self.popup.handle_event(ctx, event);
 				EventResponse::Handled
 			}
 

@@ -222,11 +222,9 @@ impl ImportedExternalTexture {
 				.begin_command_buffer(cmd.handle(), &begin_info)
 				.map_err(|e| RhiError::BackendError(format!("begin_command_buffer failed: {e}")))?;
 
-			let barrier = vk::ImageMemoryBarrier2::default()
-				.src_stage_mask(vk::PipelineStageFlags2::TOP_OF_PIPE)
-				.src_access_mask(vk::AccessFlags2::NONE)
-				.dst_stage_mask(vk::PipelineStageFlags2::FRAGMENT_SHADER)
-				.dst_access_mask(vk::AccessFlags2::SHADER_SAMPLED_READ)
+			let barrier = vk::ImageMemoryBarrier::default()
+				.src_access_mask(vk::AccessFlags::empty())
+				.dst_access_mask(vk::AccessFlags::SHADER_READ)
 				.old_layout(vk::ImageLayout::UNDEFINED)
 				.new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
 				.src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
@@ -240,9 +238,15 @@ impl ImportedExternalTexture {
 					layer_count: 1,
 				});
 
-			let barriers = [barrier];
-			let dep_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
-			self.device.cmd_pipeline_barrier2(cmd.handle(), &dep_info);
+			self.device.cmd_pipeline_barrier(
+				cmd.handle(),
+				vk::PipelineStageFlags::TOP_OF_PIPE,
+				vk::PipelineStageFlags::FRAGMENT_SHADER,
+				vk::DependencyFlags::empty(),
+				&[],
+				&[],
+				&[barrier],
+			);
 
 			self
 				.device

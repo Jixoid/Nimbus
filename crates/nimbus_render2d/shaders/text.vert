@@ -1,7 +1,7 @@
 #version 450
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
-#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_buffer_reference_uvec2 : require
 
 struct GlyphInstance {
     vec4 rect;
@@ -14,7 +14,7 @@ layout(buffer_reference, scalar) readonly buffer GlyphBuffer {
 };
 
 layout(push_constant) uniform TextPushConstants {
-    uint64_t glyph_addr;
+    uvec2 glyph_addr;
     vec2 screen_size;
     uint texture_id;
     uint _pad;

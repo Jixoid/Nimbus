@@ -85,6 +85,12 @@ root qstd::vbox {
       tab_id: 1
       on_changed: "ChangeStroke"
     }
+
+    node qstd::choice "theme_dpi" {
+      tabs: ["Auto", "1.0x", "1.5x", "2.0x", "2.5x", "3.0x"]
+      tab_id: 0
+      on_changed: "ChangeDpi"
+    }
   }
 
   node qstd::tabs "main_tabs" {

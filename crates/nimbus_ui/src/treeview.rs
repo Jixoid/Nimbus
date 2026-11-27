@@ -140,6 +140,7 @@ pub struct TreeView {
 
 	visible_rows: Vec<VisibleRow>,
 	hovered_row: Option<usize>,
+	pressed_row: Option<(TreePath, bool)>,
 	drag: Option<DragRow>,
 	last_click: Option<(Instant, TreePath)>,
 	last_bounds: Cell<Rect<f32>>,
@@ -167,6 +168,7 @@ impl Default for TreeView {
 			on_reparented: None,
 			visible_rows: Vec::new(),
 			hovered_row: None,
+			pressed_row: None,
 			drag: None,
 			last_click: None,
 			last_bounds: Cell::new(Rect::ZERO),
@@ -619,38 +621,10 @@ impl Widget for TreeView {
 				if let Some(row_idx) = self.row_at_y(bounds, position.y) {
 					let row = self.visible_rows[row_idx].clone();
 					let chev_r = self.chevron_rect(bounds, row_idx, row.depth);
+					let hit_chevron = row.has_children && chev_r.contains_point(*position);
+					self.pressed_row = Some((row.path.clone(), hit_chevron));
 
-					// Click on chevron toggles expand/collapse
-					if row.has_children && chev_r.contains_point(*position) {
-						if self.toggle_expanded(&row.path) {
-							ctx.request_layout();
-							ctx.request_redraw();
-						}
-						return EventResponse::Handled;
-					}
-
-					// Select row
-					self.selected = Some(row.path.clone());
-					if let Some(item) = self.item_at(&row.path)
-						&& let Some(cb) = &self.on_selected
-					{
-						cb.call2(item.id.clone(), item.label.clone());
-					}
-
-					// Double-click on parent row toggles expand/collapse
-					let now = Instant::now();
-					let is_double = self.last_click.as_ref().is_some_and(|(prev_t, prev_p)| {
-						now.duration_since(*prev_t).as_millis() < 350 && prev_p == &row.path
-					});
-					self.last_click = Some((now, row.path.clone()));
-					if is_double && row.has_children {
-						self.toggle_expanded(&row.path);
-						ctx.request_layout();
-						ctx.request_redraw();
-						return EventResponse::Handled;
-					}
-
-					if self.draggable {
+					if self.draggable && !hit_chevron {
 						self.drag = Some(DragRow {
 							source_path: row.path,
 							label: row.label,
@@ -670,12 +644,13 @@ impl Widget for TreeView {
 			InputEvent::PointerButton {
 				button: MouseButton::Left,
 				state: ButtonState::Released,
-				..
+				position,
 			} => {
-				if let Some(drag) = self.drag.take() {
-					if drag.active
-						&& let Some(target_path) = drag.target_path
-					{
+				if let Some(drag) = self.drag.take()
+					&& drag.active
+				{
+					self.pressed_row = None;
+					if let Some(target_path) = drag.target_path {
 						let target_label = self
 							.item_at(&target_path)
 							.map(|i| i.label.clone())
@@ -690,7 +665,52 @@ impl Widget for TreeView {
 					ctx.request_redraw();
 					return EventResponse::Handled;
 				}
+
+				if let Some((pressed_path, hit_chevron)) = self.pressed_row.take() {
+					if bounds.contains_point(*position)
+						&& let Some(row_idx) = self.row_at_y(bounds, position.y)
+						&& self.visible_rows[row_idx].path == pressed_path
+					{
+						let row = self.visible_rows[row_idx].clone();
+						let chev_r = self.chevron_rect(bounds, row_idx, row.depth);
+						if hit_chevron {
+							if row.has_children && chev_r.contains_point(*position) && self.toggle_expanded(&row.path) {
+								ctx.request_layout();
+								ctx.request_redraw();
+							}
+							return EventResponse::Handled;
+						}
+
+						self.selected = Some(row.path.clone());
+						if let Some(item) = self.item_at(&row.path)
+							&& let Some(cb) = &self.on_selected
+						{
+							cb.call2(item.id.clone(), item.label.clone());
+						}
+
+						let now = Instant::now();
+						let is_double = self.last_click.as_ref().is_some_and(|(prev_t, prev_p)| {
+							now.duration_since(*prev_t).as_millis() < 350 && prev_p == &row.path
+						});
+						self.last_click = Some((now, row.path.clone()));
+						if is_double && row.has_children {
+							self.toggle_expanded(&row.path);
+							ctx.request_layout();
+						}
+					}
+					ctx.request_redraw();
+					return EventResponse::Handled;
+				}
 				EventResponse::Ignored
+			}
+
+			InputEvent::PointerCancel => {
+				if self.pressed_row.take().is_some() || self.drag.take().is_some() {
+					ctx.request_redraw();
+					EventResponse::Handled
+				} else {
+					EventResponse::Ignored
+				}
 			}
 
 			_ => EventResponse::Ignored,

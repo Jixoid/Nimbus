@@ -95,6 +95,23 @@ impl Application {
 
 	pub fn run(self) -> Result<(), String> {
 		let event_loop = EventLoop::new().map_err(|e| format!("Failed to create EventLoop: {e}"))?;
+		self.run_with_event_loop(event_loop)
+	}
+
+	#[cfg(target_os = "android")]
+	pub fn run_android(
+		self,
+		android_app: winit::platform::android::activity::AndroidApp,
+	) -> Result<(), String> {
+		use winit::platform::android::EventLoopBuilderExtAndroid;
+		let event_loop = EventLoop::builder()
+			.with_android_app(android_app)
+			.build()
+			.map_err(|e| format!("Failed to create Android EventLoop: {e}"))?;
+		self.run_with_event_loop(event_loop)
+	}
+
+	fn run_with_event_loop(self, event_loop: EventLoop<()>) -> Result<(), String> {
 		event_loop.set_control_flow(ControlFlow::Poll);
 
 		let mut runner = AppRunner {
@@ -172,6 +189,17 @@ impl ApplicationHandler for AppRunner {
 					}
 				}
 			}
+		}
+	}
+
+	fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+		if let Some(device) = &self.device {
+			device.wait_idle();
+		}
+		self.winit_map.clear();
+		for window in self.windows.values_mut() {
+			window.display = None;
+			window.winit_id = None;
 		}
 	}
 
@@ -268,7 +296,7 @@ impl ApplicationHandler for AppRunner {
 			}
 			if window.should_close {
 				closed_windows.push((handle, window.winit_id));
-			} else if window.tree.needs_redraw || window.tree.needs_layout {
+			} else if window.tree.needs_redraw || window.tree.needs_layout || window.check_size_changed() {
 				window.request_redraw();
 			}
 		}
