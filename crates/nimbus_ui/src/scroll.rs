@@ -203,7 +203,7 @@ impl ScrollState {
 		if is_vertical {
 			let track_len = (bounds.height() - margin * 2.0).max(1.0);
 			let ratio = (self.viewport_size / self.content_size).clamp(0.05, 1.0);
-			let thumb_len = (track_len * ratio).clamp(20.0, track_len);
+			let thumb_len = (track_len * ratio).clamp(20.0_f32.min(track_len), track_len);
 			let scrollable_track = track_len - thumb_len;
 
 			let scroll_ratio = if self.max_offset() > 0.0 {
@@ -219,7 +219,7 @@ impl ScrollState {
 		} else {
 			let track_len = (bounds.width() - margin * 2.0).max(1.0);
 			let ratio = (self.viewport_size / self.content_size).clamp(0.05, 1.0);
-			let thumb_len = (track_len * ratio).clamp(20.0, track_len);
+			let thumb_len = (track_len * ratio).clamp(20.0_f32.min(track_len), track_len);
 			let scrollable_track = track_len - thumb_len;
 
 			let scroll_ratio = if self.max_offset() > 0.0 {
@@ -320,7 +320,7 @@ impl ScrollState {
 						(bounds.width() - margin * 2.0).max(1.0)
 					};
 					let ratio = (self.viewport_size / self.content_size).clamp(0.05, 1.0);
-					let thumb_len = (track_len * ratio).clamp(20.0, track_len);
+					let thumb_len = (track_len * ratio).clamp(20.0_f32.min(track_len), track_len);
 					let scrollable_track = (track_len - thumb_len).max(1.0);
 
 					let current_pos = if is_vertical { position.y } else { position.x };
